@@ -180,32 +180,27 @@ def test_run_job_success(cli_runner, cleanup, cwl_file, inputs):
     [
         # The description file is malformed: class attribute is unknown
         (
-            "test/workflows/malformed_description/description_malformed_class.cwl",
-            [],
+            "test/workflows/malformed_description/description_malformed_class.cwl", [],
             "`class`containsundefinedreferenceto",
         ),
         # The description file is malformed: baseCommand is unknown
         (
-            "test/workflows/malformed_description/description_malformed_command.cwl",
-            [],
+            "test/workflows/malformed_description/description_malformed_command.cwl", [],
             "invalidfield`baseComand`",
         ),
         # The description file points to a non-existent file (subworkflow)
         (
-            "test/workflows/bad_references/reference_doesnotexists.cwl",
-            [],
+            "test/workflows/bad_references/reference_doesnotexists.cwl", [],
             "Nosuchfileordirectory",
         ),
         # The description file points to another file point to it (circular dependency)
         (
-            "test/workflows/bad_references/reference_circular1.cwl",
-            [],
+            "test/workflows/bad_references/reference_circular1.cwl", [],
             "Recursingintostep",
         ),
         # The description file points to itself (another circular dependency)
         (
-            "test/workflows/bad_references/reference_circular1.cwl",
-            [],
+            "test/workflows/bad_references/reference_circular2.cwl", [],
             "Recursingintostep",
         ),
         # The configuration file is malformed: the hints are overridden more than once
@@ -216,6 +211,57 @@ def test_run_job_success(cli_runner, cleanup, cwl_file, inputs):
             ],
             "Failedtovalidatetheparameter",
         ),
+        # The core resource requirements are wrong: coresMin is higher than coresMax value
+        (
+            "test/workflows/resource_requirements/bad_cores/clt_bad_cores.cwl", [],
+            "RequirementValidationError"
+        ),
+        (
+            "test/workflows/resource_requirements/bad_cores/step_bad_cores.cwl", [],
+            "RequirementValidationError"
+        ),
+        (
+            "test/workflows/resource_requirements/bad_cores/step_run_bad_cores.cwl", [],
+            "RequirementValidationError"
+        ),
+        (
+            "test/workflows/resource_requirements/bad_cores/wf_bad_cores.cwl", [],
+            "RequirementValidationError"
+        ),
+        # The ram resource requirements are wrong: ramMin is higher than ramMax value
+        (
+            "test/workflows/resource_requirements/bad_ram/clt_bad_ram.cwl", [],
+            "RequirementValidationError"
+        ),
+        (
+            "test/workflows/resource_requirements/bad_ram/step_bad_ram.cwl", [],
+            "RequirementValidationError"
+        ),
+        (
+            "test/workflows/resource_requirements/bad_ram/step_run_bad_ram.cwl", [],
+            "RequirementValidationError"
+        ),
+        (
+            "test/workflows/resource_requirements/bad_ram/wf_bad_ram.cwl", [],
+            "RequirementValidationError"
+        ),
+        # The resource requirements contains conflicts
+        (
+            "test/workflows/resource_requirements/resource_conflicts/cores_conflict_wf_step.cwl", [],
+            "RequirementValidationError"
+        ),
+        (
+            "test/workflows/resource_requirements/resource_conflicts/cores_conflict_wf_step_run.cwl", [],
+            "RequirementValidationError"
+        ),
+        (
+            "test/workflows/resource_requirements/resource_conflicts/ram_conflict_wf_step.cwl", [],
+            "RequirementValidationError"
+        ),
+        (
+            "test/workflows/resource_requirements/resource_conflicts/ram_conflict_wf_step_run.cwl", [],
+            "RequirementValidationError"
+        )
     ],
 )
 def test_run_job_validation_failure(
