@@ -227,17 +227,21 @@ def submit_job_router(job: JobSubmissionModel) -> bool:
     logger.info("Validating the job(s)...")
 
     try:
-        #TODO: I don't know if it's the best way to do that ?
-        # If we keep this class-idea, maybe later we could do a list of RequirementClass for each one we want to validate for the workflow
-        # and loop on it to call validate() on each one? Without calling them manyally like this:
+        # TODO: I don't know if it's the best way to do that ?
+        # If we keep this class-idea, maybe later we could do a list of RequirementClass
+        # for each one we want to validate for the workflow
+        # and loop on it to call validate() on each one?
+        # Without calling them manyally like this:
         ResourceRequirementValidator(cwl_object=job.task).validate()
     except ValueError as ex:
-        #TODO: I don't really know how to handle this to match with the current test?
-        # because it seems that I need to raise a ValidationException for 'test_run_job_validation_failure' (maybe I'm wrong on that)
-        # the way I did it is kinda bad here because it raises a ValueError and a ValidationException for the same exception...
+        # TODO: I don't really know how to handle this to match with the current test?
+        # because it seems that I need to raise a ValidationException
+        # for 'test_run_job_validation_failure' (maybe I'm wrong on that)
+        # the way I did it is kinda bad here because it raises a ValueError
+        # and a ValidationException for the same exception...
         # we have like 3 traceback when trying to submit a bad job using the CLI
         logger.exception(f"RequirementValidationError: {ex}")
-        raise ValidationException(f"RequirementValidationError: {ex}")
+        raise ValidationException(f"RequirementValidationError: {ex}") from ex
 
     # Initiate 1 job per parameter
     jobs = []
@@ -245,7 +249,6 @@ def submit_job_router(job: JobSubmissionModel) -> bool:
         jobs.append(job)
     else:
         for parameter in job.parameters:
-            print(parameter)
             jobs.append(
                 JobSubmissionModel(
                     task=job.task,
@@ -266,6 +269,7 @@ def submit_job_router(job: JobSubmissionModel) -> bool:
     logger.info("Jobs done.")
 
     return all(results)
+
 
 # -----------------------------------------------------------------------------
 # JobWrapper
