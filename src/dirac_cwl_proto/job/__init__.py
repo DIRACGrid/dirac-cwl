@@ -30,7 +30,8 @@ from schema_salad.exceptions import ValidationException
 from dirac_cwl_proto.execution_hooks import (
     ExecutionHooksBasePlugin,
 )
-from dirac_cwl_proto.execution_hooks.validator import (
+from dirac_cwl_proto.execution_hooks.requirement_validator import (
+    RequirementError,
     ResourceRequirementValidator,
 )
 from dirac_cwl_proto.submission_models import (
@@ -146,9 +147,11 @@ def submit_job_client(
         "[blue]:information_source:[/blue] [bold]CLI:[/bold] Submitting the job(s) to service..."
     )
     print_json(job.model_dump_json(indent=4))
-    if not submit_job_router(job):
+    try:
+        submit_job_router(job)
+    except Exception as ex:
         console.print(
-            "[red]:heavy_multiplication_x:[/red] [bold]CLI:[/bold] Failed to run job(s)."
+            f"[red]:heavy_multiplication_x:[/red] [bold]CLI:[/bold] Failed to run job(s) : {ex}"
         )
         return typer.Exit(code=1)
     console.print("[green]:heavy_check_mark:[/green] [bold]CLI:[/bold] Job(s) done.")
@@ -232,16 +235,10 @@ def submit_job_router(job: JobSubmissionModel) -> bool:
         # for each one we want to validate for the workflow
         # and loop on it to call validate() on each one?
         # Without calling them manyally like this:
-        ResourceRequirementValidator(cwl_object=job.task).validate()
-    except ValueError as ex:
-        # TODO: I don't really know how to handle this to match with the current test?
-        # because it seems that I need to raise a ValidationException
-        # for 'test_run_job_validation_failure' (maybe I'm wrong on that)
-        # the way I did it is kinda bad here because it raises a ValueError
-        # and a ValidationException for the same exception...
-        # we have like 3 traceback when trying to submit a bad job using the CLI
-        logger.exception(f"RequirementValidationError: {ex}")
-        raise ValidationException(f"RequirementValidationError: {ex}") from ex
+        ResourceRequirementValidator(cwl_object=job.task).validate_requirements()
+    except RequirementError as ex:
+        logger.exception(f"RequirementValidationError - {ex}")
+        raise
 
     # Initiate 1 job per parameter
     jobs = []
@@ -431,7 +428,7 @@ def run_job(job: JobSubmissionModel) -> bool:
 
     except Exception:
         logger.exception("JobWrapper: Failed to execute workflow")
-        return False
+        raise
     finally:
         # Clean up
         if job_path.exists():
