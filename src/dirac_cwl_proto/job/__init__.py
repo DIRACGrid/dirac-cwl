@@ -230,11 +230,6 @@ def submit_job_router(job: JobSubmissionModel) -> bool:
     logger.info("Validating the job(s)...")
 
     try:
-        # TODO: I don't know if it's the best way to do that ?
-        # If we keep this class-idea, maybe later we could do a list of RequirementClass
-        # for each one we want to validate for the workflow
-        # and loop on it to call validate() on each one?
-        # Without calling them manyally like this:
         ResourceRequirementValidator(cwl_object=job.task).validate_requirements()
     except RequirementError as ex:
         logger.exception(f"RequirementValidationError - {ex}")
