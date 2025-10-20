@@ -279,6 +279,16 @@ def test_run_job_success(cli_runner, cleanup, cwl_file, inputs):
             [],
             "ResourceRequirementisinvalid",
         ),
+        (
+            "test/workflows/resource_requirements/resource_conflicts/nested_wf/external_conflict_nested_wf.cwl",
+            [],
+            "ResourceRequirementisinvalid",
+        ),
+        (
+            "test/workflows/resource_requirements/resource_conflicts/nested_wf/internal_conflict_nested_wf.cwl",
+            [],
+            "ResourceRequirementisinvalid",
+        ),
     ],
 )
 def test_run_job_validation_failure(
@@ -698,6 +708,11 @@ def test_run_simple_production_success(cli_runner, cleanup, cwl_file, metadata):
             "test/workflows/mandelbrot/description.cwl",
             "test/workflows/mandelbrot/type_dependencies/production/malformed-nonexisting-type_metadata-mandelbrot_complete.yaml",
             "Unknownexecutionhooksplugin:'MandelBrotDoesNotExist'",
+        ),
+        (
+            "test/workflows/resource_requirements/bad_merge_production.cwl",
+            "test/workflows/merge/type_dependencies/production/metadata-merge_complete.yaml",
+            "ResourceRequirementisinvalid",
         ),
     ],
 )
