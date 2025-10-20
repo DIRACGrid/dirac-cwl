@@ -9,7 +9,7 @@ class RequirementValidator(BaseModel, ABC):
     model_config = ConfigDict(validate_assignment=True, arbitrary_types_allowed=True)
 
     requirement_class: ClassVar[str]
-    cwl_object: Workflow | CommandLineTool | WorkflowStep
+    cwl_object: Workflow | CommandLineTool
 
     def get_requirement(self, cwl_object: Workflow | CommandLineTool | WorkflowStep):
         """
@@ -70,7 +70,7 @@ class RequirementValidator(BaseModel, ABC):
             self.validate_requirement(global_requirement, context="global requirements")
 
         # Validate WorkflowStep requirements, if any.
-        if cwl_object.class_ != "CommandLineTool" and cwl_object.steps:
+        if not isinstance(cwl_object, CommandLineTool) and cwl_object.steps:
             self.validate_steps_requirements(
                 cwl_object.steps, global_requirement, production
             )
@@ -114,7 +114,7 @@ class RequirementValidator(BaseModel, ABC):
         :param production: True if the requirements are for a production workflow, False otherwise.
         -- Maybe we could add a transformation parameter later.
         """
-        if run.class_ == "Workflow":
+        if isinstance(run, Workflow):
             # Validate nested Workflow requirements, if any.
             self.validate_requirements(cwl_object=run)
 
