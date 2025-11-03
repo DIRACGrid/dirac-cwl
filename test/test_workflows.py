@@ -214,7 +214,7 @@ def test_run_job_success(cli_runner, cleanup, cwl_file, inputs):
         ),
         # The description file points to itself (another circular dependency)
         (
-            "test/workflows/bad_references/reference_circular2.cwl",
+            "test/workflows/bad_references/reference_itself.cwl",
             [],
             "Recursingintostep",
         ),
@@ -480,7 +480,7 @@ def test_run_blocking_transformation_success(
         ),
         # The description file points to itself (another circular dependency)
         (
-            "test/workflows/bad_references/reference_circular1.cwl",
+            "test/workflows/bad_references/reference_itself.cwl",
             [],
             "Recursingintostep",
         ),
