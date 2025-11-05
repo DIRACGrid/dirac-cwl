@@ -9,10 +9,11 @@ from __future__ import annotations
 
 from typing import Any
 
-from cwl_utils.parser import save
+from cwl_utils.parser import WorkflowStep, save
 from cwl_utils.parser.cwl_v1_2 import (
     CommandLineTool,
     ExpressionTool,
+    ResourceRequirement,
     Workflow,
 )
 from pydantic import BaseModel, ConfigDict, field_serializer, model_validator
@@ -52,6 +53,15 @@ class JobSubmissionModel(BaseModel):
     parameters: list[JobInputModel] | None = None
     scheduling: SchedulingHint
     execution_hooks: ExecutionHooksHint
+
+    @model_validator(mode="before")
+    def validate_job(cls, values):
+        task = values.get("task")
+
+        # Validate Resource Requirement values of CWLObject, will raise ValueError if needed.
+        validate_resource_requirements(task)
+
+        return values
 
     @field_serializer("task")
     def serialize_task(self, value):
@@ -121,11 +131,10 @@ class ProductionSubmissionModel(BaseModel):
                 )
 
         # ResourceRequirement
-        for req in task.requirements:
-            if req.class_ == "ResourceRequirement":
-                raise ValueError(
-                    "Global ResourceRequirement is not allowed in productions."
-                )
+        if any(req.class_ == "ResourceRequirement" for req in task.requirements):
+            raise ValueError(
+                "Global ResourceRequirement is not allowed in productions."
+            )
 
         return values
 
@@ -140,8 +149,6 @@ class ProductionSubmissionModel(BaseModel):
 # -----------------------------------------------------------------------------
 # Module helpers
 # -----------------------------------------------------------------------------
-
-
 def extract_dirac_hints(cwl: Any) -> tuple[ExecutionHooksHint, SchedulingHint]:
     """Thin wrapper that returns (ExecutionHooksHint, SchedulingHint).
 
@@ -150,3 +157,88 @@ def extract_dirac_hints(cwl: Any) -> tuple[ExecutionHooksHint, SchedulingHint]:
     convenience.
     """
     return ExecutionHooksHint.from_cwl(cwl), SchedulingHint.from_cwl(cwl)
+
+
+def validate_resource_requirements(task):
+    """
+    Validate ResourceRequirements of a task (CommandLineTool, Workflow, WorkflowStep, WorkflowStep.run).
+
+    :param task: The task to validate
+    """
+    cwl_req = get_resource_requirement(task)
+
+    # Validate Workflow/CLT requirements.
+    if cwl_req:
+        validate_resource_requirement(cwl_req)
+
+    # Validate WorkflowStep requirements.
+    if not isinstance(task, CommandLineTool) and task.steps:
+        for step in task.steps:
+            step_req = get_resource_requirement(step)
+            if step_req:
+                validate_resource_requirement(step_req, cwl_req=cwl_req)
+
+            # Validate run requirements for each step if they exist.
+            if step.run:
+                if isinstance(step.run, Workflow):
+                    # Validate nested Workflow requirements, if any.
+                    validate_resource_requirements(task=step.run)
+
+                step_run_req = get_resource_requirement(step.run)
+                if step_run_req:
+                    validate_resource_requirement(step_run_req, cwl_req=cwl_req)
+
+
+def validate_resource_requirement(requirement, cwl_req=None):
+    """
+    Validate a ResourceRequirement.
+    Verify:
+     - that resourceMin is not higher than resourceMax (CommandLineTool, Workflow, WorkflowStep, WorkflowStep.run)
+     --> #TODO this should be done by cwl-utils/cwltool later
+     - that resourceMin (WorkflowStep, WorkflowStep.run) is not higher than global (Workflow) resourceMax.
+
+    :param requirement: The current ResourceRequirement to validate.
+    :param cwl_req: The global Workflow/CLT requirement, if any.
+    :raises ValueError: If the requirement is invalid.
+    """
+
+    def check_resource(
+        current_resource, req_min_value, req_max_value, global_max_value=None
+    ):
+        if req_min_value and req_max_value and req_min_value > req_max_value:
+            raise ValueError(
+                f"{current_resource}Min is higher than {current_resource}Max"
+            )
+        if global_max_value and req_min_value and req_min_value > global_max_value:
+            raise ValueError(
+                f"{current_resource}Min is higher than global {current_resource}Max"
+            )
+
+    for resource, min_value, max_value in [
+        ("ram", requirement.ramMin, requirement.ramMax),
+        ("cores", requirement.coresMin, requirement.coresMax),
+        ("tmpdir", requirement.tmpdirMin, requirement.tmpdirMax),
+        ("outdir", requirement.outdirMin, requirement.outdirMax),
+    ]:
+        check_resource(
+            resource,
+            min_value,
+            max_value,
+            cwl_req and getattr(cwl_req, f"{resource}Max"),
+        )
+
+
+def get_resource_requirement(
+    cwl_object: Workflow | CommandLineTool | WorkflowStep,
+) -> ResourceRequirement | None:
+    """
+    Extract the resource requirement from the current cwl_object
+
+    :param cwl_object: The cwl_object to extract the requirement from.
+    :return: The resource requirement object, or None if not found.
+    """
+    requirements = getattr(cwl_object, "requirements", []) or []
+    for requirement in requirements:
+        if requirement.class_ == "ResourceRequirement":
+            return requirement
+    return None

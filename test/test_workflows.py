@@ -14,11 +14,16 @@ from cwl_utils.parser.cwl_v1_2 import (
 from typer.testing import CliRunner
 
 from dirac_cwl_proto import app
-from dirac_cwl_proto.execution_hooks.requirement_validator import (
-    RequirementError,
-    ResourceRequirementValidator,
+from dirac_cwl_proto.execution_hooks import (
+    ExecutionHooksHint,
+    SchedulingHint,
+    TransformationExecutionHooksHint,
 )
-from dirac_cwl_proto.submission_models import ProductionSubmissionModel
+from dirac_cwl_proto.submission_models import (
+    JobSubmissionModel,
+    ProductionSubmissionModel,
+    TransformationSubmissionModel,
+)
 
 
 def strip_ansi_codes(text: str) -> str:
@@ -701,7 +706,7 @@ def test_run_production_validation_failure(
 
 
 # -----------------------------------------------------------------------------
-# Requirements tests
+# Resource Requirements tests
 # -----------------------------------------------------------------------------
 
 
@@ -732,6 +737,18 @@ def create_step(requirements=None, run=None, in_=None, out=None):
     )
 
 
+def submit_task(task):
+    with pytest.raises(ValueError):
+        JobSubmissionModel(
+            task=task, execution_hooks=ExecutionHooksHint(), scheduling=SchedulingHint()
+        )
+        TransformationSubmissionModel(
+            task=task,
+            execution_hooks=TransformationExecutionHooksHint(),
+            scheduling=SchedulingHint(),
+        )
+
+
 @pytest.mark.parametrize(
     "bad_min_max_reqs",
     [
@@ -739,6 +756,10 @@ def create_step(requirements=None, run=None, in_=None, out=None):
         ResourceRequirement(coresMin=4, coresMax=2),
         # ram
         ResourceRequirement(ramMin=2048, ramMax=1024),
+        # tmpdir
+        ResourceRequirement(tmpdirMin=1024, tmpdirMax=512),
+        # outdir
+        ResourceRequirement(outdirMin=512, outdirMax=256),
     ],
 )
 def test_bad_min_max_resource_reqs(bad_min_max_reqs):
@@ -748,33 +769,28 @@ def test_bad_min_max_resource_reqs(bad_min_max_reqs):
 
     # CommandlineTool with bad minmax reqs
     clt = create_commandlinetool(requirements=[bad_min_max_reqs])
-    with pytest.raises(RequirementError):
-        ResourceRequirementValidator(cwl_object=clt).validate_requirements()
+    submit_task(clt)
 
     # WorkflowStep.run with bad minmax reqs
     step_bad_run = create_step(run=clt)
     workflow = create_workflow(steps=[step_bad_run])
-    with pytest.raises(RequirementError):
-        ResourceRequirementValidator(cwl_object=workflow).validate_requirements()
+    submit_task(workflow)
 
     # WorkflowStep with bad minmax reqs
     clt = create_commandlinetool()
     step = create_step(run=clt, requirements=[bad_min_max_reqs])
     workflow = create_workflow(steps=[step])
-    with pytest.raises(RequirementError):
-        ResourceRequirementValidator(cwl_object=workflow).validate_requirements()
+    submit_task(workflow)
 
     # Workflow with bad minmax reqs
     workflow = create_workflow(requirements=[bad_min_max_reqs])
-    with pytest.raises(RequirementError):
-        ResourceRequirementValidator(cwl_object=workflow).validate_requirements()
+    submit_task(workflow)
 
     # NestedWorkflow with bad minmax reqs
     nest_workflow = create_workflow(requirements=[bad_min_max_reqs])
     step = create_step(run=nest_workflow)
     workflow = create_workflow(steps=[step])
-    with pytest.raises(RequirementError):
-        ResourceRequirementValidator(cwl_object=workflow).validate_requirements()
+    submit_task(workflow)
 
     # DeepNestedWorkflow with bad minmax reqs
     deep_workflow = create_workflow(requirements=[bad_min_max_reqs])
@@ -782,8 +798,7 @@ def test_bad_min_max_resource_reqs(bad_min_max_reqs):
     nest_workflow = create_workflow(steps=[deep_step])
     step = create_step(run=nest_workflow)
     workflow = create_workflow(steps=[step])
-    with pytest.raises(RequirementError):
-        ResourceRequirementValidator(cwl_object=workflow).validate_requirements()
+    submit_task(workflow)
 
 
 @pytest.mark.parametrize(
@@ -799,6 +814,13 @@ def test_bad_min_max_resource_reqs(bad_min_max_reqs):
             ResourceRequirement(ramMax=512),
             ResourceRequirement(ramMin=1024),
         ),
+        # tmpdir
+        (
+            ResourceRequirement(tmpdirMax=512),
+            ResourceRequirement(tmpdirMin=1024),
+        ),
+        # outdir
+        (ResourceRequirement(outdirMax=256), ResourceRequirement(outdirMin=512)),
     ],
 )
 def test_bad_global_requirements(global_requirements, higher_requirements):
@@ -809,22 +831,19 @@ def test_bad_global_requirements(global_requirements, higher_requirements):
     # Workflow - WorkflowStep conflict
     step = create_step(requirements=[higher_requirements])
     workflow = create_workflow(requirements=[global_requirements], steps=[step])
-    with pytest.raises(RequirementError):
-        ResourceRequirementValidator(cwl_object=workflow).validate_requirements()
+    submit_task(workflow)
 
     # Workflow - WorkflowStep.run conflict
     run = create_commandlinetool(requirements=[higher_requirements])
     step = create_step(run=run)
     workflow = create_workflow(requirements=[global_requirements], steps=[step])
-    with pytest.raises(RequirementError):
-        ResourceRequirementValidator(cwl_object=workflow).validate_requirements()
+    submit_task(workflow)
 
     # Workflow - NestedWorkflow conflict
     nest_workflow = create_workflow(requirements=[higher_requirements])
     step = create_step(run=nest_workflow)
     workflow = create_workflow(requirements=[global_requirements], steps=[step])
-    with pytest.raises(RequirementError):
-        ResourceRequirementValidator(cwl_object=workflow).validate_requirements()
+    submit_task(workflow)
 
 
 @pytest.mark.parametrize(
@@ -834,6 +853,10 @@ def test_bad_global_requirements(global_requirements, higher_requirements):
         ResourceRequirement(coresMin=2, coresMax=4),
         # ram
         ResourceRequirement(ramMin=1024, ramMax=2048),
+        # tmpdir
+        ResourceRequirement(tmpdirMin=512, tmpdirMax=1024),
+        # outdir
+        ResourceRequirement(outdirMin=256, outdirMax=512),
     ],
 )
 def test_production_requirements(requirements):

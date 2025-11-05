@@ -30,10 +30,6 @@ from schema_salad.exceptions import ValidationException
 from dirac_cwl_proto.execution_hooks import (
     ExecutionHooksBasePlugin,
 )
-from dirac_cwl_proto.execution_hooks.requirement_validator import (
-    RequirementError,
-    ResourceRequirementValidator,
-)
 from dirac_cwl_proto.submission_models import (
     JobInputModel,
     JobSubmissionModel,
@@ -147,11 +143,9 @@ def submit_job_client(
         "[blue]:information_source:[/blue] [bold]CLI:[/bold] Submitting the job(s) to service..."
     )
     print_json(job.model_dump_json(indent=4))
-    try:
-        submit_job_router(job)
-    except Exception as ex:
+    if not submit_job_router(job):
         console.print(
-            f"[red]:heavy_multiplication_x:[/red] [bold]CLI:[/bold] Failed to run job(s) : {ex}"
+            "[red]:heavy_multiplication_x:[/red] [bold]CLI:[/bold] Failed to run job(s)."
         )
         return typer.Exit(code=1)
     console.print("[green]:heavy_check_mark:[/green] [bold]CLI:[/bold] Job(s) done.")
@@ -229,12 +223,6 @@ def submit_job_router(job: JobSubmissionModel) -> bool:
     # Validate the jobs
     logger.info("Validating the job(s)...")
 
-    try:
-        ResourceRequirementValidator(cwl_object=job.task).validate_requirements()
-    except RequirementError as ex:
-        logger.exception(f"RequirementValidationError - {ex}")
-        raise
-
     # Initiate 1 job per parameter
     jobs = []
     if not job.parameters:
@@ -266,8 +254,6 @@ def submit_job_router(job: JobSubmissionModel) -> bool:
 # -----------------------------------------------------------------------------
 # JobWrapper
 # -----------------------------------------------------------------------------
-
-
 def _pre_process(
     executable: CommandLineTool | Workflow | ExpressionTool,
     arguments: JobInputModel | None,
@@ -423,7 +409,7 @@ def run_job(job: JobSubmissionModel) -> bool:
 
     except Exception:
         logger.exception("JobWrapper: Failed to execute workflow")
-        raise
+        return False
     finally:
         # Clean up
         if job_path.exists():
