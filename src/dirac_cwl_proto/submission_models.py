@@ -102,8 +102,10 @@ class ProductionSubmissionModel(BaseModel):
     steps_scheduling: dict[str, SchedulingHint] = {}
 
     @model_validator(mode="before")
-    def validate_steps_metadata(cls, values):
+    def validate_production(cls, values):
         task = values.get("task")
+
+        # Metadata
         steps_execution_hooks = values.get("steps_execution_hooks")
 
         if task and steps_execution_hooks:
@@ -116,6 +118,13 @@ class ProductionSubmissionModel(BaseModel):
             if missing_steps:
                 raise ValueError(
                     f"The following steps are missing from the task workflow: {missing_steps}"
+                )
+
+        # ResourceRequirement
+        for req in task.requirements:
+            if req.class_ == "ResourceRequirement":
+                raise ValueError(
+                    "Global ResourceRequirement is not allowed in productions."
                 )
 
         return values

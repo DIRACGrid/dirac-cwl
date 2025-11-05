@@ -18,6 +18,7 @@ from dirac_cwl_proto.execution_hooks.requirement_validator import (
     RequirementError,
     ResourceRequirementValidator,
 )
+from dirac_cwl_proto.submission_models import ProductionSubmissionModel
 
 
 def strip_ansi_codes(text: str) -> str:
@@ -842,14 +843,10 @@ def test_production_requirements(requirements):
 
     # Production workflows can't have global requirements
     workflow = create_workflow(requirements=[requirements])
-    with pytest.raises(RequirementError):
-        ResourceRequirementValidator(cwl_object=workflow).validate_requirements(
-            production=True
-        )
+    with pytest.raises(ValueError):
+        ProductionSubmissionModel(task=workflow, steps_execution_hooks={})
 
     # Production workflows can have step requirements
     step = create_step(requirements=[requirements])
     workflow = create_workflow(steps=[step])
-    ResourceRequirementValidator(cwl_object=workflow).validate_requirements(
-        production=True
-    )
+    ProductionSubmissionModel(task=workflow, steps_execution_hooks={})

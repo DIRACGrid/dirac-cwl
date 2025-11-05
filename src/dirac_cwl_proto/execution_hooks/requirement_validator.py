@@ -39,60 +39,35 @@ class RequirementValidator(BaseModel, ABC):
         """
         pass
 
-    @abstractmethod
-    def validate_production_requirement(self, requirement, is_global: bool = False):
-        """
-        Validate a production workflow requirement, specific for each requirement class.
-        This method also depends on the production workflow rules.
-
-        :param requirement: The current requirement to validate.
-        :param is_global: True if it's a global requirement, False otherwise.
-        """
-        pass
-
-    def validate_requirements(self, cwl_object=None, production: bool = False) -> None:
+    def validate_requirements(self, cwl_object=None) -> None:
         """
         Validate all requirements in a Workflow.
 
         :param cwl_object: The cwl_object to validate the requirements for.
         If None, use the cwl_object from the class. This is used for nested workflows validation.
-        :param production: True if the requirements are for a production workflow, False otherwise.
-        -- Maybe we could add a transformation parameter later.
         """
         cwl_object = cwl_object if cwl_object else self.cwl_object
         global_requirement = self.get_requirement(cwl_object)
 
         # Validate Workflow/CommandLineTool global requirements.
         if global_requirement:
-            # Production-workflow-specific validation.
-            if production:
-                self.validate_production_requirement(global_requirement, is_global=True)
             self.validate_requirement(global_requirement, context="global requirements")
 
         # Validate WorkflowStep requirements, if any.
         if not isinstance(cwl_object, CommandLineTool) and cwl_object.steps:
-            self.validate_steps_requirements(
-                cwl_object.steps, global_requirement, production
-            )
+            self.validate_steps_requirements(cwl_object.steps, global_requirement)
 
-    def validate_steps_requirements(
-        self, steps, global_requirement, production: bool = False
-    ):
+    def validate_steps_requirements(self, steps, global_requirement):
         """
         Validate steps requirements in WorkflowStep.
 
         :param steps: The WorkflowStep to validate the requirements for.
         :param global_requirement: The global Workflow requirement, if any.
-        :param production: True if the requirements are for a production workflow, False otherwise.
-        -- Maybe we could add a transformation parameter later.
         """
         for step in steps:
             step_requirement = self.get_requirement(step)
             # Validate WorkflowStep requirements, if any.
             if step_requirement:
-                # Production-workflow-specific validation.
-                if production:
-                    self.validate_production_requirement(step_requirement)
                 self.validate_requirement(
                     step_requirement,
                     context="step requirements",
@@ -101,18 +76,14 @@ class RequirementValidator(BaseModel, ABC):
 
             # Validate WorkflowStep.run, if any.
             if step.run:
-                self.validate_run_requirements(step.run, global_requirement, production)
+                self.validate_run_requirements(step.run, global_requirement)
 
-    def validate_run_requirements(
-        self, run, global_requirement, production: bool = False
-    ):
+    def validate_run_requirements(self, run, global_requirement):
         """
         Validate WorkflowStep.run requirements.
 
         :param run: The WorkflowStep.run to validate the requirements for.
         :param global_requirement: The global Workflow requirement, if any.
-        :param production: True if the requirements are for a production workflow, False otherwise.
-        -- Maybe we could add a transformation parameter later.
         """
         if isinstance(run, Workflow):
             # Validate nested Workflow requirements, if any.
@@ -120,9 +91,6 @@ class RequirementValidator(BaseModel, ABC):
 
         step_run_requirement = self.get_requirement(run)
         if step_run_requirement:
-            # Production-workflow-specific validation.
-            if production:
-                self.validate_production_requirement(step_run_requirement)
             self.validate_requirement(
                 step_run_requirement,
                 context="step run requirements",
@@ -169,21 +137,6 @@ class ResourceRequirementValidator(RequirementValidator):
             raise ValueError(
                 f"{resource}Min is higher than global {resource}Max in {context}"
             )
-
-    def validate_production_requirement(self, requirement, is_global: bool = False):
-        """
-        Raise an error if there's a global ResourceRequirement in a production workflow.
-        Otherwise, add some logic for WorkflowSteps, CommandLineTools
-        and WorkflowStep.run, etc. in production workflows.
-
-        :param requirement: The current requirement to validate.
-        :param is_global: True if there's a global ResourceRequirement, False otherwise.
-        """
-        if is_global:
-            raise RequirementError(
-                "ResourceRequirement is invalid: global ResourceRequirement is not allowed in production workflows"
-            )
-        # else ...
 
     def validate_requirement(
         self, requirement, context: str = "", global_requirement=None

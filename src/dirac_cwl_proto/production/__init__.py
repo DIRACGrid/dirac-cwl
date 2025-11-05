@@ -25,10 +25,6 @@ from dirac_cwl_proto.execution_hooks import (
     SchedulingHint,
     TransformationExecutionHooksHint,
 )
-from dirac_cwl_proto.execution_hooks.requirement_validator import (
-    RequirementError,
-    ResourceRequirementValidator,
-)
 from dirac_cwl_proto.submission_models import (
     ProductionSubmissionModel,
     TransformationSubmissionModel,
@@ -144,15 +140,6 @@ def submit_production_router(production: ProductionSubmissionModel) -> bool:
 
     # Validate the transformation
     logger.info("Validating the production...")
-
-    try:
-        # Production jobs can't have a global ResourceRequirement
-        ResourceRequirementValidator(cwl_object=production.task).validate_requirements(
-            production=True
-        )
-    except RequirementError as ex:
-        logger.exception(f"RequirementValidationError - {ex}")
-        raise
 
     # Already validated by the pydantic model
     logger.info("Production validated!")
