@@ -11,7 +11,7 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 
 # Configure logger to use UTC time
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("run_lbprodrun")
 logging.Formatter.converter = time.gmtime  # Use UTC for all log timestamps
 logging.basicConfig(
     level=logging.INFO,
@@ -606,7 +606,15 @@ async def run_lbprodrun(
     prodconf_file: str,
 ):
     """Run the application using lb-prod-run"""
-    command = ["lb-prod-run", prodconf_file, "--prmon", "--verbose"]
+    import os
+
+    # Debug: Check if CMAKE_PREFIX_PATH is set
+    cmake_prefix = os.environ.get("CMAKE_PREFIX_PATH", "NOT SET")
+    analysis_prods_dynamic = os.environ.get("ANALYSIS_PRODUCTIONS_DYNAMIC", "NOT SET")
+    logger.info(f"DEBUG: CMAKE_PREFIX_PATH = {cmake_prefix}")
+    logger.info(f"DEBUG: ANALYSIS_PRODUCTIONS_DYNAMIC = {analysis_prods_dynamic}")
+
+    command = ["lb-prod-run","--prmon", "--verbose", prodconf_file]
 
     stdout = ""
     stderr = ""
@@ -656,11 +664,12 @@ async def readlines(
 async def handle_output(stream: asyncio.StreamReader, fh):
     """Process output of lb-prod-run."""
     async for line in readlines(stream):
-        if "INFO Evt" in line or "Reading Event record" in line or "lb-run" in line:
+        if "INFO Evt" in line or "Reading Event record" in line or "lb-run" in line or "Application Manager" in line or "NTuples" in line:
             # These ones will appear in the std.out log too
             logger.info(line.rstrip())
         if fh:
             fh.write(line + "\n")
+            fh.flush()
 
 
 if __name__ == "__main__":

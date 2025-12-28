@@ -469,6 +469,13 @@ def main(
         "--disable-color",  # Disable ANSI color codes in logs
     ]
 
+    # Preserve environment variables needed for local AnalysisProductions testing
+    import os
+    if "CMAKE_PREFIX_PATH" in os.environ:
+        cwltool_args.extend(["--preserve-environment", "CMAKE_PREFIX_PATH"])
+    if "ANALYSIS_PRODUCTIONS_DYNAMIC" in os.environ:
+        cwltool_args.extend(["--preserve-environment", "ANALYSIS_PRODUCTIONS_DYNAMIC"])
+
     if tmpdir_prefix:
         cwltool_args.extend(["--tmpdir-prefix", str(tmpdir_prefix)])
 

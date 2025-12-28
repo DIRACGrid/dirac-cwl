@@ -697,7 +697,7 @@ def _buildOutputParameters(step: dict[str, Any]) -> list[CommandOutputParameter]
                     "prodConf*.py",
                     "summary*.xml",
                     "prmon*",
-                    f"{app_name.replace('/', '').replace(' ', '')}*.log",
+                    "*.log",
                 ]
             ),
         )
@@ -908,10 +908,15 @@ def _getMainWorkflowOutputs(
 ) -> list[WorkflowOutputParameter]:
     """Build outputs for the main workflow."""
 
-    # Output comes from the last transformation
+    # Output data comes from the last transformation
     last_transform = (
         transformation_names[-1] if transformation_names else "transformation_1"
     )
+
+    # Collect "others" outputs from ALL transformations to preserve logs/summaries
+    all_other_output_sources = [
+        f"{transform_name}/others" for transform_name in transformation_names
+    ]
 
     return [
         WorkflowOutputParameter(
@@ -923,7 +928,8 @@ def _getMainWorkflowOutputs(
         WorkflowOutputParameter(
             id="others",
             label="Logs and summaries",
-            type_={"type": "array", "items": ["File", "null"]},
-            outputSource=f"{last_transform}/others",
+            type_="File[]",
+            outputSource=all_other_output_sources,
+            linkMerge="merge_flattened",
         ),
     ]
