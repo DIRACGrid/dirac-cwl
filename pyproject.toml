@@ -56,8 +56,11 @@ line-length = 120
 src = ["src", "tests"]
 
 [tool.ruff.lint]
-select = ["E", "F", "B", "I", "PLE"]
+select = ["E", "F", "B", "I", "PLE", "D"]
 ignore = ["B905", "B008", "B006"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "pep257"  # Base convention for Sphinx/reST style docstrings
 
 [tool.mypy]
 plugins = ["pydantic.mypy"]

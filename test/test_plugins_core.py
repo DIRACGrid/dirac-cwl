@@ -179,10 +179,11 @@ class TestPluginCommands:
 
     @pytest.fixture
     def job_type_testing(self):
-        """Registers a plugin with 1 preprocess and 1 postprocess command with the name of "JobTypeTestingPlugin"
+        """Register a plugin with 1 preprocess and 1 postprocess command.
+
+        Creates and registers "JobTypeTestingPlugin" with DownloadConfig and GroupOutputs commands,
         and returns its class.
         """
-
         from dirac_cwl_proto.commands.download_config import DownloadConfig
         from dirac_cwl_proto.commands.group_outputs import GroupOutputs
         from dirac_cwl_proto.execution_hooks.core import ExecutionHooksBasePlugin
@@ -212,7 +213,6 @@ class TestPluginCommands:
         The plugin "JobTypeTestingPlugin" was registered with 1 command on each step at the fixture "job_type_testing".
         The fixture "job_type_testing" is the class "JobTypeTestingPlugin".
         """
-
         from dirac_cwl_proto.execution_hooks.registry import get_registry
 
         # Get the job from the registry
@@ -234,7 +234,6 @@ class TestPluginCommands:
         The plugin "JobTypeTestingPlugin" was registered with 1 command on each step at the fixture "job_type_testing".
         The fixture "job_type_testing" is the class "JobTypeTestingPlugin".
         """
-
         from dirac_cwl_proto.execution_hooks.core import ExecutionHooksHint
 
         # Get the plugin from the hints
@@ -260,7 +259,6 @@ class TestPluginCommands:
         The fixture "job_type_testing" is the class "JobTypeTestingPlugin".
         It uses the plugin class from the fixture, even though the commands will be overwritten.
         """
-
         from dirac_cwl_proto.commands import PostProcessCommand, PreProcessCommand
 
         # Initialization
@@ -319,7 +317,6 @@ class TestPluginCommands:
         The fixture "job_type_testing" is the class "JobTypeTestingPlugin".
         It uses the plugin class from the fixture, even though the commands will be overwritten.
         """
-
         from dirac_cwl_proto.commands import PostProcessCommand, PreProcessCommand
 
         # Initialization

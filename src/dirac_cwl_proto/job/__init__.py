@@ -1,6 +1,4 @@
-"""
-CLI interface to run a workflow as a job.
-"""
+"""CLI interface to run a workflow as a job."""
 
 import logging
 import os
@@ -47,7 +45,7 @@ async def submit_job_client(
     local: bool | None = typer.Option(True, help="Run the job locally instead of submitting it to the router"),
 ):
     """
-    Correspond to the dirac-cli command to submit jobs
+    Correspond to the dirac-cli command to submit jobs.
 
     This command will:
     - Validate the workflow
@@ -115,7 +113,7 @@ async def submit_job_client(
 
 def validate_jobs(job: JobSubmissionModel) -> list[JobModel]:
     """
-    Validate jobs
+    Validate jobs.
 
     :param job: The task to execute
 
@@ -150,7 +148,6 @@ def prepare_input_sandbox(input_data: dict[str, Any]) -> list[Path]:
 
     :return: The list of files
     """
-
     # Get the files from the input data
     files = []
     for _, input_value in input_data.items():

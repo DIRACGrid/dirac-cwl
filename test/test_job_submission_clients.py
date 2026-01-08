@@ -65,7 +65,6 @@ LFN:/pi/100/result_5.sim;""",
     )
     def test_convert_to_jdl(self, cwl_file, cwl_input, expected_jdl):
         """Test convert_to_jdl."""
-
         submission_client = DIRACSubmissionClient()
 
         task_path = cwl_file

@@ -39,6 +39,11 @@ class JobInputModel(BaseModel):
 
     @field_serializer("cwl")
     def serialize_cwl(self, value):
+        """Serialize CWL object to dictionary.
+
+        :param value: CWL object to serialize.
+        :return: Serialized CWL dictionary.
+        """
         return save(value)
 
 
@@ -52,6 +57,12 @@ class BaseJobModel(BaseModel):
 
     @field_serializer("task")
     def serialize_task(self, value):
+        """Serialize CWL task object to dictionary.
+
+        :param value: CWL task object to serialize.
+        :return: Serialized task dictionary.
+        :raises TypeError: If value is not a valid CWL task type.
+        """
         if isinstance(value, (CommandLineTool, Workflow, ExpressionTool)):
             return save(value)
         else:
@@ -59,6 +70,11 @@ class BaseJobModel(BaseModel):
 
     @model_validator(mode="before")
     def validate_hints(cls, values):
+        """Validate execution hooks and scheduling hints in the task.
+
+        :param values: Model values dictionary.
+        :return: Validated values dictionary.
+        """
         task = values.get("task")
         ExecutionHooksHint.from_cwl(task), SchedulingHint.from_cwl(task)
         return values
@@ -91,6 +107,12 @@ class TransformationSubmissionModel(BaseModel):
 
     @field_serializer("task")
     def serialize_task(self, value):
+        """Serialize CWL task object to dictionary.
+
+        :param value: CWL task object to serialize.
+        :return: Serialized task dictionary.
+        :raises TypeError: If value is not a valid CWL task type.
+        """
         if isinstance(value, (CommandLineTool, Workflow, ExpressionTool)):
             return save(value)
         else:
@@ -98,6 +120,11 @@ class TransformationSubmissionModel(BaseModel):
 
     @model_validator(mode="before")
     def validate_hints(cls, values):
+        """Validate transformation execution hooks and scheduling hints in the task.
+
+        :param values: Model values dictionary.
+        :return: Validated values dictionary.
+        """
         task = values.get("task")
         TransformationExecutionHooksHint.from_cwl(task), SchedulingHint.from_cwl(task)
         return values
@@ -118,6 +145,12 @@ class ProductionSubmissionModel(BaseModel):
 
     @field_serializer("task")
     def serialize_task(self, value):
+        """Serialize CWL workflow object to dictionary.
+
+        :param value: CWL workflow object to serialize.
+        :return: Serialized workflow dictionary.
+        :raises TypeError: If value is not a valid CWL workflow type.
+        """
         if isinstance(value, (ExpressionTool, CommandLineTool, Workflow)):
             return save(value)
         else:

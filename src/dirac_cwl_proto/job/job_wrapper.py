@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+"""Job wrapper for executing CWL workflows with DIRAC."""
 
 import json
 import logging
@@ -49,14 +50,17 @@ class JobWrapper:
     _sandbox_store_client: SandboxStoreClient = PrivateAttr(default_factory=SandboxStoreClient)
 
     def __init__(self) -> None:
+        """Initialize the job wrapper."""
         self.execution_hooks_plugin: ExecutionHooksBasePlugin | None = None
         self.job_path: Path = Path()
         if os.getenv("DIRAC_PROTO_LOCAL") == "1":
             self._sandbox_store_client = MockSandboxStoreClient()
 
     def __download_input_sandbox(self, arguments: JobInputModel, job_path: Path) -> None:
-        """
-        Download the files from the sandbox store
+        """Download the files from the sandbox store.
+
+        :param arguments: Job input model containing sandbox information.
+        :param job_path: Path to the job working directory.
         """
         assert arguments.sandbox is not None
         if not self.execution_hooks_plugin:
@@ -114,17 +118,16 @@ class JobWrapper:
         file paths for each input specified in `updates`. It supports both
         single files and lists of files.
 
-        :param JobInputModel inputs:
-            The job input model whose `cwl` dictionary will be updated.
-        :param dict[str, Path | list[Path]] updates:
-            Dictionary mapping input names to their corresponding local file
+        :param inputs: The job input model whose `cwl` dictionary will be updated.
+        :type inputs: JobInputModel
+        :param updates: Dictionary mapping input names to their corresponding local file
             paths. Each value can be a single `Path` or a list of `Path` objects.
+        :type updates: dict[str, Path | list[Path]]
 
-        Notes
-        -----
-        This method is typically called after downloading LFNs
-        using `download_lfns` to ensure that the CWL job inputs reference
-        the correct local files.
+        .. note::
+           This method is typically called after downloading LFNs
+           using `download_lfns` to ensure that the CWL job inputs reference
+           the correct local files.
         """
         for input_name, path in updates.items():
             if isinstance(path, Path):
@@ -229,11 +232,12 @@ class JobWrapper:
         return True
 
     def run_job(self, job: JobModel) -> bool:
-        """
-        Executes a given CWL workflow using cwltool.
+        """Execute a given CWL workflow using cwltool.
+
         This is the equivalent of the DIRAC JobWrapper.
 
-        :return: True if the job is executed successfully, False otherwise
+        :param job: The job model containing workflow and inputs.
+        :return: True if the job is executed successfully, False otherwise.
         """
         logger = logging.getLogger("JobWrapper")
         # Instantiate runtime metadata from the serializable descriptor and

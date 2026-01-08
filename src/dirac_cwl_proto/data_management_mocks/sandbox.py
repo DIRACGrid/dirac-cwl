@@ -1,3 +1,5 @@
+"""Mock DIRAC sandbox store client for local file operations."""
+
 import logging
 import random
 import tarfile
@@ -11,11 +13,10 @@ logger = logging.getLogger(__name__)
 
 
 class MockSandboxStoreClient(SandboxStoreClient):
-    """
-    Local mock for Dirac's SandboxStore Client.
-    """
+    """Local mock for Dirac's SandboxStore Client."""
 
     def __init__(self):
+        """Initialize the mock sandbox store client."""
         pass
 
     def uploadFilesAsSandbox(
@@ -81,9 +82,15 @@ class MockSandboxStoreClient(SandboxStoreClient):
             return S_OK([str(Path(destinationDir) / file) for file in files])
 
     def downloadSandboxForJob(self, jobId, sbType, destinationPath="", inMemory=False, unpack=True) -> None:
-        """
-        Download sandbox contents for a specific job.
+        """Download sandbox contents for a specific job.
 
         Placeholder for future implementation of job-based sandbox retrieval.
+
+        :param jobId: Job identifier.
+        :param sbType: Sandbox type.
+        :param destinationPath: Destination directory path.
+        :param inMemory: Whether to load sandbox in memory.
+        :param unpack: Whether to unpack the sandbox.
+        :raises NotImplementedError: This method is not yet implemented.
         """
         raise NotImplementedError

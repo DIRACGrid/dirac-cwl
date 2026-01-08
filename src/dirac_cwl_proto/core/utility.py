@@ -1,3 +1,5 @@
+"""Utility functions for file catalog operations."""
+
 from pathlib import Path
 from typing import Any
 
@@ -7,11 +9,10 @@ from cwl_utils.parser.cwl_v1_2 import (
 
 
 def get_lfns(input_data: dict[str, Any]) -> dict[str, list[Path]]:
-    """
-    Get the list of LFNs in the inputs from the parameters
+    """Get the list of LFNs in the inputs from the parameters.
 
-    :param input_data: The parameters of the job
-    :return: The list of LFN paths
+    :param input_data: The parameters of the job.
+    :return: The list of LFN paths.
     """
     # Get the files from the input data
     files: dict[str, list[Path]] = {}

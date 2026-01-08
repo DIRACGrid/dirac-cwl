@@ -106,7 +106,6 @@ class TestExecutionHookExtended:
 
     def test_output(self, mocker: MockerFixture):
         """Test that the Hook uses the correct interface for each output type."""
-
         model = ExecutionHooksBasePlugin(
             output_paths={"test_lfn": "lfn:test"},
             output_sandbox=["test_sb"],

@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+"""Job wrapper template for executing CWL jobs."""
 
 import json
 import logging
@@ -15,7 +16,6 @@ from dirac_cwl_proto.submission_models import JobModel
 
 def main():
     """Execute the job wrapper for a given job model."""
-
     if len(sys.argv) != 2:
         logging.error("1 argument is required")
         sys.exit(1)

@@ -211,7 +211,6 @@ def generate_schema(model_class: Any, model_name: str) -> Dict[str, Any]:
 
 def generate_unified_dirac_schema(models: Dict[str, Any]) -> Dict[str, Any]:
     """Generate a unified DIRAC metadata schema that references all plugins."""
-
     # Base schema structure
     schema = {
         "$schema": "http://json-schema.org/draft-07/schema#",
@@ -261,7 +260,7 @@ def save_schema(schema: Dict[str, Any], output_path: Path, format: str = "json")
 
 
 def main():
-    """Main entry point for schema generation."""
+    """Generate schemas from Pydantic metadata models."""
     parser = argparse.ArgumentParser(description="Generate JSON schemas from Pydantic metadata models")
     parser.add_argument(
         "--output-dir",

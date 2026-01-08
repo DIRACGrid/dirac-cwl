@@ -1,6 +1,4 @@
-"""
-CLI interface to run a workflow as a transformation.
-"""
+"""CLI interface to run a workflow as a transformation."""
 
 import glob
 import logging
@@ -43,7 +41,7 @@ def submit_transformation_client(
     local: Optional[bool] = typer.Option(True, help="Run the jobs locally instead of submitting them to the router"),
 ):
     """
-    Correspond to the dirac-cli command to submit transformations
+    Correspond to the dirac-cli command to submit transformations.
 
     This command will:
     - Validate the workflow
@@ -80,14 +78,13 @@ def submit_transformation_client(
 
 
 def submit_transformation_router(transformation: TransformationSubmissionModel) -> bool:
-    """
-    Execute a transformation using the router.
+    """Execute a transformation using the router.
+
     If the transformation is waiting for an input from another transformation,
     it will wait for the input to be available in the "bookkeeping".
 
-    :param transformation: The transformation to start
-
-    :return: True if the transformation is executed successfully, False otherwise
+    :param transformation: The transformation to start.
+    :return: True if the transformation is executed successfully, False otherwise.
     """
     logger = logging.getLogger("TransformationRouter")
 

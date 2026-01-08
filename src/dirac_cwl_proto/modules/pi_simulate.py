@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+"""Monte Carlo simulation module for Pi estimation."""
+
 import random
 
 import typer
@@ -10,9 +12,7 @@ console = Console()
 
 @app.command()
 def simulate(num_points: int = typer.Argument(..., help="Number of random points to generate")):
-    """
-    Simulate random points inside a square (Monte Carlo method).
-    """
+    """Simulate random points inside a square (Monte Carlo method)."""
     points = []
 
     for _ in range(num_points):

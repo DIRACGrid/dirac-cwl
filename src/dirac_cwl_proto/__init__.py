@@ -1,3 +1,5 @@
+"""DIRAC CWL Proto - Common Workflow Language integration for DIRAC."""
+
 import logging
 from importlib.metadata import PackageNotFoundError, version
 
