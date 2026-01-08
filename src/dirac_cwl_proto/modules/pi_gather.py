@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+"""Pi estimation gathering module using Monte Carlo results."""
 
 import math
 from typing import List
@@ -12,9 +13,7 @@ console = Console()
 
 @app.command()
 def process(files: List[str] = typer.Argument(..., help="Paths to the input files")):
-    """
-    Process the input points and estimate the value of Pi using the Monte Carlo method.
-    """
+    """Process the input points and estimate the value of Pi using the Monte Carlo method."""
     inside_circle = 0
     total_points = 0
 

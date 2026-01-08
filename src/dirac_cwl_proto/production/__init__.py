@@ -1,6 +1,4 @@
-"""
-CLI interface to run a workflow as a production.
-"""
+"""CLI interface to run a workflow as a production."""
 
 import logging
 import os
@@ -45,13 +43,12 @@ def submit_production_client(
     local: Optional[bool] = typer.Option(True, help="Run the job locally instead of submitting it to the router"),
 ):
     """
-    Correspond to the dirac-cli command to submit productions
+    Correspond to the dirac-cli command to submit productions.
 
     This command will:
     - Validate the workflow
     - Start the production
     """
-
     os.environ["DIRAC_PROTO_LOCAL"] = "0"
 
     # Validate the workflow

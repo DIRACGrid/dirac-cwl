@@ -75,6 +75,10 @@ class ExecutionHooksBasePlugin(BaseModel):
     _datamanager: DataManager = PrivateAttr(default_factory=DataManager)
 
     def __init__(self, **kwargs):
+        """Initialize the execution hooks base plugin.
+
+        :param kwargs: Additional keyword arguments passed to the parent class.
+        """
         super().__init__(**kwargs)
         if os.getenv("DIRAC_PROTO_LOCAL") == "1":
             self._datamanager = MockDataManager()
@@ -192,7 +196,6 @@ class ExecutionHooksBasePlugin(BaseModel):
         :param Any **kwargs:
             Additional keyword arguments for extensibility.
         """
-
         for output_name, src_path in outputs.items():
             logger.info(f"Storing output {output_name}, with source {src_path}")
 
@@ -335,31 +338,25 @@ class ExecutionHooksHint(BaseModel, Hint):
         return super().model_copy(update=merged_update, deep=deep)
 
     def to_runtime(self, submitted: Optional[Any] = None) -> "ExecutionHooksBasePlugin":
-        """
-            Build and instantiate the runtime metadata implementation.
+        """Build and instantiate the runtime metadata implementation.
 
         The returned object is an instance of :class:`ExecutionHooksBasePlugin` created
         by the metadata registry. The instantiation parameters are constructed
-            by merging, in order:
+        by merging, in order:
 
-            1. Input defaults declared on the CWL task (if ``submitted`` is provided).
-            2. The first set of CWL parameter overrides (``submitted.parameters``),
-               if present.
-            3. The descriptor's ``configuration``.
+        1. Input defaults declared on the CWL task (if ``submitted`` is provided).
+        2. The first set of CWL parameter overrides (``submitted.parameters``),
+           if present.
+        3. The descriptor's ``configuration``.
 
-            During merging, keys are normalized from dash-case to snake_case to
-            align with typical Python argument names used by runtime implementations.
+        During merging, keys are normalized from dash-case to snake_case to
+        align with typical Python argument names used by runtime implementations.
 
-            Parameters
-            ----------
-            submitted : JobSubmissionModel | None
-                Optional submission context used to resolve CWL input defaults
-                and parameter overrides.
-
-            Returns
-            -------
-            ExecutionHooksBasePlugin
-                Runtime plugin implementation instantiated from the registry.
+        :param submitted: Optional submission context used to resolve CWL input defaults
+            and parameter overrides.
+        :type submitted: JobSubmissionModel | None
+        :return: Runtime plugin implementation instantiated from the registry.
+        :rtype: ExecutionHooksBasePlugin
         """
         # Import here to avoid circular imports
         from .registry import get_registry

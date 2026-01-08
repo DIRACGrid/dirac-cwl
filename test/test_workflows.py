@@ -1,3 +1,5 @@
+"""Integration tests for CWL workflow execution."""
+
 import re
 import shutil
 import subprocess
@@ -18,11 +20,14 @@ def strip_ansi_codes(text: str) -> str:
 
 @pytest.fixture()
 def cli_runner():
+    """Provide a Typer CLI runner for testing."""
     return CliRunner()
 
 
 @pytest.fixture()
 def cleanup():
+    """Provide a cleanup function to remove test directories."""
+
     def _cleanup():
         shutil.rmtree("filecatalog", ignore_errors=True)
         shutil.rmtree("sandboxstore", ignore_errors=True)
@@ -134,6 +139,7 @@ def pi_test_files():
     ],
 )
 def test_run_job_success(cli_runner, cleanup, pi_test_files, cwl_file, inputs):
+    """Test successful job submission and execution."""
     # CWL file is the first argument
     command = ["job", "submit", cwl_file]
 
@@ -183,6 +189,7 @@ def test_run_job_success(cli_runner, cleanup, pi_test_files, cwl_file, inputs):
     ],
 )
 def test_run_job_validation_failure(cli_runner, cleanup, cwl_file, inputs, expected_error):
+    """Test job submission fails with invalid workflow or inputs."""
     command = ["job", "submit", cwl_file]
     for input in inputs:
         command.extend(["--parameter-path", input])
@@ -226,6 +233,7 @@ def test_run_job_validation_failure(cli_runner, cleanup, cwl_file, inputs, expec
 
 
 def test_run_job_parallely():
+    """Test parallel job execution performance."""
     error_margin_percentage = 0.15
 
     # This command forces the process 'dirac-cwl' to execute ONLY in
@@ -287,6 +295,7 @@ def test_run_job_parallely():
     ],
 )
 def test_run_job_with_input_data(cli_runner, cleanup, pi_test_files, cwl_file, inputs, destination_source_input_data):
+    """Test job execution with input data from file catalog."""
     for destination, inputs_data in destination_source_input_data.items():
         # Copy the input data to the destination
         destination = Path(destination)
@@ -335,6 +344,7 @@ def test_run_job_with_input_data(cli_runner, cleanup, pi_test_files, cwl_file, i
     ],
 )
 def test_run_nonblocking_transformation_success(cli_runner, cleanup, cwl_file):
+    """Test successful non-blocking transformation submission and execution."""
     # CWL file is the first argument
     command = ["transformation", "submit", cwl_file]
 
@@ -363,6 +373,8 @@ def test_run_nonblocking_transformation_success(cli_runner, cleanup, cwl_file):
     ],
 )
 def test_run_blocking_transformation_success(cli_runner, cleanup, cwl_file, destination_source_input_data):
+    """Test successful blocking transformation with input data dependencies."""
+
     # Define a function to run the transformation command and return the result
     def run_transformation():
         command = ["transformation", "submit", cwl_file]
@@ -435,6 +447,7 @@ def test_run_blocking_transformation_success(cli_runner, cleanup, cwl_file, dest
     ],
 )
 def test_run_transformation_validation_failure(cli_runner, cwl_file, cleanup, expected_error):
+    """Test transformation submission fails with invalid workflow."""
     command = ["transformation", "submit", cwl_file]
     result = cli_runner.invoke(app, command)
     clean_stdout = strip_ansi_codes(result.stdout)
@@ -489,6 +502,7 @@ def test_run_transformation_validation_failure(cli_runner, cwl_file, cleanup, ex
     ],
 )
 def test_run_simple_production_success(cli_runner, cleanup, pi_test_files, cwl_file):
+    """Test successful production workflow submission and execution."""
     # CWL file is the first argument
     command = ["production", "submit", cwl_file]
 
@@ -533,6 +547,7 @@ def test_run_simple_production_success(cli_runner, cleanup, pi_test_files, cwl_f
     ],
 )
 def test_run_production_validation_failure(cli_runner, cleanup, cwl_file, expected_error):
+    """Test production submission fails with invalid workflow."""
     command = ["production", "submit", cwl_file]
     result = cli_runner.invoke(app, command)
 

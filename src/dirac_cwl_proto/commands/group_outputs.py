@@ -1,3 +1,5 @@
+"""Example post-processing command that groups output files."""
+
 import glob
 import os
 
@@ -8,6 +10,11 @@ class GroupOutputs(PostProcessCommand):
     """Example command that merges all of the outputs in a singular file."""
 
     def execute(self, job_path, **kwargs):
+        """Execute the output file grouping.
+
+        :param job_path: Path to the job working directory.
+        :param kwargs: Additional keyword arguments.
+        """
         grouped_outputs = "group.out"
         output_path = os.path.join(job_path, grouped_outputs)
         output_files = ["*.out", "*.txt"]

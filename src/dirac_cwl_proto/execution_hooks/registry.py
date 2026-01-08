@@ -26,6 +26,7 @@ class ExecutionHooksPluginRegistry:
     """
 
     def __init__(self) -> None:
+        """Initialize the execution hooks registry."""
         self._plugins: Dict[str, Type[ExecutionHooksBasePlugin]] = {}
         self._vo_plugins: Dict[str, Dict[str, Type[ExecutionHooksBasePlugin]]] = {}
         self._plugin_info: Dict[str, Dict[str, Any]] = {}
@@ -33,17 +34,11 @@ class ExecutionHooksPluginRegistry:
     def register_plugin(self, plugin_class: Type[ExecutionHooksBasePlugin], override: bool = False) -> None:
         """Register a metadata plugin.
 
-        Parameters
-        ----------
-        plugin_class : Type[ExecutionHooksBasePlugin]
-            The metadata model class to register.
-        override : bool, optional
-            Whether to override existing registrations, by default False.
-
-        Raises
-        ------
-        ValueError
-            If plugin is already registered and override=False.
+        :param plugin_class: The metadata model class to register.
+        :type plugin_class: Type[ExecutionHooksBasePlugin]
+        :param override: Whether to override existing registrations, by default False.
+        :type override: bool
+        :raises ValueError: If plugin is already registered and override=False.
         """
         if not issubclass(plugin_class, ExecutionHooksBasePlugin):
             raise ValueError(f"Plugin {plugin_class} must inherit from ExecutionHooksBasePlugin")
@@ -78,17 +73,12 @@ class ExecutionHooksPluginRegistry:
     def get_plugin(self, plugin_key: str, vo: Optional[str] = None) -> Optional[Type[ExecutionHooksBasePlugin]]:
         """Get a registered plugin.
 
-        Parameters
-        ----------
-        plugin_key : str
-            The plugin identifier.
-        vo : Optional[str], optional
-            Virtual Organization namespace to search first, by default None.
-
-        Returns
-        -------
-        Optional[Type[ExecutionHooksBasePlugin]]
-            The plugin class or None if not found.
+        :param plugin_key: The plugin identifier.
+        :type plugin_key: str
+        :param vo: Virtual Organization namespace to search first, by default None.
+        :type vo: Optional[str]
+        :return: The plugin class or None if not found.
+        :rtype: Optional[Type[ExecutionHooksBasePlugin]]
         """
         # Try VO-specific first if specified
         if vo and vo in self._vo_plugins:
@@ -101,24 +91,14 @@ class ExecutionHooksPluginRegistry:
     def instantiate_plugin(self, descriptor: ExecutionHooksHint, **kwargs: Any) -> ExecutionHooksBasePlugin:
         """Instantiate a metadata plugin from a descriptor.
 
-        Parameters
-        ----------
-        descriptor : ExecutionHooksHint
-            The data manager containing configuration.
-        **kwargs : Any
-            Additional parameters to pass to the plugin constructor.
-
-        Returns
-        -------
-        ExecutionHooksBasePlugin
-            Instantiated metadata model.
-
-        Raises
-        ------
-        KeyError
-            If the requested plugin is not registered.
-        ValueError
-            If plugin instantiation fails.
+        :param descriptor: The data manager containing configuration.
+        :type descriptor: ExecutionHooksHint
+        :param kwargs: Additional parameters to pass to the plugin constructor.
+        :type kwargs: Any
+        :return: Instantiated metadata model.
+        :rtype: ExecutionHooksBasePlugin
+        :raises KeyError: If the requested plugin is not registered.
+        :raises ValueError: If plugin instantiation fails.
         """
         plugin_class = self.get_plugin(descriptor.hook_plugin)
 
@@ -142,15 +122,10 @@ class ExecutionHooksPluginRegistry:
     def list_plugins(self, vo: Optional[str] = None) -> List[str]:
         """List available plugins.
 
-        Parameters
-        ----------
-        vo : Optional[str], optional
-            Filter by Virtual Organization, by default None.
-
-        Returns
-        -------
-        List[str]
-            List of available plugin keys.
+        :param vo: Filter by Virtual Organization, by default None.
+        :type vo: Optional[str]
+        :return: List of available plugin keys.
+        :rtype: List[str]
         """
         if vo and vo in self._vo_plugins:
             return list(self._vo_plugins[vo].keys())
@@ -167,10 +142,8 @@ class ExecutionHooksPluginRegistry:
     def discover_plugins(self) -> int:
         """Discover and register plugins from the entry points defined in the pyproject.toml.
 
-        Returns
-        -------
-        int
-            Number of plugins discovered and registered.
+        :return: Number of plugins discovered and registered.
+        :rtype: int
         """
         entrypoints = entry_points(group="dirac_cwl_proto.execution_hooks")
         discovered = 0
@@ -194,15 +167,10 @@ class ExecutionHooksPluginRegistry:
     def validate_descriptor(self, descriptor: ExecutionHooksHint) -> List[str]:
         """Validate a data manager against registered plugins.
 
-        Parameters
-        ----------
-        descriptor : ExecutionHooksHint
-            The data manager to validate.
-
-        Returns
-        -------
-        List[str]
-            List of validation errors (empty if valid).
+        :param descriptor: The data manager to validate.
+        :type descriptor: ExecutionHooksHint
+        :return: List of validation errors (empty if valid).
+        :rtype: List[str]
         """
         errors = []
 

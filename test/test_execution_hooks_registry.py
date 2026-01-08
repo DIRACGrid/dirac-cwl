@@ -179,6 +179,7 @@ class TestExecutionHooksPluginRegistry:
         assert isinstance(plugins, list)
 
     def test_discover_plugins(self, mocker, monkeypatch):
+        """Test plugin discovery from entry points."""
         from dirac_cwl_proto.execution_hooks import registry
 
         class FakePlugin(ExecutionHooksBasePlugin): ...
