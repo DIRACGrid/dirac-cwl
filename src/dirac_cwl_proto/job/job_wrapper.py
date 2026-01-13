@@ -10,6 +10,7 @@ import subprocess
 from pathlib import Path
 from typing import Sequence, cast
 
+import DIRAC  # type: ignore[import-untyped]
 from cwl_utils.parser import (
     save,
 )
@@ -24,7 +25,6 @@ from DIRAC.WorkloadManagementSystem.Client.SandboxStoreClient import SandboxStor
 from DIRACCommon.Core.Utilities.ReturnValues import (  # type: ignore[import-untyped]
     returnValueOrRaise,
 )
-from pydantic import PrivateAttr
 from rich.text import Text
 from ruamel.yaml import YAML
 
@@ -47,7 +47,7 @@ logger = logging.getLogger(__name__)
 class JobWrapper:
     """Job Wrapper for the execution hook."""
 
-    _sandbox_store_client: SandboxStoreClient = PrivateAttr(default_factory=SandboxStoreClient)
+    _sandbox_store_client: SandboxStoreClient
 
     def __init__(self) -> None:
         """Initialize the job wrapper."""
@@ -55,6 +55,9 @@ class JobWrapper:
         self.job_path: Path = Path()
         if os.getenv("DIRAC_PROTO_LOCAL") == "1":
             self._sandbox_store_client = MockSandboxStoreClient()
+        else:
+            DIRAC.initialize()
+            self._sandbox_store_client = SandboxStoreClient()
 
     def __download_input_sandbox(self, arguments: JobInputModel, job_path: Path) -> None:
         """Download the files from the sandbox store.
@@ -66,7 +69,9 @@ class JobWrapper:
         if not self.execution_hooks_plugin:
             raise RuntimeError("Could not download sandboxes")
         for sandbox in arguments.sandbox:
-            self._sandbox_store_client.downloadSandbox(sandbox, job_path)
+            ret = self._sandbox_store_client.downloadSandbox(sandbox, job_path)
+            if not ret["OK"]:
+                raise RuntimeError(f"Could not download sandbox {sandbox}: {ret['Message']}")
 
     def __upload_output_sandbox(
         self,
