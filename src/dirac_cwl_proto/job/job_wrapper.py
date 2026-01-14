@@ -236,12 +236,14 @@ class JobWrapper:
 
         outputs = self.__parse_output_filepaths(stdout)
 
+        success = True
+
         if self.execution_hooks_plugin:
-            return self.execution_hooks_plugin.post_process(self.job_path, outputs=outputs)
+            success = self.execution_hooks_plugin.post_process(self.job_path, outputs=outputs)
 
         self.__upload_output_sandbox(outputs=outputs)
 
-        return True
+        return success
 
     def run_job(self, job: JobModel) -> bool:
         """Execute a given CWL workflow using cwltool.
