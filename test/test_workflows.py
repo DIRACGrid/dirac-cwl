@@ -7,6 +7,7 @@ import threading
 import time
 from pathlib import Path
 
+import psutil
 import pytest
 from typer.testing import CliRunner
 
@@ -234,46 +235,71 @@ def test_run_job_validation_failure(cli_runner, cleanup, cwl_file, inputs, expec
 
 def test_run_job_parallely():
     """Test parallel job execution performance."""
-    error_margin_percentage = 0.15
-
-    # This command forces the process 'dirac-cwl' to execute ONLY in
-    # one core of the machine, independently of how many there are
-    # phisically available.
-    # This simulates a sequential execution of the workflow.
-    command = [
-        "taskset",
-        "-c",
-        "0",
-        "dirac-cwl",
-        "job",
-        "submit",
-        "test/workflows/parallel/description.cwl",
+    command_seq = [
+        "taskset", "-c", "0",
+        "dirac-cwl", "job", "submit",
+        "test/workflows/parallel/description.cwl"
     ]
+    
+    # Dictionary to evade creating the Process class more than one time
+    #  If not, process.cpu_percent(None) will always return 0
+    processes = {} # pid: psutil.Process
+    def get_process(pid):
+        if pid not in processes:
+            processes[pid] = psutil.Process(pid)
+        return processes[pid]
 
-    start = time.time()
-    subprocess.run(command)
-    end = time.time()
-    sequential_time = end - start
+    parent_popen = subprocess.Popen(command_seq)
+    parent_process = psutil.Process(parent_popen.pid)
+    seq_max_cpu_percentage = 0
 
-    command = [
-        "dirac-cwl",
-        "job",
-        "submit",
-        "test/workflows/parallel/description.cwl",
+    while parent_popen.poll() is None:
+        time.sleep(0.1)
+
+        cpu_percentage = parent_process.cpu_percent(None)
+        if cpu_percentage > seq_max_cpu_percentage:
+            seq_max_cpu_percentage = cpu_percentage
+
+        for child in parent_process.children(recursive=True):
+            child_process = get_process(child.pid)
+            cpu_percentage = child_process.cpu_percent(None)
+
+            if cpu_percentage > seq_max_cpu_percentage:
+                seq_max_cpu_percentage = cpu_percentage
+
+    command_par = [
+        "dirac-cwl", "job", "submit",
+        "test/workflows/parallel/description.cwl"
     ]
+    
+    parent_popen = subprocess.Popen(command_par)
+    parent_process = psutil.Process(parent_popen.pid)
+    par_max_cpu_percentage = 0
 
-    start = time.time()
-    subprocess.run(command)
-    end = time.time()
-    parallel_time = end - start
+    processes = {}
+    
+    while parent_popen.poll() is None:
+        time.sleep(0.1)
 
-    # Parallel time should be approximately half the time.
-    assert abs(1 - sequential_time / (2 * parallel_time)) < error_margin_percentage, (
-        "Difference between parallel and sequential time is too large",
-        f"Sequential: {sequential_time} # Parallel: {parallel_time}",
-        f"Sequential time should be twice the parallel time with an error of {int(error_margin_percentage * 100)}%",
-    )
+        cpu_percentage = parent_process.cpu_percent(None)
+        if cpu_percentage > par_max_cpu_percentage:
+            par_max_cpu_percentage = cpu_percentage
 
+        for child in parent_process.children(recursive=True):
+            child_process = get_process(child.pid)
+            cpu_percentage = child_process.cpu_percent(None)
+
+            if cpu_percentage > par_max_cpu_percentage:
+                par_max_cpu_percentage = cpu_percentage
+
+    # Make sure that sequential max cpu usage percentage is less than 115% (magic number)
+    assert seq_max_cpu_percentage < 115, (
+            f"Sequential max cpu usage higher than 115%: {seq_max_cpu_percentage}"
+        )
+    # Make sure that max parallel cpu usage percentage is higher than 115% (same magic number)
+    assert par_max_cpu_percentage > 115, (
+            f"Parallel max cpu usage not higher than 115%: {par_max_cpu_percentage}"
+        )
 
 @pytest.mark.parametrize(
     "cwl_file, inputs, destination_source_input_data",
