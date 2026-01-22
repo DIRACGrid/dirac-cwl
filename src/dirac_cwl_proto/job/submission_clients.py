@@ -55,14 +55,14 @@ class PrototypeSubmissionClient(SubmissionClient):
         :return: Sandbox PFN or None
         """
         from dirac_cwl_proto.data_management_mocks.sandbox import (
-            MockDiracXSandboxAPI,
+            upload_sandbox,
         )
 
         if not isb_file_paths:
             return None
 
         Path("sandboxstore").mkdir(exist_ok=True)
-        return MockDiracXSandboxAPI().upload_sandbox(paths=isb_file_paths)
+        return upload_sandbox(paths=isb_file_paths)
 
     async def submit_job(self, job_submission: JobSubmissionModel) -> bool:
         """
