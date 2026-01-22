@@ -5,6 +5,7 @@ import json
 import logging
 import os
 import random
+import shutil
 import subprocess
 from pathlib import Path
 from typing import Sequence, cast
@@ -284,5 +285,5 @@ class JobWrapper:
         finally:
             pass
             # Clean up
-            # if self.job_path.exists():
-            #     shutil.rmtree(self.job_path)
+            if self.job_path.exists():
+                shutil.rmtree(self.job_path)
