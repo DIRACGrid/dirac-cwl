@@ -5,7 +5,6 @@ import json
 import logging
 import os
 import random
-import shutil
 import subprocess
 from pathlib import Path
 from typing import Sequence, cast
@@ -29,7 +28,7 @@ from rich.text import Text
 from ruamel.yaml import YAML
 
 from dirac_cwl_proto.core.utility import get_lfns
-from dirac_cwl_proto.data_management_mocks.sandbox import MockSandboxStoreClient
+from dirac_cwl_proto.data_management_mocks.sandbox import MockDiracXSandboxAPI
 from dirac_cwl_proto.execution_hooks import ExecutionHooksHint
 from dirac_cwl_proto.execution_hooks.core import ExecutionHooksBasePlugin
 from dirac_cwl_proto.submission_models import (
@@ -54,7 +53,7 @@ class JobWrapper:
         self.execution_hooks_plugin: ExecutionHooksBasePlugin | None = None
         self.job_path: Path = Path()
         if os.getenv("DIRAC_PROTO_LOCAL") == "1":
-            self._sandbox_store_client = MockSandboxStoreClient()
+            self._sandbox_store_client = MockDiracXSandboxAPI()
 
     def __download_input_sandbox(self, arguments: JobInputModel, job_path: Path) -> None:
         """Download the files from the sandbox store.
@@ -66,7 +65,7 @@ class JobWrapper:
         if not self.execution_hooks_plugin:
             raise RuntimeError("Could not download sandboxes")
         for sandbox in arguments.sandbox:
-            self._sandbox_store_client.downloadSandbox(sandbox, job_path)
+            self._sandbox_store_client.download_sandbox(sandbox, job_path)
 
     def __upload_output_sandbox(
         self,
@@ -78,7 +77,10 @@ class JobWrapper:
             if self.execution_hooks_plugin.output_sandbox and output_name in self.execution_hooks_plugin.output_sandbox:
                 if isinstance(src_path, Path) or isinstance(src_path, str):
                     src_path = [src_path]
-                sb_path = returnValueOrRaise(self._sandbox_store_client.uploadFilesAsSandbox(src_path))
+
+                sb_path = Path(f"sandboxstore/{self._sandbox_store_client.upload_sandbox(src_path)}")
+                if not sb_path.exists():
+                    raise RuntimeError(f"Sandbox {sb_path} does not exist")
                 logger.info("Successfully stored output %s in Sandbox %s", output_name, sb_path)
 
     def __download_input_data(self, inputs: JobInputModel, job_path: Path) -> dict[str, Path | list[Path]]:
@@ -280,6 +282,7 @@ class JobWrapper:
             logger.exception("JobWrapper: Failed to execute workflow")
             return False
         finally:
+            pass
             # Clean up
-            if self.job_path.exists():
-                shutil.rmtree(self.job_path)
+            # if self.job_path.exists():
+            #     shutil.rmtree(self.job_path)
