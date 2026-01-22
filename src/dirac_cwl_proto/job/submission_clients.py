@@ -29,7 +29,7 @@ class SubmissionClient(ABC):
 
         :param isb_file_paths: List of input sandbox file paths
         :param parameter_path: Path to the parameter file
-        :return: Sandbox ID or None
+        :return: Sandbox PFN or None
         """
         pass
 
@@ -90,7 +90,7 @@ class DIRACSubmissionClient(SubmissionClient):
 
         :param isb_file_paths: List of input sandbox file paths
         :param parameter_path: Path to the parameter file
-        :return: Sandbox ID or None
+        :return: Sandbox PFN or None
         """
         # Modify the location of the files to point to the future location on the worker node
         modified_paths = [Path(p.name) for p in isb_file_paths]
@@ -130,12 +130,12 @@ class DIRACSubmissionClient(SubmissionClient):
         )
         return True
 
-    def convert_to_jdl(self, job: JobModel, sandbox_id: str) -> str:
+    def convert_to_jdl(self, job: JobModel, sandbox_pfn: str) -> str:
         """
         Convert job model to jdl.
 
         :param job: The task to execute
-        :param sandbox_ids: The sandbox IDs
+        :param sandbox_pfn: The sandbox PFN
         :return: JDL string
         """
         jdl_lines = []
@@ -155,7 +155,7 @@ class DIRACSubmissionClient(SubmissionClient):
         if job_scheduling.sites:
             jdl_lines.append(f"Site = {job_scheduling.sites};")
 
-        jdl_lines.append(f"InputSandbox = {sandbox_id};")
+        jdl_lines.append(f"InputSandbox = {sandbox_pfn};")
         if job.input:
             formatted_lfns = []
             lfns_list = get_lfns(job.input.cwl).values()
