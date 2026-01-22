@@ -1,11 +1,13 @@
 """Integration tests for CWL workflow execution."""
 
+import platform
 import re
 import shutil
 import subprocess
 import threading
 import time
 from pathlib import Path
+from statistics import median
 
 import psutil
 import pytest
@@ -233,6 +235,9 @@ def test_run_job_validation_failure(cli_runner, cleanup, cwl_file, inputs, expec
         )
 
 
+@pytest.mark.skipif(
+    platform.system() != "Linux" or not shutil.which("taskset"), reason="taskset command only available on Linux"
+)
 def test_run_job_parallely():
     """Test parallel job execution performance."""
     command_seq = ["taskset", "-c", "0", "dirac-cwl", "job", "submit", "test/workflows/parallel/description.cwl"]
@@ -248,48 +253,59 @@ def test_run_job_parallely():
 
     parent_popen = subprocess.Popen(command_seq)
     parent_process = psutil.Process(parent_popen.pid)
-    seq_max_cpu_percentage = 0
+    seq_cpu_list = []
 
     while parent_popen.poll() is None:
         time.sleep(0.1)
 
-        cpu_percentage = parent_process.cpu_percent(None)
-        if cpu_percentage > seq_max_cpu_percentage:
-            seq_max_cpu_percentage = cpu_percentage
+        try:
+            cpu_percentage = parent_process.cpu_percent(None)
+            seq_cpu_list += [cpu_percentage]
+        except psutil.NoSuchProcess:
+            break
 
         for child in parent_process.children(recursive=True):
-            child_process = get_process(child.pid)
-            cpu_percentage = child_process.cpu_percent(None)
-
-            if cpu_percentage > seq_max_cpu_percentage:
-                seq_max_cpu_percentage = cpu_percentage
+            try:
+                child_process = get_process(child.pid)
+                cpu_percentage = child_process.cpu_percent(None)
+                seq_cpu_list += [cpu_percentage]
+            except psutil.NoSuchProcess:
+                continue
 
     command_par = ["dirac-cwl", "job", "submit", "test/workflows/parallel/description.cwl"]
 
     parent_popen = subprocess.Popen(command_par)
     parent_process = psutil.Process(parent_popen.pid)
-    par_max_cpu_percentage = 0
+    par_cpu_list = []
 
     processes = {}
 
     while parent_popen.poll() is None:
         time.sleep(0.1)
 
-        cpu_percentage = parent_process.cpu_percent(None)
-        if cpu_percentage > par_max_cpu_percentage:
-            par_max_cpu_percentage = cpu_percentage
+        try:
+            cpu_percentage = parent_process.cpu_percent(None)
+            par_cpu_list += [cpu_percentage]
+        except psutil.NoSuchProcess:
+            break
 
         for child in parent_process.children(recursive=True):
-            child_process = get_process(child.pid)
-            cpu_percentage = child_process.cpu_percent(None)
+            try:
+                child_process = get_process(child.pid)
+                cpu_percentage = child_process.cpu_percent(None)
+                par_cpu_list += [cpu_percentage]
+            except psutil.NoSuchProcess:
+                continue
 
-            if cpu_percentage > par_max_cpu_percentage:
-                par_max_cpu_percentage = cpu_percentage
+    # Use only when the process is working.
+    seq_working_median = median(filter(lambda x: int(x) != 0, seq_cpu_list))
+    par_working_median = median(filter(lambda x: int(x) != 0, par_cpu_list))
 
-    # Make sure that sequential max cpu usage percentage is less than 115% (magic number)
-    assert seq_max_cpu_percentage < 115, f"Sequential max cpu usage higher than 115%: {seq_max_cpu_percentage}"
-    # Make sure that max parallel cpu usage percentage is higher than 115% (same magic number)
-    assert par_max_cpu_percentage > 115, f"Parallel max cpu usage not higher than 115%: {par_max_cpu_percentage}"
+    # The parallel execution CPU usage should be duble, due to it executing 2 steps in parallel
+    # In an ideal situation: Sequential = 100% and Parallel = 200% CPU usage
+    assert (
+        int(abs(((seq_working_median * 2) - par_working_median) / par_working_median * 100)) <= 10
+    ), "Error between the sequential and parallel cpu median is higher than 10%"
 
 
 @pytest.mark.parametrize(

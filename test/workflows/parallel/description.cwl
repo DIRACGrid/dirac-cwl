@@ -50,33 +50,3 @@ steps:
         source: simulate2/result_sim
     out: [pi_result]
     run: ../pi/pigather.cwl
-
-  # Group 3
-  #
-  simulate3:
-    in:
-      num-points: num-points
-    out: [result_sim]
-    run: ../pi/pisimulate.cwl
-
-  gathering3:
-    in:
-      input-data:
-        source: simulate3/result_sim
-    out: [pi_result]
-    run: ../pi/pigather.cwl
-
-  # Group 4
-  #
-  simulate4:
-    in:
-      num-points: num-points
-    out: [result_sim]
-    run: ../pi/pisimulate.cwl
-
-  gathering4:
-    in:
-      input-data:
-        source: simulate4/result_sim
-    out: [pi_result]
-    run: ../pi/pigather.cwl
