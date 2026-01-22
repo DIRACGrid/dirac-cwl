@@ -94,6 +94,7 @@ pre-commit = "*"   # git hooks manager
 # conda dependencies
 python-gfal2 = "*"
 m2crypto = "*"
+pytest-asyncio = ">=1.3.0,<2"
 
 # Ensure the package is installed in editable mode in the Pixi environment
 [tool.pixi.pypi-dependencies]
