@@ -23,7 +23,7 @@ class SubmissionClient(ABC):
     """Abstract base class for job submission strategies."""
 
     @abstractmethod
-    async def upload_sandbox(self, isb_file_paths: list[Path]) -> str | None:
+    async def create_sandbox(self, isb_file_paths: list[Path]) -> str | None:
         """
         Upload parameter files to the sandbox store.
 
@@ -46,7 +46,7 @@ class SubmissionClient(ABC):
 class PrototypeSubmissionClient(SubmissionClient):
     """Submission client for local/prototype execution."""
 
-    async def upload_sandbox(self, isb_file_paths: list[Path]) -> str | None:
+    async def create_sandbox(self, isb_file_paths: list[Path]) -> str | None:
         """
         Upload files to the local sandbox store.
 
@@ -55,14 +55,14 @@ class PrototypeSubmissionClient(SubmissionClient):
         :return: Sandbox PFN or None
         """
         from dirac_cwl_proto.data_management_mocks.sandbox import (
-            upload_sandbox,
+            create_sandbox,
         )
 
         if not isb_file_paths:
             return None
 
         Path("sandboxstore").mkdir(exist_ok=True)
-        return upload_sandbox(paths=isb_file_paths)
+        return create_sandbox(paths=isb_file_paths)
 
     async def submit_job(self, job_submission: JobSubmissionModel) -> bool:
         """
@@ -81,7 +81,7 @@ class PrototypeSubmissionClient(SubmissionClient):
 class DIRACSubmissionClient(SubmissionClient):
     """Submission client for DIRAC/DiracX production execution."""
 
-    async def upload_sandbox(
+    async def create_sandbox(
         self,
         isb_file_paths: list[Path],
     ) -> str | None:

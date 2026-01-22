@@ -3,6 +3,7 @@
 
 import json
 import logging
+import os
 import random
 import shutil
 import subprocess
@@ -26,13 +27,17 @@ from rich.text import Text
 from ruamel.yaml import YAML
 
 from dirac_cwl_proto.core.utility import get_lfns
-from dirac_cwl_proto.data_management_mocks.sandbox import download_sandbox, upload_sandbox
 from dirac_cwl_proto.execution_hooks import ExecutionHooksHint
 from dirac_cwl_proto.execution_hooks.core import ExecutionHooksBasePlugin
 from dirac_cwl_proto.submission_models import (
     JobInputModel,
     JobModel,
 )
+
+if os.getenv("DIRAC_PROTO_LOCAL") == "1":
+    from dirac_cwl_proto.data_management_mocks.sandbox import create_sandbox, download_sandbox  # type: ignore[no-redef]
+else:
+    from diracx.api.jobs import create_sandbox, download_sandbox  # type: ignore[no-redef]
 
 # -----------------------------------------------------------------------------
 # JobWrapper
@@ -72,7 +77,7 @@ class JobWrapper:
                 if isinstance(src_path, Path) or isinstance(src_path, str):
                     src_path = [src_path]
 
-                sb_path = Path(f"sandboxstore/{upload_sandbox(src_path)}")
+                sb_path = Path(f"sandboxstore/{create_sandbox(src_path)}")
                 if not sb_path.exists():
                     raise RuntimeError(f"Sandbox {sb_path} does not exist")
                 logger.info("Successfully stored output %s in Sandbox %s", output_name, sb_path)

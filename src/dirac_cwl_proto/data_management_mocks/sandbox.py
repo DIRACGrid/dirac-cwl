@@ -17,7 +17,7 @@ SANDBOX_CHECKSUM_ALGORITHM = "sha256"
 SANDBOX_COMPRESSION: Literal["zst"] = "zst"
 
 
-def upload_sandbox(paths: Sequence[str | Path]):
+def create_sandbox(paths: Sequence[str | Path]):
     """Upload a sandbox archive to the sandboxstore.
 
     :param paths: File paths to be uploaded in the sandbox.

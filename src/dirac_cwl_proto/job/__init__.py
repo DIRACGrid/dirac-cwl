@@ -86,7 +86,7 @@ async def submit_job_client(
             isb_file_paths = prepare_input_sandbox(parameter)
 
             # Upload parameter sandbox
-            sandbox_id = await submission_client.upload_sandbox(isb_file_paths)
+            sandbox_id = await submission_client.create_sandbox(isb_file_paths)
 
             parameters.append(
                 JobInputModel(

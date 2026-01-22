@@ -96,9 +96,9 @@ class TestPrototypeSubmissionClient:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("file_paths", [[Path("test/workflows/helloworld/")], [Path("test/workflows/pi/")]])
-    async def test_upload_sandbox(self, file_paths):
+    async def test_create_sandbox(self, file_paths):
         """Test upload sandbox."""
         submission_client = PrototypeSubmissionClient()
 
-        sandbox_pfn = await submission_client.upload_sandbox(file_paths)
+        sandbox_pfn = await submission_client.create_sandbox(file_paths)
         assert Path(f"sandboxstore/{sandbox_pfn}").exists()
