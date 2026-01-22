@@ -1,12 +1,15 @@
 """Integration tests for CWL workflow execution."""
 
+import platform
 import re
 import shutil
 import subprocess
 import threading
 import time
 from pathlib import Path
+from statistics import median
 
+import psutil
 import pytest
 from typer.testing import CliRunner
 
@@ -232,47 +235,77 @@ def test_run_job_validation_failure(cli_runner, cleanup, cwl_file, inputs, expec
         )
 
 
+@pytest.mark.skipif(
+    platform.system() != "Linux" or not shutil.which("taskset"), reason="taskset command only available on Linux"
+)
 def test_run_job_parallely():
     """Test parallel job execution performance."""
-    error_margin_percentage = 0.15
+    command_seq = ["taskset", "-c", "0", "dirac-cwl", "job", "submit", "test/workflows/parallel/description.cwl"]
 
-    # This command forces the process 'dirac-cwl' to execute ONLY in
-    # one core of the machine, independently of how many there are
-    # phisically available.
-    # This simulates a sequential execution of the workflow.
-    command = [
-        "taskset",
-        "-c",
-        "0",
-        "dirac-cwl",
-        "job",
-        "submit",
-        "test/workflows/parallel/description.cwl",
-    ]
+    # Dictionary to evade creating the Process class more than one time
+    #  If not, process.cpu_percent(None) will always return 0
+    processes = {}  # pid: psutil.Process
 
-    start = time.time()
-    subprocess.run(command)
-    end = time.time()
-    sequential_time = end - start
+    def get_process(pid):
+        if pid not in processes:
+            processes[pid] = psutil.Process(pid)
+        return processes[pid]
 
-    command = [
-        "dirac-cwl",
-        "job",
-        "submit",
-        "test/workflows/parallel/description.cwl",
-    ]
+    parent_popen = subprocess.Popen(command_seq)
+    parent_process = psutil.Process(parent_popen.pid)
+    seq_cpu_list = []
 
-    start = time.time()
-    subprocess.run(command)
-    end = time.time()
-    parallel_time = end - start
+    while parent_popen.poll() is None:
+        time.sleep(0.1)
 
-    # Parallel time should be approximately half the time.
-    assert abs(1 - sequential_time / (2 * parallel_time)) < error_margin_percentage, (
-        "Difference between parallel and sequential time is too large",
-        f"Sequential: {sequential_time} # Parallel: {parallel_time}",
-        f"Sequential time should be twice the parallel time with an error of {int(error_margin_percentage * 100)}%",
-    )
+        try:
+            cpu_percentage = parent_process.cpu_percent(None)
+            seq_cpu_list += [cpu_percentage]
+        except psutil.NoSuchProcess:
+            break
+
+        for child in parent_process.children(recursive=True):
+            try:
+                child_process = get_process(child.pid)
+                cpu_percentage = child_process.cpu_percent(None)
+                seq_cpu_list += [cpu_percentage]
+            except psutil.NoSuchProcess:
+                continue
+
+    command_par = ["dirac-cwl", "job", "submit", "test/workflows/parallel/description.cwl"]
+
+    parent_popen = subprocess.Popen(command_par)
+    parent_process = psutil.Process(parent_popen.pid)
+    par_cpu_list = []
+
+    processes = {}
+
+    while parent_popen.poll() is None:
+        time.sleep(0.1)
+
+        try:
+            cpu_percentage = parent_process.cpu_percent(None)
+            par_cpu_list += [cpu_percentage]
+        except psutil.NoSuchProcess:
+            break
+
+        for child in parent_process.children(recursive=True):
+            try:
+                child_process = get_process(child.pid)
+                cpu_percentage = child_process.cpu_percent(None)
+                par_cpu_list += [cpu_percentage]
+            except psutil.NoSuchProcess:
+                continue
+
+    # Use only when the process is working.
+    seq_working_median = median(filter(lambda x: int(x) != 0, seq_cpu_list))
+    par_working_median = median(filter(lambda x: int(x) != 0, par_cpu_list))
+
+    # The parallel execution CPU usage should be duble, due to it executing 2 steps in parallel
+    # In an ideal situation: Sequential = 100% and Parallel = 200% CPU usage
+    assert (
+        int(abs(((seq_working_median * 2) - par_working_median) / par_working_median * 100)) <= 10
+    ), "Error between the sequential and parallel cpu median is higher than 10%"
 
 
 @pytest.mark.parametrize(
