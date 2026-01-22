@@ -176,3 +176,5 @@ generated_schemas/*
 !test/workflows/test_meta/schemas/dirac-metadata.json
 
 .DS_Store
+
+*.sim

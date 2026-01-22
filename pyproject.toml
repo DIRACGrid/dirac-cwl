@@ -26,7 +26,10 @@ dependencies = [
     "cwlformat",
     "cwltool",
     "dirac>=9.0.0",
-    "diracx-api",
+    "diracx-core>=0.0.8",
+    "diracx-api>=0.0.8",
+    "diracx-client>=0.0.8",
+    "diracx-cli>=0.0.8",
     "lbprodrun",
     "mypy",              # usually dev-only, see note below
     "pydantic",
@@ -46,8 +49,15 @@ crypto = "dirac_cwl.modules.crypto:app"
 pi-simulate = "dirac_cwl.modules.pi_simulate:app"
 pi-gather = "dirac_cwl.modules.pi_gather:app"
 
+dirac-cwl-run = "dirac_cwl.job.executor.__main__:cli"
+dirac-run-lbprodrun-app = "dirac_cwl.job.executor.run_lbprodrun:main"
+
 [project.entry-points."dirac_cwl.execution_hooks"]
 QueryBasedPlugin = "dirac_cwl.execution_hooks.plugins:QueryBasedPlugin"
+
+[project.entry-points."dirac_cwl.input_dataset_plugins"]
+NoOpInputDatasetPlugin = "dirac_cwl.production.plugins.core:NoOpInputDatasetPlugin"
+LHCbBookkeepingPlugin = "dirac_cwl.production.plugins.lhcb:LHCbBookkeepingPlugin"
 
 [tool.setuptools_scm]
 

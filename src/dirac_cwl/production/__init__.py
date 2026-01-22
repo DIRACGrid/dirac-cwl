@@ -1,4 +1,9 @@
-"""CLI interface to run a workflow as a production."""
+"""Production plugin system and CLI interface.
+
+This module provides:
+- Input dataset plugin system for experiment-specific data sources
+- CLI interface to run a workflow as a production
+"""
 
 import logging
 import os
@@ -26,6 +31,36 @@ from dirac_cwl.submission_models import (
 from dirac_cwl.transformation import (
     submit_transformation_router,
 )
+
+# Plugin system exports
+from .core import InputDatasetPluginBase, ProductionHint
+from .registry import (
+    InputDatasetPluginRegistry,
+    discover_plugins,
+    get_registry,
+)
+
+# Initialize the registry and discover plugins
+_registry = get_registry()
+
+# Auto-discover plugins on import
+try:
+    discover_plugins()
+except Exception:
+    # Fail silently if plugin discovery fails during import
+    pass
+
+__all__ = [
+    # Plugin system
+    "ProductionHint",
+    "InputDatasetPluginBase",
+    "InputDatasetPluginRegistry",
+    "get_registry",
+    "discover_plugins",
+    # CLI
+    "app",
+    "submit_production_router",
+]
 
 app = typer.Typer()
 console = Console()
