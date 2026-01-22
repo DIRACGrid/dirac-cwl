@@ -276,7 +276,6 @@ class JobWrapper:
             logger.exception("JobWrapper: Failed to execute workflow")
             return False
         finally:
-            pass
             # Clean up
             if self.job_path.exists():
                 shutil.rmtree(self.job_path)
