@@ -53,8 +53,10 @@ def create_sandbox(paths: Sequence[str | Path]):
 
         # Create PFN
         pfn = f"{sandbox_info.checksum_algorithm}:{sandbox_info.checksum}.{sandbox_info.format}"
+        logger.debug("Sandbox PFN is %s", pfn)
 
         # Create sandbox in sandboxstore
+        Path("sandboxstore").mkdir(exist_ok=True)
         sandbox_path = Path(f"sandboxstore/{pfn}")
         if not sandbox_path.exists():
             with tarfile.open(sandbox_path, "w:gz") as tar:
