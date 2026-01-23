@@ -31,8 +31,10 @@ def get_lfns(input_data: dict[str, Any]) -> dict[str, list[Path]]:
                         val.append(Path(item.location))
             files[input_name] = val
         elif isinstance(input_value, File):
-            if not input_value.location:
+            if not input_value.location and not input_value.path:
                 raise NotImplementedError("File location is not defined.")
+            if not input_value.location:
+                continue
             if input_value.location.startswith("lfn:"):
                 val.append(Path(input_value.location))
             files[input_name] = val

@@ -59,7 +59,7 @@ async def submit_job_client(
     # Validate the workflow
     console.print("[blue]:information_source:[/blue] [bold]CLI:[/bold] Validating the job(s)...")
     try:
-        task = load_document(pack(task_path))
+        task = load_document(pack(task_path), baseuri=".")
     except FileNotFoundError as ex:
         console.print(f"[red]:heavy_multiplication_x:[/red] [bold]CLI:[/bold] Failed to load the task:\n{ex}")
         return typer.Exit(code=1)

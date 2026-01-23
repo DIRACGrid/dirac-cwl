@@ -89,12 +89,9 @@ class DIRACSubmissionClient(SubmissionClient):
         Upload parameter files to the sandbox store.
 
         :param isb_file_paths: List of input sandbox file paths
-        :param parameter_path: Path to the parameter file
         :return: Sandbox PFN or None
         """
-        # Modify the location of the files to point to the future location on the worker node
-        modified_paths = [Path(p.name) for p in isb_file_paths]
-        return await create_sandbox(modified_paths)
+        return await create_sandbox(isb_file_paths)
 
     async def submit_job(self, job_submission: JobSubmissionModel) -> bool:
         """

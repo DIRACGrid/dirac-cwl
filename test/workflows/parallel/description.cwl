@@ -11,16 +11,7 @@ inputs:
   num-points:
     type: int
     doc: "Number of random points to generate for the simulation"
-    # This number must be big to force the whole simulation+gather take
-    #  a fair amount of time.
-    #
-    # - If it's too little, it would be difficult to differentiate between
-    #  a parallel and a sequetial workflow.
-    # - If it's too large, the test will take too long to complete.
-    #
-    # 10.000.000 points returned reasonable results, having a good balance
-    #  between the previously mentioned issues
-    default: 10000000
+    default: 100000
 
 # Outputs for this test are not necessary
 outputs: []

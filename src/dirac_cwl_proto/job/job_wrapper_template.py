@@ -3,12 +3,17 @@
 
 import json
 import logging
+import os
 import sys
 import tempfile
 
+import DIRAC  # type: ignore[import-untyped]
 from cwl_utils.parser import load_document_by_uri
 from cwl_utils.parser.cwl_v1_2_utils import load_inputfile
 from ruamel.yaml import YAML
+
+if os.getenv("DIRAC_PROTO_LOCAL") != "1":
+    DIRAC.initialize()
 
 from dirac_cwl_proto.job.job_wrapper import JobWrapper
 from dirac_cwl_proto.submission_models import JobModel

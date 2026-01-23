@@ -79,7 +79,7 @@ class JobWrapper:
 
                 sb_path = Path(f"sandboxstore/{create_sandbox(src_path)}")
                 if not sb_path.exists():
-                    raise RuntimeError(f"Sandbox {sb_path} does not exist")
+                    raise RuntimeError(f"Failed to create sandbox: {sb_path} does not exist")
                 logger.info("Successfully stored output %s in Sandbox %s", output_name, sb_path)
 
     def __download_input_data(self, inputs: JobInputModel, job_path: Path) -> dict[str, Path | list[Path]]:
@@ -130,6 +130,11 @@ class JobWrapper:
            using `download_lfns` to ensure that the CWL job inputs reference
            the correct local files.
         """
+        for _, value in inputs.cwl.items():
+            files = value if isinstance(value, list) else [value]
+            for file in files:
+                if isinstance(file, File) and file.path:
+                    file.path = Path(file.path).name
         for input_name, path in updates.items():
             if isinstance(path, Path):
                 inputs.cwl[input_name] = File(path=str(path))
@@ -225,12 +230,14 @@ class JobWrapper:
 
         outputs = self.__parse_output_filepaths(stdout)
 
+        success = True
+
         if self.execution_hooks_plugin:
-            return self.execution_hooks_plugin.post_process(self.job_path, outputs=outputs)
+            success = self.execution_hooks_plugin.post_process(self.job_path, outputs=outputs)
 
         self.__upload_output_sandbox(outputs=outputs)
 
-        return True
+        return success
 
     def run_job(self, job: JobModel) -> bool:
         """Execute a given CWL workflow using cwltool.
