@@ -8,7 +8,7 @@ import random
 import shutil
 import subprocess
 from pathlib import Path
-from typing import Sequence, cast
+from typing import Any, List, Sequence, cast
 
 from cwl_utils.parser import (
     save,
@@ -26,6 +26,8 @@ from DIRACCommon.Core.Utilities.ReturnValues import (  # type: ignore[import-unt
 from rich.text import Text
 from ruamel.yaml import YAML
 
+from dirac_cwl_proto.commands import PostProcessCommand, PreProcessCommand
+from dirac_cwl_proto.core.exceptions import WorkflowProcessingException
 from dirac_cwl_proto.core.utility import get_lfns
 from dirac_cwl_proto.execution_hooks import ExecutionHooksHint
 from dirac_cwl_proto.execution_hooks.core import ExecutionHooksBasePlugin
@@ -208,7 +210,7 @@ class JobWrapper:
             command.append(str(parameter_path.name))
 
         if self.execution_hooks_plugin:
-            return self.execution_hooks_plugin.pre_process(executable, arguments, self.job_path, command)
+            return self.pre_process(executable, arguments, self.job_path, command)
 
         return command
 
@@ -235,11 +237,89 @@ class JobWrapper:
         success = True
 
         if self.execution_hooks_plugin:
-            success = self.execution_hooks_plugin.post_process(self.job_path, outputs=outputs)
+            success = self.post_process(self.job_path, outputs=outputs)
 
         self.__upload_output_sandbox(outputs=outputs)
 
         return success
+
+    def pre_process(
+        self,
+        executable: CommandLineTool | Workflow | ExpressionTool,
+        arguments: Any | None,
+        job_path: Path,
+        command: List[str],
+        **kwargs: Any,
+    ) -> List[str]:
+        """Pre-process job inputs and command before execution.
+
+        :param CommandLineTool | Workflow | ExpressionTool executable:
+            The CWL tool, workflow, or expression to be executed.
+        :param JobInputModel arguments:
+            The job inputs, including CWL and LFN data.
+        :param Path job_path:
+            Path to the job working directory.
+        :param list[str] command:
+            The command to be executed, which will be modified.
+        :param Any **kwargs:
+            Additional parameters, allowing extensions to pass extra context
+            or configuration options.
+
+        :return list[str]:
+            The modified command, typically including the serialized CWL
+            input file path.
+        """
+        if not self.execution_hooks_plugin:
+            raise RuntimeWarning("Could not run pre_process: Execution hook is not defined.")
+
+        for preprocess_command in self.execution_hooks_plugin.preprocess_commands:
+            if not issubclass(preprocess_command, PreProcessCommand):
+                msg = f"The command {preprocess_command} is not a {PreProcessCommand.__name__}"
+                logger.error(msg)
+                raise TypeError(msg)
+
+            try:
+                preprocess_command().execute(job_path, **kwargs)
+            except Exception as e:
+                msg = f"Command '{preprocess_command.__name__}' failed during the pre-process stage: {e}"
+                logger.exception(msg)
+                raise WorkflowProcessingException(msg) from e
+
+        return command
+
+    def post_process(
+        self,
+        job_path: Path,
+        outputs: dict[str, str | Path | Sequence[str | Path]] = {},
+        **kwargs: Any,
+    ) -> bool:
+        """Post-process job outputs.
+
+        :param Path job_path:
+            Path to the job working directory.
+        :param str|None stdout:
+            cwltool standard output.
+        :param Any **kwargs:
+            Additional keyword arguments for extensibility.
+        """
+        if not self.execution_hooks_plugin:
+            raise RuntimeWarning("Could not run pre_process: Execution hook is not defined.")
+
+        for postprocess_command in self.execution_hooks_plugin.postprocess_commands:
+            if not issubclass(postprocess_command, PostProcessCommand):
+                msg = f"The command {postprocess_command} is not a {PostProcessCommand.__name__}"
+                logger.error(msg)
+                raise TypeError(msg)
+
+            try:
+                postprocess_command().execute(job_path, **kwargs)
+            except Exception as e:
+                msg = f"Command '{postprocess_command.__name__}' failed during the post-process stage: {e}"
+                logger.exception(msg)
+                raise WorkflowProcessingException(msg) from e
+
+        self.execution_hooks_plugin.store_output(outputs)
+        return True
 
     def run_job(self, job: JobModel) -> bool:
         """Execute a given CWL workflow using cwltool.

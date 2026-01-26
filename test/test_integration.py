@@ -18,6 +18,7 @@ from dirac_cwl_proto.execution_hooks.core import (
     ExecutionHooksHint,
     SchedulingHint,
 )
+from dirac_cwl_proto.job.job_wrapper import JobWrapper
 
 
 class TestSystemIntegration:
@@ -85,11 +86,13 @@ class TestRealWorldScenarios:
         command = ["python", "user_script.py"]
 
         # Pre-process should return a command list (may be modified by plugin)
-        processed_command = user_runtime.pre_process(None, None, job_path, command)
+        job_wrapper = JobWrapper()
+        job_wrapper.execution_hooks_plugin = user_runtime
+        processed_command = job_wrapper.pre_process(None, None, job_path, command)
         assert isinstance(processed_command, list)
 
         # Post-process should return a boolean
-        result = user_runtime.post_process(job_path)
+        result = job_wrapper.post_process(job_path)
         assert isinstance(result, bool)
 
     def test_admin_workflow_scenario(self):
@@ -116,7 +119,9 @@ class TestRealWorldScenarios:
         job_path = Path("/tmp/admin_job")
         command = ["python", "admin_script.py"]
 
-        processed_command = admin_runtime.pre_process(None, None, job_path, command)
+        job_wrapper = JobWrapper()
+        job_wrapper.execution_hooks_plugin = admin_runtime
+        processed_command = job_wrapper.pre_process(None, None, job_path, command)
         assert isinstance(processed_command, list)
 
     def test_data_analysis_workflow_scenario(self):
