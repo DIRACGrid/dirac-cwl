@@ -235,18 +235,6 @@ def test_run_job_validation_failure(cli_runner, cleanup, cwl_file, inputs, expec
         )
 
 
-def read_interval(p: Path):
-    """Read interval."""
-    start, end = p.read_text().splitlines()
-    return int(start), int(end)
-
-
-def overlaps(a, b):
-    """Check if two intervals overlap."""
-    (a0, a1), (b0, b1) = a, b
-    return a0 < b1 and b0 < a1
-
-
 @pytest.mark.skipif(
     platform.system() != "Linux" or not shutil.which("taskset"), reason="taskset command only available on Linux"
 )
@@ -265,15 +253,24 @@ def test_run_job_parallely(tmp_path, cleanup):
     allowed = sorted(allowed)
     cpu0, cpu1 = allowed[0], allowed[1]
 
+    def read_interval(p: Path):
+        """Read interval."""
+        start, end = p.read_text().splitlines()
+        return int(start), int(end)
+
+    def overlaps(a, b):
+        """Check if two intervals overlap."""
+        (a0, a1), (b0, b1) = a, b
+        return a0 < b1 and b0 < a1
+
     def run(cpu_spec: str):
-        result = subprocess.run(
+        subprocess.run(
             ["taskset", "-c", cpu_spec, "dirac-cwl", "job", "submit", str(workflow)],
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             text=True,
             check=True,
         )
-        print(result.stdout)
 
         # TODO: need to find a way to get a job id and associate the output sandbox to the job id
         sandbox_files = list(Path(SANDBOX_STORE_DIR).glob("*.tar.*"))
