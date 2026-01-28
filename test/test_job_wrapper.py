@@ -24,11 +24,11 @@ class TestJobWrapper:
 
         # Test default pre_process behavior
         command = ["echo", "hello"]
-        result = job_wrapper.pre_process({}, None, Path("/tmp"), command)
+        result = job_wrapper._JobWrapper__pre_process_hooks({}, None, Path("/tmp"), command)
         assert result == command  # Should return command unchanged
 
         # Test default post_process behavior
-        job_wrapper.post_process(Path("/tmp"), exit_code=0)  # Should not raise any exception
+        job_wrapper._JobWrapper__post_process_hooks(Path("/tmp"), exit_code=0)  # Should not raise any exception
 
     def test_execute(self, job_type_testing, mocker, monkeypatch):
         """Test the execution of the preprocess and postprocess commands.
@@ -69,13 +69,13 @@ class TestJobWrapper:
         plugin.preprocess_commands = [PreProcessCmd, DualProcessCmd]
         plugin.postprocess_commands = [PostProcessCmd, DualProcessCmd]
 
-        job_wrapper.pre_process("/fake/dir", None, "", ["fake", "command"])
+        job_wrapper._JobWrapper__pre_process_hooks("/fake/dir", None, "", ["fake", "command"])
         execute_preprocess_mock.assert_called_once()
         execute_dualprocess_mock.assert_called_once()
 
         execute_dualprocess_mock.reset_mock()  # Reset the mock to be able to call "assert_called_once"
 
-        job_wrapper.post_process("/fake/dir")
+        job_wrapper._JobWrapper__post_process_hooks("/fake/dir")
         execute_postprocess_mock.assert_called_once()
         execute_dualprocess_mock.assert_called_once()
 
@@ -85,10 +85,10 @@ class TestJobWrapper:
         plugin.postprocess_commands = [PreProcessCmd, DualProcessCmd]
 
         with pytest.raises(TypeError):
-            job_wrapper.pre_process("/fake/dir", None, "", ["fake", "command"])
+            job_wrapper._JobWrapper__pre_process_hooks("/fake/dir", None, "", ["fake", "command"])
 
         with pytest.raises(TypeError):
-            job_wrapper.post_process("/fake/dir")
+            job_wrapper._JobWrapper__post_process_hooks("/fake/dir")
 
     def test_command_exception(self, job_type_testing, mocker, monkeypatch):
         """Test exception report when a command fails.
@@ -118,7 +118,7 @@ class TestJobWrapper:
 
         # The processing steps should raise a "WorkflowProcessingException"
         with pytest.raises(WorkflowProcessingException):
-            job_wrapper.pre_process("/fake/dir", None, "", ["fake", "command"])
+            job_wrapper._JobWrapper__pre_process_hooks("/fake/dir", None, "", ["fake", "command"])
 
         with pytest.raises(WorkflowProcessingException):
-            job_wrapper.post_process("/fake/dir")
+            job_wrapper._JobWrapper__post_process_hooks("/fake/dir")

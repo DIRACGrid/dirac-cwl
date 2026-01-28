@@ -88,11 +88,11 @@ class TestRealWorldScenarios:
         # Pre-process should return a command list (may be modified by plugin)
         job_wrapper = JobWrapper()
         job_wrapper.execution_hooks_plugin = user_runtime
-        processed_command = job_wrapper.pre_process(None, None, job_path, command)
+        processed_command = job_wrapper._JobWrapper__pre_process_hooks(None, None, job_path, command)
         assert isinstance(processed_command, list)
 
         # Post-process should return a boolean
-        result = job_wrapper.post_process(job_path)
+        result = job_wrapper._JobWrapper__post_process_hooks(job_path)
         assert isinstance(result, bool)
 
     def test_admin_workflow_scenario(self):
@@ -121,7 +121,7 @@ class TestRealWorldScenarios:
 
         job_wrapper = JobWrapper()
         job_wrapper.execution_hooks_plugin = admin_runtime
-        processed_command = job_wrapper.pre_process(None, None, job_path, command)
+        processed_command = job_wrapper._JobWrapper__pre_process_hooks(None, None, job_path, command)
         assert isinstance(processed_command, list)
 
     def test_data_analysis_workflow_scenario(self):

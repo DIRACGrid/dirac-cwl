@@ -170,7 +170,7 @@ class JobWrapper:
             outputted_files[output] = file_paths
         return outputted_files
 
-    def _pre_process(
+    def pre_process(
         self,
         executable: CommandLineTool | Workflow | ExpressionTool,
         arguments: JobInputModel | None,
@@ -210,11 +210,11 @@ class JobWrapper:
             command.append(str(parameter_path.name))
 
         if self.execution_hooks_plugin:
-            return self.pre_process(executable, arguments, self.job_path, command)
+            return self.__pre_process_hooks(executable, arguments, self.job_path, command)
 
         return command
 
-    def _post_process(
+    def post_process(
         self,
         status: int,
         stdout: str,
@@ -237,13 +237,13 @@ class JobWrapper:
         success = True
 
         if self.execution_hooks_plugin:
-            success = self.post_process(self.job_path, outputs=outputs)
+            success = self.__post_process_hooks(self.job_path, outputs=outputs)
 
         self.__upload_output_sandbox(outputs=outputs)
 
         return success
 
-    def pre_process(
+    def __pre_process_hooks(
         self,
         executable: CommandLineTool | Workflow | ExpressionTool,
         arguments: Any | None,
@@ -270,7 +270,7 @@ class JobWrapper:
             input file path.
         """
         if not self.execution_hooks_plugin:
-            raise RuntimeWarning("Could not run pre_process: Execution hook is not defined.")
+            raise RuntimeWarning("Could not run pre_process_hooks: Execution hook is not defined.")
 
         for preprocess_command in self.execution_hooks_plugin.preprocess_commands:
             if not issubclass(preprocess_command, PreProcessCommand):
@@ -287,7 +287,7 @@ class JobWrapper:
 
         return command
 
-    def post_process(
+    def __post_process_hooks(
         self,
         job_path: Path,
         outputs: dict[str, str | Path | Sequence[str | Path]] = {},
@@ -303,7 +303,7 @@ class JobWrapper:
             Additional keyword arguments for extensibility.
         """
         if not self.execution_hooks_plugin:
-            raise RuntimeWarning("Could not run pre_process: Execution hook is not defined.")
+            raise RuntimeWarning("Could not run post_process_hooks: Execution hook is not defined.")
 
         for postprocess_command in self.execution_hooks_plugin.postprocess_commands:
             if not issubclass(postprocess_command, PostProcessCommand):
@@ -342,7 +342,7 @@ class JobWrapper:
         try:
             # Pre-process the job
             logger.info("Pre-processing Task...")
-            command = self._pre_process(job.task, job.input)
+            command = self.pre_process(job.task, job.input)
             logger.info("Task pre-processed successfully!")
 
             # Execute the task
@@ -356,7 +356,7 @@ class JobWrapper:
 
             # Post-process the job
             logger.info("Post-processing Task...")
-            if self._post_process(
+            if self.post_process(
                 result.returncode,
                 result.stdout,
                 result.stderr,
