@@ -1,6 +1,9 @@
 """Common pytest fixture used by test modules."""
 
 import pytest
+from cwl_utils.parser.cwl_v1_2 import CommandLineTool
+
+from dirac_cwl_proto.submission_models import JobModel
 
 
 @pytest.fixture
@@ -32,3 +35,17 @@ def job_type_testing():
 
     # Tear down
     registry._plugins.pop(JobTypeTestingPlugin.__name__)
+
+
+@pytest.fixture
+def sample_command_line_tool():
+    """Create a sample CommandLineTool."""
+    return CommandLineTool(
+        id=".", inputs=[], outputs=[], requirements=[], cwlVersion="v1.2", baseCommand=["echo", "Hello World"]
+    )
+
+
+@pytest.fixture
+def sample_job(sample_command_line_tool):
+    """Create a sample JobModel."""
+    return JobModel(task=sample_command_line_tool)
