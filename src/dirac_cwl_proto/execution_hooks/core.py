@@ -23,11 +23,6 @@ from typing import (
     Union,
 )
 
-from cwl_utils.parser.cwl_v1_2 import (
-    CommandLineTool,
-    ExpressionTool,
-    Workflow,
-)
 from DIRAC.DataManagementSystem.Client.DataManager import (  # type: ignore[import-untyped]
     DataManager,
 )
@@ -37,7 +32,6 @@ from DIRACCommon.Core.Utilities.ReturnValues import (  # type: ignore[import-unt
 from pydantic import BaseModel, ConfigDict, Field, PrivateAttr
 
 from dirac_cwl_proto.commands import PostProcessCommand, PreProcessCommand
-from dirac_cwl_proto.core.exceptions import WorkflowProcessingException
 from dirac_cwl_proto.data_management_mocks.data_manager import MockDataManager
 
 logger = logging.getLogger(__name__)
@@ -110,78 +104,6 @@ class ExecutionHooksBasePlugin(BaseModel):
     def name(cls) -> str:
         """Auto-derive hook plugin identifier from class name."""
         return cls.__name__
-
-    def pre_process(
-        self,
-        executable: CommandLineTool | Workflow | ExpressionTool,
-        arguments: Any | None,
-        job_path: Path,
-        command: List[str],
-        **kwargs: Any,
-    ) -> List[str]:
-        """Pre-process job inputs and command before execution.
-
-        :param CommandLineTool | Workflow | ExpressionTool executable:
-            The CWL tool, workflow, or expression to be executed.
-        :param JobInputModel arguments:
-            The job inputs, including CWL and LFN data.
-        :param Path job_path:
-            Path to the job working directory.
-        :param list[str] command:
-            The command to be executed, which will be modified.
-        :param Any **kwargs:
-            Additional parameters, allowing extensions to pass extra context
-            or configuration options.
-
-        :return list[str]:
-            The modified command, typically including the serialized CWL
-            input file path.
-        """
-        for preprocess_command in self.preprocess_commands:
-            if not issubclass(preprocess_command, PreProcessCommand):
-                msg = f"The command {preprocess_command} is not a {PreProcessCommand.__name__}"
-                logger.error(msg)
-                raise TypeError(msg)
-
-            try:
-                preprocess_command().execute(job_path, **kwargs)
-            except Exception as e:
-                msg = f"Command '{preprocess_command.__name__}' failed during the pre-process stage: {e}"
-                logger.exception(msg)
-                raise WorkflowProcessingException(msg) from e
-
-        return command
-
-    def post_process(
-        self,
-        job_path: Path,
-        outputs: dict[str, str | Path | Sequence[str | Path]] = {},
-        **kwargs: Any,
-    ) -> bool:
-        """Post-process job outputs.
-
-        :param Path job_path:
-            Path to the job working directory.
-        :param str|None stdout:
-            cwltool standard output.
-        :param Any **kwargs:
-            Additional keyword arguments for extensibility.
-        """
-        for postprocess_command in self.postprocess_commands:
-            if not issubclass(postprocess_command, PostProcessCommand):
-                msg = f"The command {postprocess_command} is not a {PostProcessCommand.__name__}"
-                logger.error(msg)
-                raise TypeError(msg)
-
-            try:
-                postprocess_command().execute(job_path, **kwargs)
-            except Exception as e:
-                msg = f"Command '{postprocess_command.__name__}' failed during the post-process stage: {e}"
-                logger.exception(msg)
-                raise WorkflowProcessingException(msg) from e
-
-        self.store_output(outputs)
-        return True
 
     def store_output(
         self,

@@ -6,9 +6,11 @@ including plugin discovery, registration, CWL integration, and real-world
 usage scenarios.
 """
 
-from pathlib import Path
+import os
 
 import pytest
+
+os.environ["DIRAC_PROTO_LOCAL"] = "1"
 
 from dirac_cwl_proto.execution_hooks import (
     get_registry,
@@ -18,6 +20,7 @@ from dirac_cwl_proto.execution_hooks.core import (
     ExecutionHooksHint,
     SchedulingHint,
 )
+from dirac_cwl_proto.job.job_wrapper import JobWrapper
 
 
 class TestSystemIntegration:
@@ -68,7 +71,7 @@ class TestSystemIntegration:
 class TestRealWorldScenarios:
     """Test real-world usage scenarios."""
 
-    def test_user_workflow_scenario(self):
+    def test_user_workflow_scenario(self, sample_job):
         """Test a typical user workflow scenario."""
         # Use any available plugin for a generic runtime smoke test
         registry = get_registry()
@@ -81,18 +84,18 @@ class TestRealWorldScenarios:
         user_runtime = user_descriptor.to_runtime()
 
         # Simulate job execution
-        job_path = Path("/tmp/user_job")
-        command = ["python", "user_script.py"]
 
         # Pre-process should return a command list (may be modified by plugin)
-        processed_command = user_runtime.pre_process(None, None, job_path, command)
+        job_wrapper = JobWrapper()
+        job_wrapper.execution_hooks_plugin = user_runtime
+        processed_command = job_wrapper.pre_process(sample_job.task, None)
         assert isinstance(processed_command, list)
 
         # Post-process should return a boolean
-        result = user_runtime.post_process(job_path)
+        result = job_wrapper.post_process(0, "{}", "{}")
         assert isinstance(result, bool)
 
-    def test_admin_workflow_scenario(self):
+    def test_admin_workflow_scenario(self, sample_job):
         """Test an administrative workflow scenario."""
         # Generic admin-style smoke test: ensure a plugin accepts configuration
         registry = get_registry()
@@ -113,10 +116,9 @@ class TestRealWorldScenarios:
             pytest.skip(f"Plugin {plugin_name} cannot be instantiated with configuration")
 
         # Simulate job execution
-        job_path = Path("/tmp/admin_job")
-        command = ["python", "admin_script.py"]
-
-        processed_command = admin_runtime.pre_process(None, None, job_path, command)
+        job_wrapper = JobWrapper()
+        job_wrapper.execution_hooks_plugin = admin_runtime
+        processed_command = job_wrapper.pre_process(sample_job.task, None)
         assert isinstance(processed_command, list)
 
     def test_data_analysis_workflow_scenario(self):

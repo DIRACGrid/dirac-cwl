@@ -6,8 +6,7 @@ plugin system, including ExecutionHooksBasePlugin, ExecutionHooksHint, and core
 abstract interfaces.
 """
 
-from pathlib import Path
-from typing import Any, List, Optional
+from typing import Optional
 
 import pytest
 from pytest_mock import MockerFixture
@@ -18,46 +17,6 @@ from dirac_cwl_proto.execution_hooks.core import (
     SchedulingHint,
     TransformationExecutionHooksHint,
 )
-
-
-class TestExecutionHook:
-    """Test the ExecutionHooksBasePlugin abstract base class."""
-
-    def test_instantiation(self):
-        """Test that ExecutionHooksBasePlugin can be instantiated directly with default behavior."""
-        hook = ExecutionHooksBasePlugin()
-
-        # Test default pre_process behavior
-        command = ["echo", "hello"]
-        result = hook.pre_process({}, None, Path("/tmp"), command)
-        assert result == command  # Should return command unchanged
-
-        # Test default post_process behavior
-        hook.post_process(Path("/tmp"), exit_code=0)  # Should not raise any exception
-
-    def test_concrete_implementation(self):
-        """Test that concrete implementations work correctly."""
-
-        class ConcreteHook(ExecutionHooksBasePlugin):
-            def pre_process(
-                self,
-                executable,
-                arguments,
-                job_path: Path,
-                command: List[str],
-                **kwargs: Any,
-            ) -> List[str]:
-                command = super().pre_process(executable, arguments, job_path, command, **kwargs)
-                return command + ["--processed"]
-
-        processor = ConcreteHook()
-
-        # Test pre_process
-        result = processor.pre_process({}, None, Path("/tmp"), ["echo", "hello"])
-        assert result == ["echo", "hello", "--processed"]
-
-        # Test post_process
-        processor.post_process(Path("/tmp"))  # Should not raise exception
 
 
 class TestExecutionHookExtended:
