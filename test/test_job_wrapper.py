@@ -105,20 +105,14 @@ class TestJobWrapper:
         """
         from dirac_cwl_proto.commands import PostProcessCommand, PreProcessCommand
 
-        # Initialization
+        # Initialization and set the execute function to raise an exception
         class Command(PreProcessCommand, PostProcessCommand):
             def execute(job_path, **kwargs):
-                return
+                raise NotImplementedError()
 
         plugin = job_type_testing()
         job_wrapper = JobWrapper()
         job_wrapper.execution_hooks_plugin = plugin
-
-        # Set the execute function to raise an exception
-        execute_mock = mocker.MagicMock()
-        execute_mock.side_effect = NotImplementedError()
-
-        monkeypatch.setattr(Command, "execute", execute_mock)
 
         plugin.preprocess_commands = [Command]
         plugin.postprocess_commands = [Command]
