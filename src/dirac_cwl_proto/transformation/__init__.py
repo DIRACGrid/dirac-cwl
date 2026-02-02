@@ -11,6 +11,7 @@ import typer
 from cwl_utils.pack import pack
 from cwl_utils.parser import load_document
 from cwl_utils.parser.cwl_v1_2 import File
+from cwl_utils.parser.cwl_v1_2_utils import load_inputfile
 from rich import print_json
 from rich.console import Console
 from schema_salad.exceptions import ValidationException
@@ -37,6 +38,7 @@ console = Console()
 @app.command("submit")
 def submit_transformation_client(
     task_path: str = typer.Argument(..., help="Path to the CWL file"),
+    inputs_file: str | None = typer.Option(None, help="Path to the CWL inputs file"),
     # Specific parameter for the purpose of the prototype
     local: Optional[bool] = typer.Option(True, help="Run the jobs locally instead of submitting them to the router"),
 ):
@@ -52,6 +54,14 @@ def submit_transformation_client(
     console.print("[blue]:information_source:[/blue] [bold]CLI:[/bold] Validating the transformation...")
     try:
         task = load_document(pack(task_path))
+
+        # Load Transformation inputs if existing TODO:
+        input_data = None
+        if inputs_file:
+            input_data = load_inputfile(inputs_file).get("input-data")
+        elif task.inputs and task.inputs.input_data:
+            input_data = task.inputs.input_data
+
     except FileNotFoundError as ex:
         console.print(f"[red]:heavy_multiplication_x:[/red] [bold]CLI:[/bold] Failed to load the task:\n{ex}")
         return typer.Exit(code=1)
@@ -60,7 +70,7 @@ def submit_transformation_client(
         return typer.Exit(code=1)
     console.print(f"\t[green]:heavy_check_mark:[/green] Task {task_path}")
 
-    transformation = TransformationSubmissionModel(task=task)
+    transformation = TransformationSubmissionModel(task=task, input_data=input_data)
     console.print("[green]:heavy_check_mark:[/green] [bold]CLI:[/bold] Transformation validated.")
 
     # Submit the transformation
