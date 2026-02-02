@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from typing import Any, Optional
 
-from cwl_utils.parser import save
+from cwl_utils.parser import File, save
 from cwl_utils.parser.cwl_v1_2 import (
     CommandLineTool,
     ExpressionTool,
@@ -95,8 +95,6 @@ class JobModel(BaseJobModel):
 # -----------------------------------------------------------------------------
 # Transformation models
 # -----------------------------------------------------------------------------
-
-
 class TransformationSubmissionModel(BaseModel):
     """Transformation definition sent to the router."""
 
@@ -104,6 +102,7 @@ class TransformationSubmissionModel(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     task: CommandLineTool | Workflow | ExpressionTool
+    input_data: Optional[list[str | File] | None] = None
 
     @field_serializer("task")
     def serialize_task(self, value):
@@ -117,6 +116,15 @@ class TransformationSubmissionModel(BaseModel):
             return save(value)
         else:
             raise TypeError(f"Cannot serialize type {type(value)}")
+
+    @field_serializer("input_data")
+    def serialize_input_data(self, value):
+        """Serialize an input data list to a list of strings.
+
+        :param value: Input data list to serialize.
+        :return: Serialized input data list.
+        """
+        return [save(item) if isinstance(item, File) else item for item in value]
 
     @model_validator(mode="before")
     def validate_hints(cls, values):
