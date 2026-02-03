@@ -1,0 +1,301 @@
+input-data:
+  - class: File
+    path: file_1.sim
+  - class: File
+    path: file_2.sim
+  - class: File
+    path: file_3.sim
+  - class: File
+    path: file_4.sim
+  - class: File
+    path: file_5.sim
+  - class: File
+    path: file_6.sim
+  - class: File
+    path: file_7.sim
+  - class: File
+    path: file_8.sim
+  - class: File
+    path: file_9.sim
+  - class: File
+    path: file_10.sim
+  - class: File
+    path: file_11.sim
+  - class: File
+    path: file_12.sim
+  - class: File
+    path: file_13.sim
+  - class: File
+    path: file_14.sim
+  - class: File
+    path: file_15.sim
+  - class: File
+    path: file_16.sim
+  - class: File
+    path: file_17.sim
+  - class: File
+    path: file_18.sim
+  - class: File
+    path: file_19.sim
+  - class: File
+    path: file_20.sim
+  - class: File
+    path: file_21.sim
+  - class: File
+    path: file_22.sim
+  - class: File
+    path: file_23.sim
+  - class: File
+    path: file_24.sim
+  - class: File
+    path: file_25.sim
+  - class: File
+    path: file_26.sim
+  - class: File
+    path: file_27.sim
+  - class: File
+    path: file_28.sim
+  - class: File
+    path: file_29.sim
+  - class: File
+    path: file_30.sim
+  - class: File
+    path: file_31.sim
+  - class: File
+    path: file_32.sim
+  - class: File
+    path: file_33.sim
+  - class: File
+    path: file_34.sim
+  - class: File
+    path: file_35.sim
+  - class: File
+    path: file_36.sim
+  - class: File
+    path: file_37.sim
+  - class: File
+    path: file_38.sim
+  - class: File
+    path: file_39.sim
+  - class: File
+    path: file_40.sim
+  - class: File
+    path: file_41.sim
+  - class: File
+    path: file_42.sim
+  - class: File
+    path: file_43.sim
+  - class: File
+    path: file_44.sim
+  - class: File
+    path: file_45.sim
+  - class: File
+    path: file_46.sim
+  - class: File
+    path: file_47.sim
+  - class: File
+    path: file_48.sim
+  - class: File
+    path: file_49.sim
+  - class: File
+    path: file_50.sim
+  - class: File
+    path: file_51.sim
+  - class: File
+    path: file_52.sim
+  - class: File
+    path: file_53.sim
+  - class: File
+    path: file_54.sim
+  - class: File
+    path: file_55.sim
+  - class: File
+    path: file_56.sim
+  - class: File
+    path: file_57.sim
+  - class: File
+    path: file_58.sim
+  - class: File
+    path: file_59.sim
+  - class: File
+    path: file_60.sim
+  - class: File
+    path: file_61.sim
+  - class: File
+    path: file_62.sim
+  - class: File
+    path: file_63.sim
+  - class: File
+    path: file_64.sim
+  - class: File
+    path: file_65.sim
+  - class: File
+    path: file_66.sim
+  - class: File
+    path: file_67.sim
+  - class: File
+    path: file_68.sim
+  - class: File
+    path: file_69.sim
+  - class: File
+    path: file_70.sim
+  - class: File
+    path: file_71.sim
+  - class: File
+    path: file_72.sim
+  - class: File
+    path: file_73.sim
+  - class: File
+    path: file_74.sim
+  - class: File
+    path: file_75.sim
+  - class: File
+    path: file_76.sim
+  - class: File
+    path: file_77.sim
+  - class: File
+    path: file_78.sim
+  - class: File
+    path: file_79.sim
+  - class: File
+    path: file_80.sim
+  - class: File
+    path: file_81.sim
+  - class: File
+    path: file_82.sim
+  - class: File
+    path: file_83.sim
+  - class: File
+    path: file_84.sim
+  - class: File
+    path: file_85.sim
+  - class: File
+    path: file_86.sim
+  - class: File
+    path: file_87.sim
+  - class: File
+    path: file_88.sim
+  - class: File
+    path: file_89.sim
+  - class: File
+    path: file_90.sim
+  - class: File
+    path: file_91.sim
+  - class: File
+    path: file_92.sim
+  - class: File
+    path: file_93.sim
+  - class: File
+    path: file_94.sim
+  - class: File
+    path: file_95.sim
+  - class: File
+    path: file_96.sim
+  - class: File
+    path: file_97.sim
+  - class: File
+    path: file_98.sim
+  - class: File
+    path: file_99.sim
+  - class: File
+    path: file_100.sim
+  - class: File
+    path: file_101.sim
+  - class: File
+    path: file_102.sim
+  - class: File
+    path: file_103.sim
+  - class: File
+    path: file_104.sim
+  - class: File
+    path: file_105.sim
+  - class: File
+    path: file_106.sim
+  - class: File
+    path: file_107.sim
+  - class: File
+    path: file_108.sim
+  - class: File
+    path: file_109.sim
+  - class: File
+    path: file_110.sim
+  - class: File
+    path: file_111.sim
+  - class: File
+    path: file_112.sim
+  - class: File
+    path: file_113.sim
+  - class: File
+    path: file_114.sim
+  - class: File
+    path: file_115.sim
+  - class: File
+    path: file_116.sim
+  - class: File
+    path: file_117.sim
+  - class: File
+    path: file_118.sim
+  - class: File
+    path: file_119.sim
+  - class: File
+    path: file_120.sim
+  - class: File
+    path: file_121.sim
+  - class: File
+    path: file_122.sim
+  - class: File
+    path: file_123.sim
+  - class: File
+    path: file_124.sim
+  - class: File
+    path: file_125.sim
+  - class: File
+    path: file_126.sim
+  - class: File
+    path: file_127.sim
+  - class: File
+    path: file_128.sim
+  - class: File
+    path: file_129.sim
+  - class: File
+    path: file_130.sim
+  - class: File
+    path: file_131.sim
+  - class: File
+    path: file_132.sim
+  - class: File
+    path: file_133.sim
+  - class: File
+    path: file_134.sim
+  - class: File
+    path: file_135.sim
+  - class: File
+    path: file_136.sim
+  - class: File
+    path: file_137.sim
+  - class: File
+    path: file_138.sim
+  - class: File
+    path: file_139.sim
+  - class: File
+    path: file_140.sim
+  - class: File
+    path: file_141.sim
+  - class: File
+    path: file_142.sim
+  - class: File
+    path: file_143.sim
+  - class: File
+    path: file_144.sim
+  - class: File
+    path: file_145.sim
+  - class: File
+    path: file_146.sim
+  - class: File
+    path: file_147.sim
+  - class: File
+    path: file_148.sim
+  - class: File
+    path: file_149.sim
+  - class: File
+    path: file_150.sim
