@@ -124,7 +124,9 @@ class TransformationSubmissionModel(BaseModel):
         :param value: Input data list to serialize.
         :return: Serialized input data list.
         """
-        return [save(item) if isinstance(item, File) else item for item in value]
+        if value:
+            return [save(item) if isinstance(item, File) else item for item in value]
+        return None
 
     @model_validator(mode="before")
     def validate_hints(cls, values):
