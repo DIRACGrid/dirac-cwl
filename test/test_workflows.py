@@ -342,31 +342,42 @@ def test_run_job_with_input_data(cli_runner, cleanup, pi_test_files, cwl_file, i
 
 
 @pytest.mark.parametrize(
-    "cwl_file",
+    "cwl_file, inputs_file",
     [
         # --- Hello World example ---
         # There is no input expected
-        "test/workflows/helloworld/description_basic.cwl",
+        ("test/workflows/helloworld/description_basic.cwl", None),
         # --- Crypto example ---
         # Complete
-        "test/workflows/crypto/description.cwl",
+        ("test/workflows/crypto/description.cwl", None),
         # Caesar only
-        "test/workflows/crypto/caesar.cwl",
+        ("test/workflows/crypto/caesar.cwl", None),
         # ROT13 only
-        "test/workflows/crypto/rot13.cwl",
+        ("test/workflows/crypto/rot13.cwl", None),
         # Base64 only
-        "test/workflows/crypto/base64.cwl",
+        ("test/workflows/crypto/base64.cwl", None),
         # MD5 only
-        "test/workflows/crypto/md5.cwl",
+        ("test/workflows/crypto/md5.cwl", None),
         # --- Pi example ---
         # Pi simulate transformation
-        "test/workflows/pi/pisimulate.cwl",
+        ("test/workflows/pi/pisimulate.cwl", None),
+        # --- Job Grouping ---
+        (
+            "test/workflows/automatic_job_grouping/job_grouping.cwl",
+            "test/workflows/automatic_job_grouping/inputs_files-strings.yaml",
+        ),
+        # TODO: make this test sample work (problem is File not existing):
+        # ("test/workflows/automatic_job_grouping/job_grouping.cwl",
+        # "test/workflows/automatic_job_grouping/inputs_files.yaml")
     ],
 )
-def test_run_nonblocking_transformation_success(cli_runner, cleanup, cwl_file):
+def test_run_nonblocking_transformation_success(cli_runner, cleanup, cwl_file, inputs_file):
     """Test successful non-blocking transformation submission and execution."""
     # CWL file is the first argument
     command = ["transformation", "submit", cwl_file]
+
+    if inputs_file:
+        command.extend(["--inputs-file", inputs_file])
 
     result = cli_runner.invoke(app, command)
     clean_output = strip_ansi_codes(result.stdout)
