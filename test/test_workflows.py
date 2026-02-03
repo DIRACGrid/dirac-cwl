@@ -384,6 +384,8 @@ def test_run_nonblocking_transformation_success(cli_runner, cleanup, cwl_file, i
     assert "Transformation done" in clean_output, f"Failed to run the transformation: {result.stdout}"
 
 
+# TODO: re-enable this test once approval on questions of new Job Grouping
+@pytest.mark.skip(reason="Waiting for approval on new Job Grouping (the tested code is currently commented)")
 @pytest.mark.parametrize(
     "cwl_file, destination_source_input_data",
     [

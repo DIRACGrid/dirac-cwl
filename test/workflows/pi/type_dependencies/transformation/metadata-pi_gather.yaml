@@ -1,7 +1,7 @@
 - class: dirac:ExecutionHooks
   hook_plugin: QueryBasedPlugin
   group_size:
-    input-data: 5
+    input_data: 5
   configuration:
     num_points: 100
     query_root: "."

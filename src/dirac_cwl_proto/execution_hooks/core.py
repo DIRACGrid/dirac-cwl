@@ -337,4 +337,6 @@ class ExecutionHooksHint(BaseModel, Hint):
 class TransformationExecutionHooksHint(ExecutionHooksHint):
     """Extended data manager for transformations."""
 
-    group_size: Optional[int] = Field(default=None, description="Input grouping configuration for transformation jobs")
+    group_size: Optional[Dict[str, int]] = Field(
+        default=None, description="Input grouping configuration for transformation jobs"
+    )

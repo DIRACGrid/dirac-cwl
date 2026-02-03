@@ -19,7 +19,8 @@ outputs:
 
 hints:
   - class: dirac:ExecutionHooks
-    group_size: 46 # should create 4 jobs: 46/46/46/12 files
+    group_size:
+      input_data: 46 # should create 4 jobs: 46/46/46/12 files
     output_sandbox: ["result-file"]
 
 steps:
