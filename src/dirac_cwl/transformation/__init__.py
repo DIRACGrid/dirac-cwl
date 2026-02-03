@@ -112,7 +112,7 @@ def submit_transformation_router(transformation: TransformationSubmissionModel) 
 
     if transformation.input_data:
         nb_files = len(transformation.input_data)
-        group_size = transformation_execution_hooks.group_size or nb_files
+        group_size = (transformation_execution_hooks.group_size or {}).get("input_data") or nb_files
         nb_groups = (nb_files + group_size - 1) // group_size
         logger.info("Creating %s jobs for the transformation with group size of %s...", nb_groups, group_size)
 
