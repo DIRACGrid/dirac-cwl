@@ -1,0 +1,91 @@
+name: Deployment
+
+on:
+  push:
+    tags:
+      - 'v*'
+  pull_request:
+    paths-ignore:
+      - 'CHANGELOG.md'
+  schedule:
+    - cron: '0 10 * * *'
+
+jobs:
+  deploy-pypi:
+    name: PyPI deployment
+    runs-on: "ubuntu-latest"
+    if: github.event_name != 'push' || github.repository == 'DIRACGrid/dirac-cwl'
+    outputs:
+      new-version: ${{ steps.check-tag.outputs.new-version }}
+      create-release: ${{ steps.check-tag.outputs.create-release }}
+    permissions:
+      id-token: write  # IMPORTANT: this permission is mandatory for trusted publishing on pypi
+      actions: write
+      checks: write
+      contents: write
+      deployments: write
+      discussions: write
+      issues: write
+      packages: write
+      pages: write
+      pull-requests: write
+      repository-projects: write
+      security-events: write
+      statuses: write
+    defaults:
+      run:
+        # We need extglob for REFERENCE_BRANCH substitution
+        shell: bash -l -O extglob {0}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          token: ${{ github.token }}
+      - run: |
+          git fetch --prune --unshallow
+          git config --global user.email "ci@diracgrid.org"
+          git config --global user.name "DIRACGrid CI"
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+      - name: Installing dependencies
+        run: |
+          python -m pip install \
+              build \
+              python-dateutil \
+              pytz \
+              readme_renderer[md] \
+              requests \
+              setuptools_scm
+      - name: Validate README for PyPI
+        run: |
+          python -m readme_renderer README.md -o /tmp/README.html
+      - name: Extract version from tag
+        id: check-tag
+        run: |
+          set -xeuo pipefail
+          IFS=$'\n\t'
+          # Check if this is a tag push
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            # Extract version from the tag
+            export NEW_VERSION="${GITHUB_REF#refs/tags/}"
+            echo "Deploying release $NEW_VERSION"
+            echo "create-release=true" >> $GITHUB_OUTPUT
+            echo "new-version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          else
+            echo "Not a tag push, skipping release"
+            echo "create-release=false" >> $GITHUB_OUTPUT
+          fi
+      - name: Build distributions
+        run: |
+          python -m build --outdir $PWD/dist .
+      - name: 'Upload Artifact'
+        uses: actions/upload-artifact@v6
+        with:
+          name: dirac-cwl-whl
+          path: dist/dirac-cwl-*.whl
+          retention-days: 5
+      # Use trusted publisher for pypi
+      # https://docs.pypi.org/trusted-publishers/
+      - name: Publish package on PyPI
+        if: steps.check-tag.outputs.create-release == 'true'
+        uses: pypa/gh-action-pypi-publish@release/v1
