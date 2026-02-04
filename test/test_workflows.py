@@ -12,8 +12,8 @@ from pathlib import Path
 import pytest
 from typer.testing import CliRunner
 
-from dirac_cwl_proto import app
-from dirac_cwl_proto.data_management_mocks.sandbox import SANDBOX_STORE_DIR, download_sandbox
+from dirac_cwl import app
+from dirac_cwl.data_management_mocks.sandbox import SANDBOX_STORE_DIR, download_sandbox
 
 
 def strip_ansi_codes(text: str) -> str:

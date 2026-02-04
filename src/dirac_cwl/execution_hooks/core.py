@@ -31,8 +31,8 @@ from DIRACCommon.Core.Utilities.ReturnValues import (  # type: ignore[import-unt
 )
 from pydantic import BaseModel, ConfigDict, Field, PrivateAttr
 
-from dirac_cwl_proto.commands import PostProcessCommand, PreProcessCommand
-from dirac_cwl_proto.data_management_mocks.data_manager import MockDataManager
+from dirac_cwl.commands import PostProcessCommand, PreProcessCommand
+from dirac_cwl.data_management_mocks.data_manager import MockDataManager
 
 logger = logging.getLogger(__name__)
 

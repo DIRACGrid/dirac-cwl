@@ -3,8 +3,8 @@
 </p>
 
 # Dirac CWL Prototype
-![Workflow tests](https://github.com/aldbr/dirac-cwl-proto/actions/workflows/main.yml/badge.svg?branch=main)
-![Schema Generation](https://github.com/aldbr/dirac-cwl-proto/actions/workflows/generate-schemas.yml/badge.svg?branch=main)
+![Workflow tests](https://github.com/DIRACGrid/dirac-cwl/actions/workflows/main.yml/badge.svg?branch=main)
+![Schema Generation](https://github.com/DIRACGrid/dirac-cwl/actions/workflows/generate-schemas.yml/badge.svg?branch=main)
 
 This Python prototype introduces a command-line interface (CLI) designed for the end-to-end execution of Common Workflow Language (CWL) workflows at different scales. It enables users to locally test CWL workflows, and then run them as jobs, transformations and/or productions.
 
@@ -98,7 +98,7 @@ pixi run lint
 To use the workflows and inputs directly with `cwltool`, you need to add the `modules` directory to the `$PATH`:
 
 ```bash
-export PATH=$PATH:</path/to/dirac-cwl-proto/src/dirac_cwl_proto/modules>
+export PATH=$PATH:</path/to/dirac-cwl/src/dirac_cwl/modules>
 cwltool <workflow_path> <inputs>
 ```
 
@@ -141,23 +141,23 @@ workflows/
 
 A pre/post-processing command allows the execution of code before and after the workflow.
 
-The commands should be stored at the `src/dirac_cwl_proto/commands/` directory
+The commands should be stored at the `src/dirac_cwl/commands/` directory
 
 To add a new pre/post-processing command to the project, follow these steps:
 
-- Create a class that inherits `PreProcessCommand` if it's going to be executed before the workflow or `PostProcessCommand` if it's going to be executed after the workflow. In the rare case that the command can be executed in both stages, it should inherit both classes. These classes are located at `src/dirac_cwl_proto/commands/core.py`.
+- Create a class that inherits `PreProcessCommand` if it's going to be executed before the workflow or `PostProcessCommand` if it's going to be executed after the workflow. In the rare case that the command can be executed in both stages, it should inherit both classes. These classes are located at `src/dirac_cwl/commands/core.py`.
 
 - Implement the `execute` function with the actions it's expected to do. This function recieves the `job path` as a `string` and the dictionary of keyworded arguments `**kwargs`. This function can raise exceptions if it needs to.
 
 #### Add a Job Type
 
-Job types in `dirac_cwl_proto` have the name of "plugins". These plugins are created from the hints defined in a cwl file.
+Job types in `dirac_cwl` have the name of "plugins". These plugins are created from the hints defined in a cwl file.
 
-The Job type should be stored at the `src/dirac_cwl_proto/execution_hooks/plugins/` directory and should appear in the `__all__` list of the `__init__.py` file.
+The Job type should be stored at the `src/dirac_cwl/execution_hooks/plugins/` directory and should appear in the `__all__` list of the `__init__.py` file.
 
 To add a new Job type to the project, follow these steps:
 
-- Create a class that inherits `ExecutionHooksBasePlugin` from `src/dirac_cwl_proto/execution_hooks/core.py`.
+- Create a class that inherits `ExecutionHooksBasePlugin` from `src/dirac_cwl/execution_hooks/core.py`.
 
 - Import the pre-processing and post-processing commands that this Job type is going to execute.
 
@@ -178,12 +178,12 @@ class JobTypeExample(ExecutionHooksBasePlugin):
 
 In the previous example, `PreProcessCmd1` will be executed before `PreProcessCmd2`, and this will be executed before `PreProcessCmd3`.
 
-- Finally, to be able to discover this plugin from the registry, it has to appear in `pyproject.toml` entrypoints at the group `dirac_cwl_proto.execution_hooks`. The previous example would look like:
+- Finally, to be able to discover this plugin from the registry, it has to appear in `pyproject.toml` entrypoints at the group `dirac_cwl.execution_hooks`. The previous example would look like:
 
 ```toml
-[project.entry-points."dirac_cwl_proto.execution_hooks"]
+[project.entry-points."dirac_cwl.execution_hooks"]
 # ...
-JobTypeExample = "dirac_cwl_proto.execution_hooks.plugins:JobTypeExample"
+JobTypeExample = "dirac_cwl.execution_hooks.plugins:JobTypeExample"
 # ...
 ```
 
@@ -191,14 +191,14 @@ JobTypeExample = "dirac_cwl_proto.execution_hooks.plugins:JobTypeExample"
 
 If your workflow requires calling a script, you can add this script as a module. Follow these steps to properly integrate the module:
 
-- Add the script: Place your script in the `src/dirac_cwl_proto/modules` directory.
+- Add the script: Place your script in the `src/dirac_cwl/modules` directory.
 - Update `pyproject.toml`: Add the script to the `pyproject.toml` file to create a command-line interface (CLI) command.
 - Reinstall the package: Run `pixi run pip install .` to reinstall the package and make the new script available as a command.
 - Usage in CWL Workflow: Reference the command in your `description.cwl` file.
 
 **Example**
 
-Let’s say you have a script named `generic_command.py` located at `src/dirac_cwl_proto/modules/generic_command.py`. Here's how you can integrate it:
+Let’s say you have a script named `generic_command.py` located at `src/dirac_cwl/modules/generic_command.py`. Here's how you can integrate it:
 
 - `generic_command.py` Example Script:
 
@@ -222,7 +222,7 @@ if __name__ == "__main__":
 
 ```toml
 [project.scripts]
-generic-command = "dirac_cwl_proto.modules.generic_command:app"
+generic-command = "dirac_cwl.modules.generic_command:app"
 ```
 
 - Reinstall the package with:

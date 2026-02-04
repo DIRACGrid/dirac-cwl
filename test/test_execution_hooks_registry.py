@@ -10,11 +10,11 @@ from typing import Any, ClassVar, Optional
 
 import pytest
 
-from dirac_cwl_proto.execution_hooks.core import (
+from dirac_cwl.execution_hooks.core import (
     ExecutionHooksBasePlugin,
     ExecutionHooksHint,
 )
-from dirac_cwl_proto.execution_hooks.registry import (
+from dirac_cwl.execution_hooks.registry import (
     ExecutionHooksPluginRegistry,
     get_registry,
 )
@@ -161,7 +161,7 @@ class TestExecutionHooksPluginRegistry:
 
     def test_discover_no_plugins(self, mocker, monkeypatch):
         """Test automatic plugin discovery."""
-        from dirac_cwl_proto.execution_hooks import registry
+        from dirac_cwl.execution_hooks import registry
 
         # Mock entry_points to have nothing
         entrypointMock = mocker.MagicMock()
@@ -180,7 +180,7 @@ class TestExecutionHooksPluginRegistry:
 
     def test_discover_plugins(self, mocker, monkeypatch):
         """Test plugin discovery from entry points."""
-        from dirac_cwl_proto.execution_hooks import registry
+        from dirac_cwl.execution_hooks import registry
 
         class FakePlugin(ExecutionHooksBasePlugin): ...
 
@@ -268,7 +268,7 @@ class TestPluginSystem:
 
     def test_direct_plugin_usage(self):
         """Test using plugins directly without legacy wrapper."""
-        from dirac_cwl_proto.execution_hooks.core import ExecutionHooksBasePlugin
+        from dirac_cwl.execution_hooks.core import ExecutionHooksBasePlugin
 
         class DirectPlugin(ExecutionHooksBasePlugin):
             test_param: str = "default"
@@ -290,7 +290,7 @@ class TestPluginSystem:
 
     def test_plugin_parameter_handling(self):
         """Test that parameters are passed correctly to plugins."""
-        from dirac_cwl_proto.execution_hooks.core import ExecutionHooksBasePlugin
+        from dirac_cwl.execution_hooks.core import ExecutionHooksBasePlugin
 
         class ParameterTestPlugin(ExecutionHooksBasePlugin):
             test_param: str = "default"

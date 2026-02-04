@@ -10,7 +10,7 @@ from pathlib import Path
 
 from DIRACCommon.Core.Utilities.ReturnValues import SErrorException
 
-from dirac_cwl_proto.execution_hooks.plugins.core import (
+from dirac_cwl.execution_hooks.plugins.core import (
     QueryBasedPlugin,
 )
 
@@ -158,7 +158,7 @@ class TestPluginCommands:
         The plugin "JobTypeTestingPlugin" was registered with 1 command on each step at the fixture "job_type_testing".
         The fixture "job_type_testing" is the class "JobTypeTestingPlugin".
         """
-        from dirac_cwl_proto.execution_hooks.registry import get_registry
+        from dirac_cwl.execution_hooks.registry import get_registry
 
         # Get the job from the registry
         registry = get_registry()
@@ -179,7 +179,7 @@ class TestPluginCommands:
         The plugin "JobTypeTestingPlugin" was registered with 1 command on each step at the fixture "job_type_testing".
         The fixture "job_type_testing" is the class "JobTypeTestingPlugin".
         """
-        from dirac_cwl_proto.execution_hooks.core import ExecutionHooksHint
+        from dirac_cwl.execution_hooks.core import ExecutionHooksHint
 
         # Get the plugin from the hints
         hint = ExecutionHooksHint(hook_plugin="JobTypeTestingPlugin")

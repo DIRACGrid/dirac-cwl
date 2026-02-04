@@ -4,14 +4,14 @@
       "class": "ExecutionHooksBasePlugin",
       "description": "Base metadata model",
       "hook_plugin": null,
-      "module": "dirac_cwl_proto.execution_hooks.core",
+      "module": "dirac_cwl.execution_hooks.core",
       "vo": null
     },
     "QueryBasedPlugin": {
       "class": "QueryBasedPlugin",
       "description": "LFN-based metadata for structured data discovery",
       "hook_plugin": null,
-      "module": "dirac_cwl_proto.execution_hooks.plugins.core",
+      "module": "dirac_cwl.execution_hooks.plugins.core",
       "vo": null
     }
   },

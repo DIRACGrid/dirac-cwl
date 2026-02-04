@@ -7,8 +7,8 @@ metadata system with additional functionality for CWL integration.
 
 import pytest
 
-from dirac_cwl_proto.execution_hooks import get_registry
-from dirac_cwl_proto.execution_hooks.core import ExecutionHooksHint, SchedulingHint
+from dirac_cwl.execution_hooks import get_registry
+from dirac_cwl.execution_hooks.core import ExecutionHooksHint, SchedulingHint
 
 
 class TestExecutionHooksHint:
@@ -124,7 +124,7 @@ class TestExecutionHooksHint:
         """Test from_cwl class method."""
         mock_cwl = mocker.Mock()
         mock_descriptor = ExecutionHooksHint(hook_plugin="QueryBasedPlugin")
-        mock_from_cwl = mocker.patch("dirac_cwl_proto.submission_models.ExecutionHooksHint.from_cwl")
+        mock_from_cwl = mocker.patch("dirac_cwl.submission_models.ExecutionHooksHint.from_cwl")
         mock_from_cwl.return_value = mock_descriptor
 
         result = ExecutionHooksHint.from_cwl(mock_cwl)

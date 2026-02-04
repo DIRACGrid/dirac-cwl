@@ -19,12 +19,12 @@ from rich import print_json
 from rich.console import Console
 from schema_salad.exceptions import ValidationException
 
-from dirac_cwl_proto.job.submission_clients import (
+from dirac_cwl.job.submission_clients import (
     DIRACSubmissionClient,
     PrototypeSubmissionClient,
     SubmissionClient,
 )
-from dirac_cwl_proto.submission_models import (
+from dirac_cwl.submission_models import (
     JobInputModel,
     JobModel,
     JobSubmissionModel,
@@ -229,7 +229,7 @@ def run_job(job_id: int, job: JobModel, logger: logging.Logger) -> bool:
         [
             "python",
             "-m",
-            "dirac_cwl_proto.job.job_wrapper_template",
+            "dirac_cwl.job.job_wrapper_template",
             str(job_json_path),
         ],
         capture_output=True,

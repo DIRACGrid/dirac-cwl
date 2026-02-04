@@ -3,7 +3,7 @@
 import pytest
 from cwl_utils.parser.cwl_v1_2 import CommandLineTool
 
-from dirac_cwl_proto.submission_models import JobModel
+from dirac_cwl.submission_models import JobModel
 
 
 @pytest.fixture
@@ -13,10 +13,10 @@ def job_type_testing():
     Creates and registers "JobTypeTestingPlugin" with DownloadConfig and GroupOutputs commands,
     and returns its class.
     """
-    from dirac_cwl_proto.commands.download_config import DownloadConfig
-    from dirac_cwl_proto.commands.group_outputs import GroupOutputs
-    from dirac_cwl_proto.execution_hooks.core import ExecutionHooksBasePlugin
-    from dirac_cwl_proto.execution_hooks.registry import get_registry
+    from dirac_cwl.commands.download_config import DownloadConfig
+    from dirac_cwl.commands.group_outputs import GroupOutputs
+    from dirac_cwl.execution_hooks.core import ExecutionHooksBasePlugin
+    from dirac_cwl.execution_hooks.registry import get_registry
 
     registry = get_registry()
 

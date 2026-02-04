@@ -19,11 +19,11 @@ from rich import print_json
 from rich.console import Console
 from schema_salad.exceptions import ValidationException
 
-from dirac_cwl_proto.submission_models import (
+from dirac_cwl.submission_models import (
     ProductionSubmissionModel,
     TransformationSubmissionModel,
 )
-from dirac_cwl_proto.transformation import (
+from dirac_cwl.transformation import (
     submit_transformation_router,
 )
 

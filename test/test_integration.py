@@ -12,15 +12,15 @@ import pytest
 
 os.environ["DIRAC_PROTO_LOCAL"] = "1"
 
-from dirac_cwl_proto.execution_hooks import (
+from dirac_cwl.execution_hooks import (
     get_registry,
 )
-from dirac_cwl_proto.execution_hooks.core import (
+from dirac_cwl.execution_hooks.core import (
     ExecutionHooksBasePlugin,
     ExecutionHooksHint,
     SchedulingHint,
 )
-from dirac_cwl_proto.job.job_wrapper import JobWrapper
+from dirac_cwl.job.job_wrapper import JobWrapper
 
 
 class TestSystemIntegration:
