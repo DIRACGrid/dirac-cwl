@@ -6,6 +6,7 @@ plugin system, including ExecutionHooksBasePlugin, ExecutionHooksHint, and core
 abstract interfaces.
 """
 
+import asyncio
 from typing import Optional
 
 import pytest
@@ -90,7 +91,7 @@ class TestExecutionHookExtended:
         # )
 
         # Use data manager if output is in output_paths hint
-        model.store_output({"test_lfn": "file.test"})
+        asyncio.run(model.store_output({"test_lfn": "file.test"}))
         assert "test_lfn" in model.output_paths
         put_mock.assert_called_once()
         # sb_upload_mock.assert_not_called()

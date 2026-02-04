@@ -231,6 +231,7 @@ def run_job(job_id: int, job: JobModel, logger: logging.Logger) -> bool:
             "-m",
             "dirac_cwl.job.job_wrapper_template",
             str(job_json_path),
+            str(job_id),
         ],
         capture_output=True,
         text=True,
@@ -238,6 +239,9 @@ def run_job(job_id: int, job: JobModel, logger: logging.Logger) -> bool:
 
     # Clean up the job JSON file
     job_json_path.unlink()
+
+    status_path = f"status_{job_id}"
+    Path(status_path).unlink()
 
     # Log output
     if result.stdout:
