@@ -7,7 +7,7 @@ name = "dirac_cwl_proto"
 version = "0.1.0"
 description = "Prototype of CWL used as a production/job workflow language"
 readme = "README.md"
-requires-python = ">=3.12"
+requires-python = ">=3.11"
 license = {file = "LICENSE"}
 authors = [{ name = "DIRAC consortium" }]
 classifiers = [
@@ -15,7 +15,7 @@ classifiers = [
     "Intended Audience :: Science/Research",
     "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.11",
     "Topic :: Scientific/Engineering",
     "Topic :: System :: Distributed Computing"
 ]
