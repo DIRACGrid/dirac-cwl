@@ -82,7 +82,7 @@ jobs:
         uses: actions/upload-artifact@v6
         with:
           name: dirac-cwl-whl
-          path: dist/dirac-cwl-*.whl
+          path: dist/dirac_cwl-*.whl
           retention-days: 5
       # Use trusted publisher for pypi
       # https://docs.pypi.org/trusted-publishers/
