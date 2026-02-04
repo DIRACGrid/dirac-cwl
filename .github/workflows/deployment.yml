@@ -78,12 +78,6 @@ jobs:
       - name: Build distributions
         run: |
           python -m build --outdir $PWD/dist .
-      - name: 'Upload Artifact'
-        uses: actions/upload-artifact@v6
-        with:
-          name: dirac-cwl-whl
-          path: dist/dirac_cwl-*.whl
-          retention-days: 5
       # Use trusted publisher for pypi
       # https://docs.pypi.org/trusted-publishers/
       - name: Publish package on PyPI
