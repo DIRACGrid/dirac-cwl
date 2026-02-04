@@ -1428,8 +1428,8 @@ packages:
   requires_python: '>=3.11'
 - pypi: ./
   name: dirac-cwl
-  version: 0.1.0
-  sha256: ac4115849ac4d9c2981bbd87f8a6cdeb764f708037044d32b5d465562d1818f2
+  version: 0.1.0a2.dev330+g83c255432
+  sha256: 7c0acc2a37308e56ac7e419f037654c0cf2932008d556f597af058a80c02ab47
   requires_dist:
   - cwl-utils
   - cwlformat
