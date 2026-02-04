@@ -4,7 +4,6 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "dirac-cwl"
-version = "0.1.0"
 description = "Prototype of CWL used as a production/job workflow language"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -19,6 +18,7 @@ classifiers = [
     "Topic :: Scientific/Engineering",
     "Topic :: System :: Distributed Computing"
 ]
+dynamic = ["version"]
 
 # Runtime dependencies (what your package needs when installed)
 dependencies = [
