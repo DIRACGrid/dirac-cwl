@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.2](https://github.com/DIRACGrid/dirac-cwl/compare/v1.0.1...v1.0.2) (2026-02-05)
+
+
+### Bug Fixes
+
+* don't do a shallow clone in order to see newly created tags ([0100427](https://github.com/DIRACGrid/dirac-cwl/commit/0100427bd8072cc3041d08d7b05f3bb873abc761))
+
 ## [1.0.1](https://github.com/DIRACGrid/dirac-cwl/compare/v1.0.0...v1.0.1) (2026-02-05)
 
 
