@@ -33,7 +33,7 @@ jobs:
 
   release-please:
     runs-on: ubuntu-latest
-    if: ${{ github.event_name == 'push' && github.repository == 'DIRACGrid/diracx-cwl' }}
+    if: ${{ github.event_name == 'push' && github.repository == 'DIRACGrid/dirac-cwl' }}
     outputs:
       release_created: ${{ steps.release.outputs.release_created }}
     permissions:
