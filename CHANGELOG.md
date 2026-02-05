@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.1](https://github.com/DIRACGrid/dirac-cwl/compare/v1.0.0...v1.0.1) (2026-02-05)
+
+
+### Bug Fixes
+
+* diracx-cwl --&gt; dirac-cwl ([52224c5](https://github.com/DIRACGrid/dirac-cwl/commit/52224c55a5507fb0fbd9aa5c6c4522b56dfe0407))
+
 ## 1.0.0 (2026-02-05)
 
 
