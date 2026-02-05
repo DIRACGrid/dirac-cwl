@@ -178,3 +178,4 @@ generated_schemas/*
 .DS_Store
 
 *.sim
+task.cwl

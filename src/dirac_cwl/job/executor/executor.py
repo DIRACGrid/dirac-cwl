@@ -2,8 +2,9 @@
 
 import functools
 import logging
+from collections.abc import MutableMapping
 from pathlib import Path
-from typing import Any, Dict, List, cast
+from typing import cast
 
 from cwltool.command_line_tool import CommandLineTool
 from cwltool.context import RuntimeContext
@@ -13,7 +14,7 @@ from cwltool.job import CommandLineJob
 from cwltool.pathmapper import PathMapper
 from cwltool.process import Process
 from cwltool.stdfsaccess import StdFsAccess
-from cwltool.utils import CWLObjectType
+from cwltool.utils import CWLObjectType, CWLOutputType
 from cwltool.workflow_job import WorkflowJob
 from diracx.core.models.replica_map import ReplicaMap
 
@@ -28,7 +29,7 @@ _original_make_path_mapper = CommandLineTool.make_path_mapper
 
 
 def _custom_make_path_mapper(
-    reffiles: List[CWLObjectType],
+    reffiles: list[CWLObjectType],
     stagedir: str,
     runtimeContext: RuntimeContext,
     separateDirs: bool,
@@ -47,7 +48,7 @@ def _custom_make_path_mapper(
 
 
 # Apply the monkey-patch
-CommandLineTool.make_path_mapper = staticmethod(_custom_make_path_mapper)
+CommandLineTool.make_path_mapper = staticmethod(_custom_make_path_mapper)  # type: ignore[method-assign]
 
 
 class DiracExecutor(SingleJobExecutor):
@@ -66,7 +67,7 @@ class DiracExecutor(SingleJobExecutor):
     def run_jobs(
         self,
         process: Process,
-        job_order_object: Dict[str, Any],
+        job_order_object: MutableMapping[str, CWLOutputType | None],
         logger_arg: logging.Logger,
         runtime_context: RuntimeContext,
     ) -> None:
@@ -241,7 +242,7 @@ class DiracExecutor(SingleJobExecutor):
         except Exception as e:
             logger.exception("%s: Failed to update replica map - %s", job_name, e)
 
-    def _extract_lfns_from_inputs(self, job_order: Dict[str, Any]) -> list[str]:
+    def _extract_lfns_from_inputs(self, job_order: MutableMapping[str, CWLOutputType | None]) -> list[str]:
         """Extract LFN paths from job inputs.
 
         Recursively searches through the job order dictionary to find File objects

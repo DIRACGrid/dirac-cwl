@@ -376,7 +376,7 @@ def update_replica_map_from_pool_xml(pool_xml_path: Path, replica_map_path: Path
 
                 replicas.append(ReplicaMap.MapEntry.Replica(url=pfn_url, se="DIRAC.Client.Local"))
 
-        if not replicas:
+        if not replicas or not lfn:
             continue
 
         # Get file size if the file exists locally

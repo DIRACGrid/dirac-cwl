@@ -56,11 +56,11 @@ class DiracPathMapper(PathMapper):
         The files are either already downloaded locally or will be accessed via
         network protocols like xrootd.
         """
-        tgt = obj.get("location", "")
+        tgt = str(obj.get("location", ""))
         logger.debug("DiracPathMapper.visit: processing location=%s", tgt)
 
         # Check if this is an LFN that we need to resolve
-        if tgt.startswith("LFN:") and obj["class"] == "File":
+        if tgt.startswith("LFN:") and obj.get("class") == "File":
             # Extract the LFN (without the LFN: prefix)
             lfn = tgt[4:]  # Remove "LFN:" prefix
             logger.debug("DiracPathMapper.visit: Found LFN=%s", lfn)
