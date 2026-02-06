@@ -387,6 +387,16 @@ def main(
     print_workflow: bool = typer.Option(
         False, "--print-workflow", help="Print the workflow structure before execution"
     ),
+    preserve_environment: list[str] = typer.Option(
+        [],
+        "--preserve-environment",
+        help="Preserve specific environment variable when running CommandLineTools. May be provided multiple times.",
+    ),
+    preserve_entire_environment: bool = typer.Option(
+        False,
+        "--preserve-entire-environment",
+        help="Preserve entire host environment when running CommandLineTools.",
+    ),
     debug: bool = typer.Option(False, help="Enable debug logging"),
     verbose: bool = typer.Option(False, help="Enable verbose logging"),
     parallel: bool = typer.Option(False, help="Run jobs in parallel"),
@@ -448,6 +458,12 @@ def main(
 
     if parallel:
         cwltool_args.append("--parallel")
+
+    if preserve_entire_environment:
+        cwltool_args.append("--preserve-entire-environment")
+    else:
+        for envvar in preserve_environment:
+            cwltool_args.extend(["--preserve-environment", envvar])
 
     # Workflow printing - show our nice visualization
     if print_workflow:
