@@ -4,7 +4,7 @@
 
 # Dirac CWL Prototype
 ![Workflow tests](https://github.com/DIRACGrid/dirac-cwl/actions/workflows/main.yml/badge.svg?branch=main)
-![Schema Generation](https://github.com/DIRACGrid/dirac-cwl/actions/workflows/generate-schemas.yml/badge.svg?branch=main) [![Conda Recipe](https://img.shields.io/badge/recipe-dirac--cwl-green.svg)](https://anaconda.org/conda-forge/dirac-cwl) 
+![Schema Generation](https://github.com/DIRACGrid/dirac-cwl/actions/workflows/generate-schemas.yml/badge.svg?branch=main) [![Conda Version](https://img.shields.io/conda/vn/conda-forge/dirac-cwl.svg)](https://anaconda.org/conda-forge/dirac-cwl)  [![Conda Recipe](https://img.shields.io/badge/recipe-dirac--cwl-green.svg)](https://anaconda.org/conda-forge/dirac-cwl) 
 
 This Python prototype introduces a command-line interface (CLI) designed for the end-to-end execution of Common Workflow Language (CWL) workflows at different scales. It enables users to locally test CWL workflows, and then run them as jobs, transformations and/or productions.
 
