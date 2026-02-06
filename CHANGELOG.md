@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.0](https://github.com/DIRACGrid/dirac-cwl/compare/v1.0.2...v1.1.0) (2026-02-06)
+
+
+### Features
+
+* CWL Executor and hint design for input data ([#94](https://github.com/DIRACGrid/dirac-cwl/issues/94)) ([e658633](https://github.com/DIRACGrid/dirac-cwl/commit/e658633a6e4d33dcebce4526bec55dd4b5d3ea14))
+
 ## [1.0.2](https://github.com/DIRACGrid/dirac-cwl/compare/v1.0.1...v1.0.2) (2026-02-05)
 
 
