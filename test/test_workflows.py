@@ -148,7 +148,7 @@ def test_run_job_success(cli_runner, cleanup, pi_test_files, cwl_file, inputs):
 
     # Add the input file(s)
     for input in inputs:
-        command.extend(["--parameter-path", input])
+        command.extend(["--input-files", input])
 
     result = cli_runner.invoke(app, command)
     # Remove ANSI color codes for assertion
@@ -195,7 +195,7 @@ def test_run_job_validation_failure(cli_runner, cleanup, cwl_file, inputs, expec
     """Test job submission fails with invalid workflow or inputs."""
     command = ["job", "submit", cwl_file]
     for input in inputs:
-        command.extend(["--parameter-path", input])
+        command.extend(["--input-files", input])
     result = cli_runner.invoke(app, command)
     clean_stdout = strip_ansi_codes(result.stdout)
     assert "Job(s) done" not in clean_stdout, "The job did complete successfully."
@@ -328,7 +328,7 @@ def test_run_job_with_input_data(cli_runner, cleanup, pi_test_files, cwl_file, i
 
     # Add the input file(s)
     for input in inputs:
-        command.extend(["--parameter-path", input])
+        command.extend(["--input-files", input])
 
     result = cli_runner.invoke(app, command)
     # Remove ANSI color codes for assertion

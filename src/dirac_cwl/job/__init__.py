@@ -40,7 +40,7 @@ console = Console()
 @app.async_command("submit")
 async def submit_job_client(
     task_path: str = typer.Argument(..., help="Path to the CWL file"),
-    parameter_path: list[str] | None = typer.Option(None, help="Path to the files containing the metadata"),
+    input_files: list[str] | None = typer.Option(None, help="Paths to the CWL input files"),
     # Specific parameter for the purpose of the prototype
     local: bool | None = typer.Option(True, help="Run the job locally instead of submitting it to the router"),
 ):
@@ -70,35 +70,35 @@ async def submit_job_client(
     console.print(f"\t[green]:heavy_check_mark:[/green] Task {task_path}")
     console.print("\t[green]:heavy_check_mark:[/green] Hints")
 
-    # Extract parameters if any
-    parameters = []
-    if parameter_path:
-        for parameter_p in parameter_path:
+    # Extract inputs if any
+    inputs = []
+    if input_files:
+        for file in input_files:
             try:
-                parameter = load_inputfile(parameter_p)
+                input_file = load_inputfile(file)
             except Exception as ex:
                 console.print(
-                    f"[red]:heavy_multiplication_x:[/red] [bold]CLI:[/bold] Failed to validate the parameter:\n{ex}"
+                    f"[red]:heavy_multiplication_x:[/red] [bold]CLI:[/bold] Failed to validate the input file:\n{ex}"
                 )
                 return typer.Exit(code=1)
 
             # Prepare files for the ISB
-            isb_file_paths = prepare_input_sandbox(parameter)
+            isb_file_paths = prepare_input_sandbox(input_file)
 
-            # Upload parameter sandbox
+            # Upload input file sandbox
             sandbox_id = await submission_client.create_sandbox(isb_file_paths)
 
-            parameters.append(
+            inputs.append(
                 JobInputModel(
                     sandbox=[sandbox_id] if sandbox_id else None,
-                    cwl=parameter,
+                    cwl=input_file,
                 )
             )
-            console.print(f"\t[green]:heavy_check_mark:[/green] Parameter {parameter_p}")
+            console.print(f"\t[green]:heavy_check_mark:[/green] File {file}")
 
     job = JobSubmissionModel(
         task=task,
-        inputs=parameters,
+        inputs=inputs,
     )
     console.print("[green]:heavy_check_mark:[/green] [bold]CLI:[/bold] Job(s) validated.")
 
