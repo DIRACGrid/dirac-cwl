@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Literal, Sequence
 
 import zstandard
-from diracx.core.models import SandboxInfo
+from diracx.core.models.sandbox import SandboxInfo
 
 logger = logging.getLogger(__name__)
 
