@@ -31,12 +31,6 @@ from DIRACCommon.Core.Utilities.ReturnValues import (  # type: ignore[import-unt
 )
 from pydantic import BaseModel, ConfigDict, Field, PrivateAttr
 
-if os.getenv("DIRAC_PROTO_LOCAL") == "1":
-    from dirac_cwl.data_management_mocks.status import set_job_status  # type: ignore[no-redef]
-else:
-    from diracx.api.jobs import set_job_status  # type: ignore[no-redef]
-
-
 from dirac_cwl.commands import PostProcessCommand, PreProcessCommand
 from dirac_cwl.data_management_mocks.data_manager import MockDataManager
 
@@ -124,6 +118,10 @@ class ExecutionHooksBasePlugin(BaseModel):
         :param Any **kwargs:
             Additional keyword arguments for extensibility.
         """
+        if os.getenv("DIRAC_PROTO_LOCAL") == "1":
+            from dirac_cwl.data_management_mocks.status import set_job_status  # type: ignore[no-redef]
+        else:
+            from diracx.api.jobs import set_job_status  # type: ignore[no-redef]
         for output_name, src_path in outputs.items():
             if not src_path:
                 raise RuntimeError(f"src_path parameter required for filesystem storage of {output_name}")

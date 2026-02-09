@@ -6,6 +6,7 @@ including plugin discovery, registration, CWL integration, and real-world
 usage scenarios.
 """
 
+import asyncio
 import os
 
 import pytest
@@ -88,11 +89,11 @@ class TestRealWorldScenarios:
         # Pre-process should return a command list (may be modified by plugin)
         job_wrapper = JobWrapper()
         job_wrapper.execution_hooks_plugin = user_runtime
-        processed_command = job_wrapper.pre_process(sample_job.task, None)
+        processed_command = asyncio.run(job_wrapper.pre_process(sample_job.task, None))
         assert isinstance(processed_command, list)
 
         # Post-process should return a boolean
-        result = job_wrapper.post_process(0, "{}", "{}")
+        result = asyncio.run(job_wrapper.post_process(0, "{}", "{}"))
         assert isinstance(result, bool)
 
     def test_admin_workflow_scenario(self, sample_job):
@@ -118,7 +119,7 @@ class TestRealWorldScenarios:
         # Simulate job execution
         job_wrapper = JobWrapper()
         job_wrapper.execution_hooks_plugin = admin_runtime
-        processed_command = job_wrapper.pre_process(sample_job.task, None)
+        processed_command = asyncio.run(job_wrapper.pre_process(sample_job.task, None))
         assert isinstance(processed_command, list)
 
     def test_data_analysis_workflow_scenario(self):
