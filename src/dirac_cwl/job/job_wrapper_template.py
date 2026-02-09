@@ -17,7 +17,7 @@ if os.getenv("DIRAC_PROTO_LOCAL") != "1":
     DIRAC.initialize()
     from diracx.api.jobs import set_job_status
 else:
-    from dirac_cwl_proto.data_management_mocks.status import set_job_status
+    from dirac_cwl.data_management_mocks.status import set_job_status
 
 from dirac_cwl.job.job_wrapper import JobWrapper
 from dirac_cwl.submission_models import JobModel

@@ -7,6 +7,7 @@ abstract interfaces.
 """
 
 import asyncio
+import os
 from typing import Optional
 
 import pytest
@@ -53,6 +54,7 @@ class TestExecutionHookExtended:
 
     def test_default_interface_methods(self, tmp_path):
         """Test that default interface methods are implemented."""
+        os.environ["DIRAC_PROTO_LOCAL"] = "1"
 
         class TestModel(ExecutionHooksBasePlugin):
             pass
@@ -62,7 +64,7 @@ class TestExecutionHookExtended:
 
         # Test store_output raises RuntimeError when src_path is missing
         with pytest.raises(RuntimeError, match="src_path parameter required"):
-            model.store_output({"test": None})
+            asyncio.run(model.store_output({"test": None}))
 
     def test_output(self, mocker: MockerFixture):
         """Test that the Hook uses the correct interface for each output type."""
