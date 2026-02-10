@@ -37,6 +37,9 @@ class TestJobWrapper:
         result = job_wrapper.run_job(sample_job)
         assert result
 
+        task_file = job_wrapper.job_path / "task.cwl"
+        task_file.unlink(missing_ok=True)
+
     def test_execute(self, job_type_testing, sample_job, mocker, monkeypatch):
         """Test the execution of the preprocess and postprocess commands.
 
@@ -97,6 +100,9 @@ class TestJobWrapper:
         with pytest.raises(TypeError):
             job_wrapper.post_process(0, "{}", "{}")
 
+        task_file = job_wrapper.job_path / "task.cwl"
+        task_file.unlink(missing_ok=True)
+
     def test_command_exception(self, job_type_testing, sample_job, mocker, monkeypatch):
         """Test exception report when a command fails.
 
@@ -123,3 +129,6 @@ class TestJobWrapper:
 
         with pytest.raises(WorkflowProcessingException):
             job_wrapper.post_process(0, "{}", "{}")
+
+        task_file = job_wrapper.job_path / "task.cwl"
+        task_file.unlink(missing_ok=True)
