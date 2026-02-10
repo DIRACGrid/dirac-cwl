@@ -15,8 +15,8 @@ from ruamel.yaml import YAML
 if os.getenv("DIRAC_PROTO_LOCAL") != "1":
     DIRAC.initialize()
 
-from dirac_cwl_proto.job.job_wrapper import JobWrapper
-from dirac_cwl_proto.submission_models import JobModel
+from dirac_cwl.job.job_wrapper import JobWrapper
+from dirac_cwl.submission_models import JobModel
 
 
 def main():

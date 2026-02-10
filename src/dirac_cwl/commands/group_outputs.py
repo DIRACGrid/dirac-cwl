@@ -3,7 +3,7 @@
 import glob
 import os
 
-from dirac_cwl_proto.commands import PostProcessCommand
+from dirac_cwl.commands import PostProcessCommand
 
 
 class GroupOutputs(PostProcessCommand):

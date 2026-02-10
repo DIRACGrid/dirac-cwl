@@ -12,9 +12,9 @@ from diracx.api.jobs import create_sandbox
 from diracx.client.aio import AsyncDiracClient
 from rich.console import Console
 
-from dirac_cwl_proto.core.utility import get_lfns
-from dirac_cwl_proto.execution_hooks import SchedulingHint
-from dirac_cwl_proto.submission_models import JobModel, JobSubmissionModel
+from dirac_cwl.core.utility import get_lfns
+from dirac_cwl.execution_hooks import SchedulingHint
+from dirac_cwl.submission_models import JobModel, JobSubmissionModel
 
 console = Console()
 
@@ -54,7 +54,7 @@ class PrototypeSubmissionClient(SubmissionClient):
         :param parameter_path: Path to the parameter file (not used in local mode)
         :return: Sandbox PFN or None
         """
-        from dirac_cwl_proto.data_management_mocks.sandbox import (
+        from dirac_cwl.data_management_mocks.sandbox import (
             create_sandbox,
         )
 
@@ -69,7 +69,7 @@ class PrototypeSubmissionClient(SubmissionClient):
 
         :param job_submission: Job submission model
         """
-        from dirac_cwl_proto.job import submit_job_router
+        from dirac_cwl.job import submit_job_router
 
         result = submit_job_router(job_submission)
         if result:
@@ -98,7 +98,7 @@ class DIRACSubmissionClient(SubmissionClient):
 
         :param job_submission: Job submission model
         """
-        from dirac_cwl_proto.job import validate_jobs
+        from dirac_cwl.job import validate_jobs
 
         jdls = []
         job_submission_path = Path("job.json")

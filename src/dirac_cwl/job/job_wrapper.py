@@ -26,18 +26,18 @@ from DIRACCommon.Core.Utilities.ReturnValues import (  # type: ignore[import-unt
 from rich.text import Text
 from ruamel.yaml import YAML
 
-from dirac_cwl_proto.commands import PostProcessCommand, PreProcessCommand
-from dirac_cwl_proto.core.exceptions import WorkflowProcessingException
-from dirac_cwl_proto.core.utility import get_lfns
-from dirac_cwl_proto.execution_hooks import ExecutionHooksHint
-from dirac_cwl_proto.execution_hooks.core import ExecutionHooksBasePlugin
-from dirac_cwl_proto.submission_models import (
+from dirac_cwl.commands import PostProcessCommand, PreProcessCommand
+from dirac_cwl.core.exceptions import WorkflowProcessingException
+from dirac_cwl.core.utility import get_lfns
+from dirac_cwl.execution_hooks import ExecutionHooksHint
+from dirac_cwl.execution_hooks.core import ExecutionHooksBasePlugin
+from dirac_cwl.submission_models import (
     JobInputModel,
     JobModel,
 )
 
 if os.getenv("DIRAC_PROTO_LOCAL") == "1":
-    from dirac_cwl_proto.data_management_mocks.sandbox import create_sandbox, download_sandbox  # type: ignore[no-redef]
+    from dirac_cwl.data_management_mocks.sandbox import create_sandbox, download_sandbox  # type: ignore[no-redef]
 else:
     from diracx.api.jobs import create_sandbox, download_sandbox  # type: ignore[no-redef]
 

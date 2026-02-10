@@ -148,7 +148,7 @@ class ExecutionHooksPluginRegistry:
         :return: Number of plugins discovered and registered.
         :rtype: int
         """
-        entrypoints = entry_points(group="dirac_cwl_proto.execution_hooks")
+        entrypoints = entry_points(group="dirac_cwl.execution_hooks")
         discovered = 0
         for hook_name in entrypoints.names:
             try:

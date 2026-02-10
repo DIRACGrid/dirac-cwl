@@ -11,7 +11,7 @@ from typing import Optional
 import pytest
 from pytest_mock import MockerFixture
 
-from dirac_cwl_proto.execution_hooks.core import (
+from dirac_cwl.execution_hooks.core import (
     ExecutionHooksBasePlugin,
     ExecutionHooksHint,
     SchedulingHint,

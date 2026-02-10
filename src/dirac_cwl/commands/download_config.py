@@ -2,7 +2,7 @@
 
 import os
 
-from dirac_cwl_proto.commands import PreProcessCommand
+from dirac_cwl.commands import PreProcessCommand
 
 
 class DownloadConfig(PreProcessCommand):

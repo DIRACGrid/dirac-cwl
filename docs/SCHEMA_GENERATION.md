@@ -16,8 +16,8 @@ The DIRAC CWL prototype now automatically generates JSON and YAML schemas from P
 ### Automatic Generation (CI/CD)
 
 Schemas are automatically generated in CI/CD when:
-- Changes are made to metadata models in `src/dirac_cwl_proto/metadata/`
-- Changes are made to submission models in `src/dirac_cwl_proto/submission_models.py`
+- Changes are made to metadata models in `src/dirac_cwl/metadata/`
+- Changes are made to submission models in `src/dirac_cwl/submission_models.py`
 - The schema generation script is modified
 
 The CI workflow:
@@ -141,8 +141,8 @@ The generated schemas include:
 
 1. **Create the model class**:
 ```python
-# In src/dirac_cwl_proto/metadata/plugins/my_experiment.py
-from dirac_cwl_proto.metadata.core import BaseMetadataModel
+# In src/dirac_cwl/metadata/plugins/my_experiment.py
+from dirac_cwl.metadata.core import BaseMetadataModel
 
 class MyMetadata(BaseMetadataModel):
     metadata_type: ClassVar[str] = "MyModel"
@@ -171,7 +171,7 @@ make test-schemas
 ### Plugin Discovery
 
 The schema generation automatically discovers plugins by:
-1. Scanning `dirac_cwl_proto.metadata.plugins.*`
+1. Scanning `dirac_cwl.metadata.plugins.*`
 2. Looking for classes that inherit from `BaseMetadataModel`
 3. Including experiment-specific namespaces
 4. Supporting user-provided plugin packages
@@ -215,13 +215,13 @@ Most IDEs can use JSON schemas for autocompletion and validation:
 
 1. **Check Pydantic model syntax**:
 ```bash
-python -c "from dirac_cwl_proto.metadata.plugins.my_plugin import MyModel"
+python -c "from dirac_cwl.metadata.plugins.my_plugin import MyModel"
 ```
 
 2. **Check plugin registration**:
 ```bash
 python -c "
-from dirac_cwl_proto.metadata import get_registry
+from dirac_cwl.metadata import get_registry
 registry = get_registry()
 registry.discover_plugins()
 print(registry.list_plugins())
@@ -247,13 +247,13 @@ python scripts/generate_schemas.py --verbose
 
 ## Migration from Hardcoded Schemas
 
-The old hardcoded schemas in `src/dirac_cwl_proto/schemas/` have been removed. To migrate:
+The old hardcoded schemas in `src/dirac_cwl/schemas/` have been removed. To migrate:
 
 1. **Update CWL files** to reference generated schemas:
 ```yaml
 # Old
 $namespaces:
-  dirac: "package://dirac_cwl_proto/schemas/dirac-metadata.yaml#"
+  dirac: "package://dirac_cwl/schemas/dirac-metadata.yaml#"
 
 # New
 $namespaces:

@@ -174,3 +174,8 @@ filecatalog
 generated_schemas/*
 # But keep test schemas that are copied from generated ones
 !test/workflows/test_meta/schemas/dirac-metadata.json
+
+.DS_Store
+
+*.sim
+task.cwl

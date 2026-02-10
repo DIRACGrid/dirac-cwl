@@ -6,7 +6,7 @@ from DIRAC.DataManagementSystem.Client.DataManager import DataManager  # type: i
 from DIRAC.Resources.Storage.FileStorage import FileStorage  # type: ignore[import-untyped]
 from DIRACCommon.Core.Utilities.ReturnValues import S_ERROR, S_OK, returnSingleResult  # type: ignore[import-untyped]
 
-from dirac_cwl_proto.data_management_mocks.file_catalog import LocalFileCatalog
+from dirac_cwl.data_management_mocks.file_catalog import LocalFileCatalog
 
 
 class MockDataManager(DataManager):

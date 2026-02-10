@@ -11,8 +11,8 @@ from cwl_utils.pack import pack
 from cwl_utils.parser import load_document
 from cwl_utils.parser.cwl_v1_2_utils import load_inputfile
 
-from dirac_cwl_proto.job.submission_clients import DIRACSubmissionClient, PrototypeSubmissionClient
-from dirac_cwl_proto.submission_models import (
+from dirac_cwl.job.submission_clients import DIRACSubmissionClient, PrototypeSubmissionClient
+from dirac_cwl.submission_models import (
     JobInputModel,
     JobModel,
 )

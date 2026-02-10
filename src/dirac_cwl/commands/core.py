@@ -8,8 +8,8 @@ class CommandBase(ABC):
     """Base abstract class for pre/post-processing commands.
 
     New commands **MUST NOT** inherit this class. Instead they should inherit the interface classes
-    :class:`dirac_cwl_proto.commands.base.PreProcessCommand` and
-    :class:`dirac_cwl_proto.commands.base.PostProcessCommand`
+    :class:`dirac_cwl.commands.base.PreProcessCommand` and
+    :class:`dirac_cwl.commands.base.PostProcessCommand`
     """
 
     @abstractmethod

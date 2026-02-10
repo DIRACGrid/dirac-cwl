@@ -10,9 +10,9 @@ import pytest
 
 os.environ["DIRAC_PROTO_LOCAL"] = "1"
 
-from dirac_cwl_proto.core.exceptions import WorkflowProcessingException
-from dirac_cwl_proto.execution_hooks.core import ExecutionHooksBasePlugin
-from dirac_cwl_proto.job.job_wrapper import JobWrapper
+from dirac_cwl.core.exceptions import WorkflowProcessingException
+from dirac_cwl.execution_hooks.core import ExecutionHooksBasePlugin
+from dirac_cwl.job.job_wrapper import JobWrapper
 
 
 class TestJobWrapper:
@@ -46,7 +46,7 @@ class TestJobWrapper:
         The fixture "job_type_testing" is the class "JobTypeTestingPlugin".
         It uses the plugin class from the fixture, even though the commands will be overwritten.
         """
-        from dirac_cwl_proto.commands import PostProcessCommand, PreProcessCommand
+        from dirac_cwl.commands import PostProcessCommand, PreProcessCommand
 
         # Initialization
         class PreProcessCmd(PreProcessCommand):
@@ -109,7 +109,7 @@ class TestJobWrapper:
         The fixture "job_type_testing" is the class "JobTypeTestingPlugin".
         It uses the plugin class from the fixture, even though the commands will be overwritten.
         """
-        from dirac_cwl_proto.commands import PostProcessCommand, PreProcessCommand
+        from dirac_cwl.commands import PostProcessCommand, PreProcessCommand
 
         # Initialization and set the execute function to raise an exception
         class Command(PreProcessCommand, PostProcessCommand):
