@@ -20,8 +20,7 @@ outputs:
 
 hints:
   - class: dirac:ExecutionHooks
-    group_size:
-      input_data: 2 # will create nb_inputs /
+    group_size: 2 # will create nb_inputs // 2 jobs
     output_sandbox: ["result-file"]
 
 steps:
