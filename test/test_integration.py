@@ -95,6 +95,9 @@ class TestRealWorldScenarios:
         result = job_wrapper.post_process(0, "{}", "{}")
         assert isinstance(result, bool)
 
+        task_file = job_wrapper.job_path / "task.cwl"
+        task_file.unlink(missing_ok=True)
+
     def test_admin_workflow_scenario(self, sample_job):
         """Test an administrative workflow scenario."""
         # Generic admin-style smoke test: ensure a plugin accepts configuration
@@ -120,6 +123,9 @@ class TestRealWorldScenarios:
         job_wrapper.execution_hooks_plugin = admin_runtime
         processed_command = job_wrapper.pre_process(sample_job.task, None)
         assert isinstance(processed_command, list)
+
+        task_file = job_wrapper.job_path / "task.cwl"
+        task_file.unlink(missing_ok=True)
 
     def test_data_analysis_workflow_scenario(self):
         """Test a data analysis workflow scenario."""
