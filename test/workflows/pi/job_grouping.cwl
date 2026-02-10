@@ -1,6 +1,7 @@
 cwlVersion: v1.2
 class: Workflow
 doc: >
+  Currently used with pi workflows since they have input-data inputs files.
   Count the number of files in the inputs file of the current job group and list them.
   This workflow is used to test the Automatic Job Grouping when doing a Transformation Job.
   From one file, several jobs will be created and the values in the inputs file will be splitted among them.
@@ -20,7 +21,7 @@ outputs:
 hints:
   - class: dirac:ExecutionHooks
     group_size:
-      input_data: 46 # should create 4 jobs: 46/46/46/12 files
+      input_data: 2 # will create nb_inputs /
     output_sandbox: ["result-file"]
 
 steps:
