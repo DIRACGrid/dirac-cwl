@@ -146,7 +146,7 @@ class TestRealWorldScenarios:
         analysis_runtime = analysis_descriptor.to_runtime()
 
         # Test input data discovery
-        input_path = analysis_runtime.get_input_query("input_data")
+        input_path = analysis_runtime.get_input_query()
         assert str(input_path).startswith("/grid/data")
         assert "Run3_2024" in str(input_path)
         assert "CERN" in str(input_path)

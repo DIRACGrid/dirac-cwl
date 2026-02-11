@@ -273,8 +273,8 @@ class TestPluginSystem:
         class DirectPlugin(ExecutionHooksBasePlugin):
             test_param: str = "default"
 
-            def get_input_query(self, input_name: str, **kwargs: Any) -> Optional[Path]:
-                return Path(f"/direct/{input_name}/{self.test_param}")
+            def get_input_query(self, **kwargs: Any) -> Optional[Path]:
+                return Path(f"/direct/{self.test_param}")
 
         # Register plugin directly
         registry = get_registry()
@@ -285,8 +285,8 @@ class TestPluginSystem:
         instance = registry.instantiate_plugin(descriptor)
 
         # Should work with new interface
-        result = instance.get_input_query("test_input")
-        assert result == Path("/direct/test_input/custom")
+        result = instance.get_input_query()
+        assert result == Path("/direct/custom")
 
     def test_plugin_parameter_handling(self):
         """Test that parameters are passed correctly to plugins."""

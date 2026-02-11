@@ -3,6 +3,7 @@
 import glob
 import logging
 import os
+import time
 from pathlib import Path
 from typing import Dict, List, Optional
 
@@ -110,6 +111,7 @@ def submit_transformation_router(transformation: TransformationSubmissionModel) 
     except Exception as exc:
         raise ValueError(f"Invalid DIRAC hints:\n{exc}") from exc
 
+    # Inputs from Transformation inputs_file
     if transformation.input_data:
         nb_files = len(transformation.input_data)
         group_size = transformation_execution_hooks.group_size or 1
@@ -127,40 +129,32 @@ def submit_transformation_router(transformation: TransformationSubmissionModel) 
             )
             job_model_params.append(JobInputModel(sandbox=None, cwl={"input-data": files_chunk}))
 
-    # Temporary comment
-    # if transformation_execution_hooks.configuration and transformation_execution_hooks.group_size:
-    #     # Get the metadata class
-    #     transformation_metadata = transformation_execution_hooks.to_runtime(transformation)
-    #
-    #     # Build the input cwl for the jobs to submit
-    #     logger.info("Getting the input data for the transformation...")
-    #     input_data_dict = {}
-    #     min_length = None
-    #     for input_name, group_size in transformation_execution_hooks.group_size.items():
-    #         # Get input query
-    #         logger.info("\t- Getting input query for %s...", input_name)
-    #         input_query = transformation_metadata.get_input_query(input_name)
-    #         if not input_query:
-    #             raise RuntimeError("Input query not found.")
-    #
-    #         # Wait for the input to be available
-    #         logger.info("\t- Waiting for input data for %s...", input_name)
-    #         logger.debug("\t\t- Query: %s", input_query)
-    #         logger.debug("\t\t- Group Size: %s", group_size)
-    #         while not (inputs := _get_inputs(input_query, group_size)):
-    #             logger.debug("\t\t- Result: %s", inputs)
-    #             time.sleep(5)
-    #         logger.info("\t- Input data for %s available.", input_name)
-    #         if not min_length or len(inputs) < min_length:
-    #             min_length = len(inputs)
-    #
-    #         # Update the input data in the metadata
-    #         # Only keep the first min_length inputs
-    #         input_data_dict[input_name] = inputs[:min_length]
-    #
-    #     # Get the JobModelParameter for each input
-    #     job_model_params = _generate_job_model_parameter(input_data_dict)
-    #     logger.info("Input data for the transformation retrieved!")
+    # Inputs from DataCatalog/Bookkeeping service
+    if transformation_execution_hooks.configuration and transformation_execution_hooks.group_size:
+        # Get the metadata class
+        transformation_metadata = transformation_execution_hooks.to_runtime(transformation)
+
+        # Build the input cwl for the jobs to submit
+        logger.info("Getting the input data for the transformation...")
+        input_query = transformation_metadata.get_input_query()
+        if not input_query:
+            raise RuntimeError("Input query not found.")
+
+        # Wait for the input to be available
+        logger.info("\t- Waiting for input data...")
+        logger.debug("\t\t- Query: %s", input_query)
+        logger.debug("\t\t- Group Size: %s", transformation_execution_hooks.group_size)
+
+        while not (inputs := _get_inputs(input_query, transformation_execution_hooks.group_size)):
+            logger.debug("\t\t- Result: %s", inputs)
+            time.sleep(5)
+
+        logger.info("\t- Input data available.")
+
+        # Get the JobModelParameter for each input
+        input_data_dict = {"input-data": inputs}
+        job_model_params = _generate_job_model_parameter(input_data_dict)
+        logger.info("Input data for the transformation retrieved!")
 
     logger.info("Building the jobs...")
     jobs = JobSubmissionModel(
