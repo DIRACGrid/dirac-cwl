@@ -512,7 +512,7 @@ def test_run_transformation_validation_failure(cli_runner, cwl_file, cleanup, ex
         # --- Job Grouping ---
         # Count and list files in inputs_file
         (
-            "test/workflows/pi/job_grouping.cwl",
+            "test/workflows/job_grouping/job_grouping.cwl",
             "test/workflows/pi/type_dependencies/job/inputs-pi_gather_catalog.yaml",
             {"filecatalog/pi/100": [f"test/workflows/pi/type_dependencies/job/result_{i}.sim" for i in range(1, 6)]},
         )
