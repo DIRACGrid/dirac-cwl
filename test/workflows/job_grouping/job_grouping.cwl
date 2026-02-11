@@ -1,7 +1,6 @@
 cwlVersion: v1.2
 class: Workflow
 doc: >
-  Currently used with pi workflows since they have input-data inputs files.
   Count the number of files in the inputs file of the current job group and list them.
   This workflow is used to test the Automatic Job Grouping when doing a Transformation Job.
   From one file, several jobs will be created and the values in the inputs file will be splitted among them.
