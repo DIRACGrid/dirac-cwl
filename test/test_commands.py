@@ -8,7 +8,7 @@ import pytest
 from DIRACCommon.Core.Utilities.ReturnValues import S_ERROR, S_OK
 from pytest_mock import MockerFixture
 
-from dirac_cwl_proto.commands import UploadLogFile
+from dirac_cwl.commands import UploadLogFile
 
 
 class TestUploadLogFile:
@@ -54,18 +54,18 @@ class TestUploadLogFile:
         expected_path = os.path.join(basedir, zip_name)
 
         # Mock Operations
-        mock_ops = mocker.patch("dirac_cwl_proto.commands.upload_log_file.Operations")
+        mock_ops = mocker.patch("dirac_cwl.commands.upload_log_file.Operations")
         mock_ops.return_value.getValue = lambda value, default=None: default
 
         # Mock JobReport
-        mock_job_report = mocker.patch("dirac_cwl_proto.commands.upload_log_file.JobReport")
+        mock_job_report = mocker.patch("dirac_cwl.commands.upload_log_file.JobReport")
         mock_set_app_status = mocker.MagicMock()
         mock_set_job_parameter = mocker.MagicMock()
         mock_job_report.return_value.setApplicationStatus = mock_set_app_status
         mock_job_report.return_value.setJobParameter = mock_set_job_parameter
 
         # Mock StorageElement
-        mock_se = mocker.patch("dirac_cwl_proto.commands.upload_log_file.StorageElement")
+        mock_se = mocker.patch("dirac_cwl.commands.upload_log_file.StorageElement")
         mock_put_file = mocker.MagicMock()
         mock_get_url = mocker.MagicMock()
         mock_put_file.return_value = S_OK({"Successful": {expected_lfn: "Borked"}, "Failed": {}})
@@ -103,18 +103,18 @@ class TestUploadLogFile:
         expected_path = os.path.join(basedir, zip_name)
 
         # Mock Operations
-        mock_ops = mocker.patch("dirac_cwl_proto.commands.upload_log_file.Operations")
+        mock_ops = mocker.patch("dirac_cwl.commands.upload_log_file.Operations")
         mock_ops.return_value.getValue = lambda value, default=None: default
 
         # Mock JobReport
-        mock_job_report = mocker.patch("dirac_cwl_proto.commands.upload_log_file.JobReport")
+        mock_job_report = mocker.patch("dirac_cwl.commands.upload_log_file.JobReport")
         mock_set_app_status = mocker.MagicMock()
         mock_set_job_parameter = mocker.MagicMock()
         mock_job_report.return_value.setApplicationStatus = mock_set_app_status
         mock_job_report.return_value.setJobParameter = mock_set_job_parameter
 
         # Mock StorageElement
-        mock_se = mocker.patch("dirac_cwl_proto.commands.upload_log_file.StorageElement")
+        mock_se = mocker.patch("dirac_cwl.commands.upload_log_file.StorageElement")
         mock_put_file = mocker.MagicMock()
         mock_get_url = mocker.MagicMock()
         mock_put_file.return_value = S_OK({"Successful": {}, "Failed": {expected_lfn: "Borked"}})
@@ -152,14 +152,14 @@ class TestUploadLogFile:
         expected_path = os.path.join(basedir, zip_name)
 
         # Mock JobReport
-        mock_job_report = mocker.patch("dirac_cwl_proto.commands.upload_log_file.JobReport")
+        mock_job_report = mocker.patch("dirac_cwl.commands.upload_log_file.JobReport")
         mock_set_app_status = mocker.MagicMock()
         mock_set_job_parameter = mocker.MagicMock()
         mock_job_report.return_value.setApplicationStatus = mock_set_app_status
         mock_job_report.return_value.setJobParameter = mock_set_job_parameter
 
         # Mock StorageElement
-        mock_se = mocker.patch("dirac_cwl_proto.commands.upload_log_file.StorageElement")
+        mock_se = mocker.patch("dirac_cwl.commands.upload_log_file.StorageElement")
         mock_put_file = mocker.MagicMock()
         mock_get_url = mocker.MagicMock()
         mock_put_file.return_value = S_OK({"Successful": {}, "Failed": {expected_lfn: "Borked"}})
@@ -195,7 +195,7 @@ class TestUploadLogFile:
         shutil.rmtree(basedir)
 
         # Mock JobReport
-        mock_job_report = mocker.patch("dirac_cwl_proto.commands.upload_log_file.JobReport")
+        mock_job_report = mocker.patch("dirac_cwl.commands.upload_log_file.JobReport")
         mock_set_app_status = mocker.MagicMock()
         mock_set_job_parameter = mocker.MagicMock()
         mock_job_report.return_value.setApplicationStatus = mock_set_app_status
@@ -222,7 +222,7 @@ class TestUploadLogFile:
         mock_zip.side_effect = [AttributeError(), OSError(), ValueError()]
 
         # Mock JobReport
-        mock_job_report = mocker.patch("dirac_cwl_proto.commands.upload_log_file.JobReport")
+        mock_job_report = mocker.patch("dirac_cwl.commands.upload_log_file.JobReport")
         mock_set_app_status = mocker.MagicMock()
         mock_set_job_parameter = mocker.MagicMock()
         mock_job_report.return_value.setApplicationStatus = mock_set_app_status

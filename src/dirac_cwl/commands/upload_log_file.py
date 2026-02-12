@@ -18,7 +18,7 @@ from DIRAC.Resources.Catalog.PoolXMLFile import getGUID
 from DIRAC.Resources.Storage.StorageElement import StorageElement
 from DIRAC.WorkloadManagementSystem.Client.JobReport import JobReport
 
-from dirac_cwl_proto.commands import PostProcessCommand
+from dirac_cwl.commands import PostProcessCommand
 
 
 class UploadLogFile(PostProcessCommand):
@@ -80,7 +80,9 @@ class UploadLogFile(PostProcessCommand):
             logHttpsURL = urljoin("https://lhcb-dirac-logse.web.cern.ch/lhcb-dirac-logse/", zip_lfn)
         else:
             logHttpsURL = result["Value"]
-        job_report.setJobParameter("Log URL", f'<a href="{logHttpsURL.replace('.zip','/')}">Log file directory</a>')
+
+        logHttpsURL = logHttpsURL.replace(".zip", "/")
+        job_report.setJobParameter("Log URL", f'<a href="{logHttpsURL}">Log file directory</a>')
 
         return S_OK("Log Files uploaded")
 
