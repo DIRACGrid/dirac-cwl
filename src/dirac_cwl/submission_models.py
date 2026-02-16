@@ -58,10 +58,18 @@ class BaseJobModel(BaseModel):
 
     @model_validator(mode="before")
     def validate_job(cls, values):
+        """Validate job workflow.
+
+        :param values: Model values dictionary.
+        :return: Validated values dictionary.
+        """
         task = values.get("task")
 
-        # Validate Resource Requirement values of CWLObject, will raise ValueError if needed.
+        # ResourceRequirement validation
         validate_resource_requirements(task)
+
+        # Hints validation
+        ExecutionHooksHint.from_cwl(task), SchedulingHint.from_cwl(task)
 
         return values
 
@@ -77,17 +85,6 @@ class BaseJobModel(BaseModel):
             return save(value)
         else:
             raise TypeError(f"Cannot serialize type {type(value)}")
-
-    @model_validator(mode="before")
-    def validate_hints(cls, values):
-        """Validate execution hooks and scheduling hints in the task.
-
-        :param values: Model values dictionary.
-        :return: Validated values dictionary.
-        """
-        task = values.get("task")
-        ExecutionHooksHint.from_cwl(task), SchedulingHint.from_cwl(task)
-        return values
 
 
 class JobSubmissionModel(BaseJobModel):
@@ -165,3 +162,93 @@ class ProductionSubmissionModel(BaseModel):
             return save(value)
         else:
             raise TypeError(f"Cannot serialize type {type(value)}")
+
+    @model_validator(mode="before")
+    def validate_production(cls, values):
+        """Validate production workflow."""
+        task = values.get("task")
+
+        # ResourceRequirement validation
+        if any(req.class_ == "ResourceRequirement" for req in task.requirements):
+            raise ValueError("ResourceRequirement is not allowed at Production-level.")
+
+        return values
+
+
+# ResourceRequirement validations, temporary code, waiting on cwltool PR: https://github.com/common-workflow-language/cwltool/pull/2179.
+def validate_resource_requirements(task):
+    """
+    Validate ResourceRequirements of a task (CommandLineTool, Workflow, WorkflowStep, WorkflowStep.run).
+
+    :param task: The task to validate
+    """
+    cwl_req = get_resource_requirement(task)
+
+    # Validate Workflow/CLT requirements.
+    if cwl_req:
+        validate_resource_requirement(cwl_req)
+
+    # Validate WorkflowStep requirements.
+    if not isinstance(task, CommandLineTool) and task.steps:
+        for step in task.steps:
+            step_req = get_resource_requirement(step)
+            if step_req:
+                validate_resource_requirement(step_req, cwl_req=cwl_req)
+
+            # Validate run requirements for each step if they exist.
+            if step.run:
+                if isinstance(step.run, Workflow):
+                    # Validate nested Workflow requirements, if any.
+                    validate_resource_requirements(task=step.run)
+
+                step_run_req = get_resource_requirement(step.run)
+                if step_run_req:
+                    validate_resource_requirement(step_run_req, cwl_req=cwl_req)
+
+
+def validate_resource_requirement(requirement, cwl_req=None):
+    """Validate a ResourceRequirement.
+
+    Verify:
+     - that resourceMin is not higher than resourceMax (CommandLineTool, Workflow, WorkflowStep, WorkflowStep.run)
+     - that resourceMin (WorkflowStep, WorkflowStep.run) is not higher than global (Workflow) resourceMax.
+
+    :param requirement: The current ResourceRequirement to validate.
+    :param cwl_req: The global Workflow/CLT requirement, if any.
+    :raises ValueError: If the requirement is invalid.
+    """
+
+    def check_resource(current_resource, req_min_value, req_max_value, global_max_value=None):
+        if req_min_value and req_max_value and req_min_value > req_max_value:
+            raise ValueError(f"{current_resource}Min is higher than {current_resource}Max")
+        if global_max_value and req_min_value and req_min_value > global_max_value:
+            raise ValueError(f"{current_resource}Min is higher than global {current_resource}Max")
+
+    for resource, min_value, max_value in [
+        ("ram", requirement.ramMin, requirement.ramMax),
+        ("cores", requirement.coresMin, requirement.coresMax),
+        ("tmpdir", requirement.tmpdirMin, requirement.tmpdirMax),
+        ("outdir", requirement.outdirMin, requirement.outdirMax),
+    ]:
+        check_resource(
+            resource,
+            min_value,
+            max_value,
+            cwl_req and getattr(cwl_req, f"{resource}Max"),
+        )
+
+
+def get_resource_requirement(
+    cwl_object: Workflow | CommandLineTool | WorkflowStep,
+) -> ResourceRequirement | None:
+    """
+    Extract the resource requirement from the current cwl_object.
+
+    :param cwl_object: The cwl_object to extract the requirement from.
+    :return: The resource requirement object, or None if not found.
+    """
+    requirements = getattr(cwl_object, "requirements", []) or []
+    for requirement in requirements:
+        if requirement.class_ == "ResourceRequirement":
+            return requirement
+    return None
