@@ -7,7 +7,7 @@ modern Python typing, and comprehensive numpydoc documentation.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Optional
 
 from cwl_utils.parser import WorkflowStep, save
 from cwl_utils.parser.cwl_v1_2 import (
@@ -18,7 +18,7 @@ from cwl_utils.parser.cwl_v1_2 import (
 )
 from pydantic import BaseModel, ConfigDict, field_serializer, model_validator
 
-from dirac_cwl_proto.execution_hooks import (
+from dirac_cwl.execution_hooks import (
     ExecutionHooksHint,
     SchedulingHint,
     TransformationExecutionHooksHint,
@@ -40,35 +40,63 @@ class JobInputModel(BaseModel):
 
     @field_serializer("cwl")
     def serialize_cwl(self, value):
+        """Serialize CWL object to dictionary.
+
+        :param value: CWL object to serialize.
+        :return: Serialized CWL dictionary.
+        """
         return save(value)
 
 
-class JobSubmissionModel(BaseModel):
-    """Job definition sent to the router."""
+class BaseJobModel(BaseModel):
+    """Base class for Job definition."""
 
     # Allow arbitrary types to be passed to the model
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     task: CommandLineTool | Workflow | ExpressionTool
-    parameters: list[JobInputModel] | None = None
-    scheduling: SchedulingHint
-    execution_hooks: ExecutionHooksHint
 
     @model_validator(mode="before")
     def validate_job(cls, values):
+        """Validate job workflow.
+
+        :param values: Model values dictionary.
+        :return: Validated values dictionary.
+        """
         task = values.get("task")
 
-        # Validate Resource Requirement values of CWLObject, will raise ValueError if needed.
+        # ResourceRequirement validation
         validate_resource_requirements(task)
+
+        # Hints validation
+        ExecutionHooksHint.from_cwl(task), SchedulingHint.from_cwl(task)
 
         return values
 
     @field_serializer("task")
     def serialize_task(self, value):
+        """Serialize CWL task object to dictionary.
+
+        :param value: CWL task object to serialize.
+        :return: Serialized task dictionary.
+        :raises TypeError: If value is not a valid CWL task type.
+        """
         if isinstance(value, (CommandLineTool, Workflow, ExpressionTool)):
             return save(value)
         else:
             raise TypeError(f"Cannot serialize type {type(value)}")
+
+
+class JobSubmissionModel(BaseJobModel):
+    """Job definition sent to the router."""
+
+    inputs: list[JobInputModel] | None = None
+
+
+class JobModel(BaseJobModel):
+    """Job definition sent to the job wrapper."""
+
+    input: Optional[JobInputModel] = None
 
 
 # -----------------------------------------------------------------------------
@@ -83,15 +111,30 @@ class TransformationSubmissionModel(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     task: CommandLineTool | Workflow | ExpressionTool
-    execution_hooks: TransformationExecutionHooksHint
-    scheduling: SchedulingHint
 
     @field_serializer("task")
     def serialize_task(self, value):
+        """Serialize CWL task object to dictionary.
+
+        :param value: CWL task object to serialize.
+        :return: Serialized task dictionary.
+        :raises TypeError: If value is not a valid CWL task type.
+        """
         if isinstance(value, (CommandLineTool, Workflow, ExpressionTool)):
             return save(value)
         else:
             raise TypeError(f"Cannot serialize type {type(value)}")
+
+    @model_validator(mode="before")
+    def validate_hints(cls, values):
+        """Validate transformation execution hooks and scheduling hints in the task.
+
+        :param values: Model values dictionary.
+        :return: Validated values dictionary.
+        """
+        task = values.get("task")
+        TransformationExecutionHooksHint.from_cwl(task), SchedulingHint.from_cwl(task)
+        return values
 
 
 # -----------------------------------------------------------------------------
@@ -106,59 +149,33 @@ class ProductionSubmissionModel(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     task: Workflow
-    # Key: step name, Value: description & execution_hooks of a transformation
-    steps_execution_hooks: dict[str, TransformationExecutionHooksHint]
-    # Key: step name, Value: scheduling configuration for a transformation
-    steps_scheduling: dict[str, SchedulingHint] = {}
-
-    @model_validator(mode="before")
-    def validate_production(cls, values):
-        task = values.get("task")
-
-        # Metadata
-        steps_execution_hooks = values.get("steps_execution_hooks")
-
-        if task and steps_execution_hooks:
-            # Extract the available steps in the task
-            task_steps = set([step.id.split("#")[-1] for step in task.steps])
-            metadata_keys = set(steps_execution_hooks.keys())
-
-            # Check if all metadata keys exist in the task's workflow steps
-            missing_steps = metadata_keys - task_steps
-            if missing_steps:
-                raise ValueError(
-                    f"The following steps are missing from the task workflow: {missing_steps}"
-                )
-
-        # ResourceRequirement
-        if any(req.class_ == "ResourceRequirement" for req in task.requirements):
-            raise ValueError(
-                "Global ResourceRequirement is not allowed in productions."
-            )
-
-        return values
 
     @field_serializer("task")
     def serialize_task(self, value):
+        """Serialize CWL workflow object to dictionary.
+
+        :param value: CWL workflow object to serialize.
+        :return: Serialized workflow dictionary.
+        :raises TypeError: If value is not a valid CWL workflow type.
+        """
         if isinstance(value, (ExpressionTool, CommandLineTool, Workflow)):
             return save(value)
         else:
             raise TypeError(f"Cannot serialize type {type(value)}")
 
+    @model_validator(mode="before")
+    def validate_production(cls, values):
+        """Validate production workflow."""
+        task = values.get("task")
 
-# -----------------------------------------------------------------------------
-# Module helpers
-# -----------------------------------------------------------------------------
-def extract_dirac_hints(cwl: Any) -> tuple[ExecutionHooksHint, SchedulingHint]:
-    """Thin wrapper that returns (ExecutionHooksHint, SchedulingHint).
+        # ResourceRequirement validation
+        if any(req.class_ == "ResourceRequirement" for req in task.requirements):
+            raise ValueError("ResourceRequirement is not allowed at Production-level.")
 
-    Prefer the class-factory APIs `ExecutionHooksHint.from_cwl` and
-    `SchedulingHint.from_cwl` for new code. This helper remains for
-    convenience.
-    """
-    return ExecutionHooksHint.from_cwl(cwl), SchedulingHint.from_cwl(cwl)
+        return values
 
 
+# ResourceRequirement validations, temporary code, waiting on cwltool PR: https://github.com/common-workflow-language/cwltool/pull/2179.
 def validate_resource_requirements(task):
     """
     Validate ResourceRequirements of a task (CommandLineTool, Workflow, WorkflowStep, WorkflowStep.run).
@@ -190,11 +207,10 @@ def validate_resource_requirements(task):
 
 
 def validate_resource_requirement(requirement, cwl_req=None):
-    """
-    Validate a ResourceRequirement.
+    """Validate a ResourceRequirement.
+
     Verify:
      - that resourceMin is not higher than resourceMax (CommandLineTool, Workflow, WorkflowStep, WorkflowStep.run)
-     --> #TODO this should be done by cwl-utils/cwltool later
      - that resourceMin (WorkflowStep, WorkflowStep.run) is not higher than global (Workflow) resourceMax.
 
     :param requirement: The current ResourceRequirement to validate.
@@ -202,17 +218,11 @@ def validate_resource_requirement(requirement, cwl_req=None):
     :raises ValueError: If the requirement is invalid.
     """
 
-    def check_resource(
-        current_resource, req_min_value, req_max_value, global_max_value=None
-    ):
+    def check_resource(current_resource, req_min_value, req_max_value, global_max_value=None):
         if req_min_value and req_max_value and req_min_value > req_max_value:
-            raise ValueError(
-                f"{current_resource}Min is higher than {current_resource}Max"
-            )
+            raise ValueError(f"{current_resource}Min is higher than {current_resource}Max")
         if global_max_value and req_min_value and req_min_value > global_max_value:
-            raise ValueError(
-                f"{current_resource}Min is higher than global {current_resource}Max"
-            )
+            raise ValueError(f"{current_resource}Min is higher than global {current_resource}Max")
 
     for resource, min_value, max_value in [
         ("ram", requirement.ramMin, requirement.ramMax),
@@ -232,7 +242,7 @@ def get_resource_requirement(
     cwl_object: Workflow | CommandLineTool | WorkflowStep,
 ) -> ResourceRequirement | None:
     """
-    Extract the resource requirement from the current cwl_object
+    Extract the resource requirement from the current cwl_object.
 
     :param cwl_object: The cwl_object to extract the requirement from.
     :return: The resource requirement object, or None if not found.
