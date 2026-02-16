@@ -1,9 +1,0 @@
-precision: 0.0005
-max_iterations: 1000
-start_x: -0.5
-start_y: 0.0
-step: 1
-split: 1
-width: 7680
-height: 4320
-output_name: data_

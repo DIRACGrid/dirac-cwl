@@ -1,5 +1,9 @@
-hook_plugin: PiGatherPlugin
-group_size:
-  input-data: 5
-configuration:
-  num_points: 100
+- class: dirac:ExecutionHooks
+  hook_plugin: QueryBasedPlugin
+  group_size:
+    input-data: 5
+  configuration:
+    num_points: 100
+    query_root: "."
+    campaign: "pi"
+    data_type: "100"

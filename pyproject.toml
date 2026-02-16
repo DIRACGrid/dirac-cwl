@@ -3,28 +3,33 @@ requires = ["setuptools>=42", "wheel", "setuptools_scm[toml]>=3.4"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "dirac_cwl_proto"
-version = "0.1.0"
+name = "dirac-cwl"
 description = "Prototype of CWL used as a production/job workflow language"
 readme = "README.md"
-requires-python = ">=3.12"
-license = {file = "LICENSE"}
+requires-python = ">=3.11"
+license = "GPL-3.0-only"
+license-files = ["LICENSE"]
 authors = [{ name = "DIRAC consortium" }]
 classifiers = [
     "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Science/Research",
-    "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.11",
     "Topic :: Scientific/Engineering",
     "Topic :: System :: Distributed Computing"
 ]
+dynamic = ["version"]
 
 # Runtime dependencies (what your package needs when installed)
 dependencies = [
     "cwl-utils",
     "cwlformat",
     "cwltool",
+    "dirac>=9.0.0",
+    "diracx-core>=0.0.8",
+    "diracx-api>=0.0.8",
+    "diracx-client>=0.0.8",
+    "diracx-cli>=0.0.8",
     "lbprodrun",
     "mypy",              # usually dev-only, see note below
     "pydantic",
@@ -39,22 +44,33 @@ dependencies = [
 testing = ["pytest>=6", "pytest-mock"]
 
 [project.scripts]
-dirac-cwl = "dirac_cwl_proto:app"
-pi-simulate = "dirac_cwl_proto.modules.pi_simulate:app"
-pi-simulate-v2 = "dirac_cwl_proto.modules.pi_simulate_v2:app"
-pi-gather = "dirac_cwl_proto.modules.pi_gather:app"
-crypto = "dirac_cwl_proto.modules.crypto:app"
-lhcb-app = "dirac_cwl_proto.modules.lhcb_app:app"
-random-data-gen = "dirac_cwl_proto.modules.random_data_gen:app"
-gaussian-fit = "dirac_cwl_proto.modules.gaussian_fit:app"
+dirac-cwl = "dirac_cwl:app"
+crypto = "dirac_cwl.modules.crypto:app"
+pi-simulate = "dirac_cwl.modules.pi_simulate:app"
+pi-gather = "dirac_cwl.modules.pi_gather:app"
+
+dirac-cwl-run = "dirac_cwl.job.executor.__main__:cli"
+dirac-run-lbprodrun-app = "dirac_cwl.job.executor.run_lbprodrun:main"
+
+[project.entry-points."dirac_cwl.execution_hooks"]
+QueryBasedPlugin = "dirac_cwl.execution_hooks.plugins:QueryBasedPlugin"
+
+[project.entry-points."dirac_cwl.input_dataset_plugins"]
+NoOpInputDatasetPlugin = "dirac_cwl.production.plugins.core:NoOpInputDatasetPlugin"
+LHCbBookkeepingPlugin = "dirac_cwl.production.plugins.lhcb:LHCbBookkeepingPlugin"
 
 [tool.setuptools_scm]
 
 [tool.ruff]
-select = ["E", "F", "B", "I", "PLE"]
-ignore = ["B905", "B008", "B006"]
 line-length = 120
 src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "B", "I", "PLE", "D", "G"]
+ignore = ["B905", "B008", "B006"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "pep257"  # Base convention for Sphinx/reST style docstrings
 
 [tool.mypy]
 plugins = ["pydantic.mypy"]
@@ -62,16 +78,24 @@ exclude = ["^tests/", "^build/"]
 allow_redefinition = true
 enable_error_code = ["import", "attr-defined"]
 
+[[tool.mypy.overrides]]
+module = ["requests", "yaml"]
+ignore_missing_imports = true
+
 [tool.pytest.ini_options]
-addopts = ["-v"]
+addopts = [
+    "-v",
+    "--ignore=test/test_metadata_plugins_lhcb.py",
+    "--ignore=test/test_plugins_lhcb.py",
+]
 asyncio_mode = "auto"
 
 # -------------------------
 # Pixi configuration
 # -------------------------
-[tool.pixi.project]
+[tool.pixi.workspace]
 channels = ["conda-forge"]
-platforms = ["win-64", "linux-64", "osx-64", "osx-arm64"]
+platforms = ["linux-64", "osx-64", "osx-arm64"]
 
 # Additional dev-only dependencies (not published with your package)
 [tool.pixi.dependencies]
@@ -81,10 +105,14 @@ jsonschema = "*"   # used in validation
 mypy = "*"         # if you prefer not to list it under [project].dependencies
 ruff = "*"         # linter, optional
 pre-commit = "*"   # git hooks manager
+# conda dependencies
+python-gfal2 = "*"
+m2crypto = "*"
+pytest-asyncio = ">=1.3.0,<2"
 
 # Ensure the package is installed in editable mode in the Pixi environment
 [tool.pixi.pypi-dependencies]
-dirac-cwl-proto = { path = ".", editable = true }
+dirac-cwl = { path = ".", editable = true }
 
 [tool.pixi.tasks]
 help = "echo 'Available tasks: test, lint, schemas, schemas-json, schemas-yaml, clean-schemas, test-schemas, check-schemas, validate-schemas'"
@@ -105,8 +133,8 @@ python scripts/generate_schemas.py \
   --individual \
   --unified && \
 echo "Copying schemas to test locations..." && \
-cp generated_schemas/dirac-metadata.json test/workflows/test_meta/schemas/dirac-metadata.json && \
-cp generated_schemas/plugins-summary.json test/workflows/test_meta/schemas/plugins-summary.json
+cp generated_schemas/dirac-metadata.json test/schemas/dirac-metadata.json && \
+cp generated_schemas/plugins-summary.json test/schemas/plugins-summary.json
 """
 
 schemas-yaml = """
@@ -123,8 +151,8 @@ schemas = { depends-on = ["schemas-json", "schemas-yaml"] }
 clean-schemas = """
 echo "Cleaning generated schemas..." && \
 rm -rf generated_schemas/ && \
-rm -f test/workflows/test_meta/schemas/dirac-metadata.json \
-      test/workflows/test_meta/schemas/plugins-summary.json
+rm -f test/schemas/dirac-metadata.json \
+      test/schemas/plugins-summary.json
 """
 
 # Schema validation

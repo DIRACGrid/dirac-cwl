@@ -1,0 +1,11 @@
+input-data:
+  - class: File
+    location: lfn:/pi/100/result_1.sim
+  - class: File
+    location: lfn:/pi/100/result_2.sim
+  - class: File
+    location: lfn:/pi/100/result_3.sim
+  - class: File
+    location: lfn:/pi/100/result_4.sim
+  - class: File
+    location: lfn:/pi/100/result_5.sim

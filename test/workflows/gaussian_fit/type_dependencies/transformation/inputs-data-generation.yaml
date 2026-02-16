@@ -1,4 +1,0 @@
-hook_plugin: DataGenerationPlugin
-configuration:
-  output_file_name_1: data-gen1.txt
-  output_file_name_2: data-gen2.txt

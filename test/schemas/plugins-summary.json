@@ -1,0 +1,20 @@
+{
+  "plugins": {
+    "ExecutionHooksBasePlugin": {
+      "class": "ExecutionHooksBasePlugin",
+      "description": "Base metadata model",
+      "hook_plugin": null,
+      "module": "dirac_cwl.execution_hooks.core",
+      "vo": null
+    },
+    "QueryBasedPlugin": {
+      "class": "QueryBasedPlugin",
+      "description": "LFN-based metadata for structured data discovery",
+      "hook_plugin": null,
+      "module": "dirac_cwl.execution_hooks.plugins.core",
+      "vo": null
+    }
+  },
+  "total_plugins": 2,
+  "virtual_organizations": []
+}

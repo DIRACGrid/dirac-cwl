@@ -1,9 +1,0 @@
-# The step does not exist
-this-step-doesnot-exist:
-  execution-hooks:
-    hook_plugin: MandelBrotGeneration
-image-merge:
-  execution-hooks:
-    hook_plugin: MandelBrotMerging
-    group_size:
-      data: 5

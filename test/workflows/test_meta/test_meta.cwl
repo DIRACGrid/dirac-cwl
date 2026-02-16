@@ -3,21 +3,26 @@ cwlVersion: v1.2
 class: CommandLineTool
 
 # The inputs for this process: none.
-inputs: []
+inputs: [ ]
 # The outputs for this process: none.
-outputs: []
+outputs: [ ]
 
-baseCommand: ["echo", "Hello World"]
+baseCommand: [ "echo", "Hello World" ]
 
 $namespaces:
-  dirac: "./schemas/dirac-metadata.json#" # Generated schema from Pydantic models
+  dirac: "../../schemas/dirac-metadata.json#/$defs/" # Generated schema from Pydantic models
+
+$schemas:
+  - "../../schemas/dirac-metadata.json"
+
 hints:
-  dirac:execution-hooks:
-    hook_plugin: "User"
+  - class: dirac:ExecutionHooks
+    hook_plugin: "QueryBasedPlugin"
     configuration:
       campaign: PROD5
       site: LaPalma
-  dirac:scheduling:
+
+  - class: dirac:Scheduling
     platform: x86_64
-    priority: 10
-    sites: null
+    priority: 100
+    sites: CTAO.DESY-ZN.de, CTAO.PIC.es

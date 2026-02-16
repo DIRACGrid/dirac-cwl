@@ -6,6 +6,12 @@ doc: >
   It generates random points in a square and calculates how many fall within
   a unit circle inscribed in the square.
 
+$namespaces:
+  dirac: "../../schemas/dirac-metadata.json#/$defs/"
+
+$schemas:
+  - "../../schemas/dirac-metadata.json"
+
 # Define the inputs of the workflow
 inputs:
   num-points:

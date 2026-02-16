@@ -37,7 +37,7 @@ def collect_pydantic_models() -> Dict[str, Any]:
 
     # Import core models
     try:
-        from dirac_cwl_proto.execution_hooks.core import (
+        from dirac_cwl.execution_hooks.core import (
             ExecutionHooksBasePlugin,
             ExecutionHooksHint,
             SchedulingHint,
@@ -47,18 +47,18 @@ def collect_pydantic_models() -> Dict[str, Any]:
         models.update(
             {
                 "ExecutionHooksBasePlugin": ExecutionHooksBasePlugin,
-                "ExecutionHooksHint": ExecutionHooksHint,
-                "SchedulingHint": SchedulingHint,
-                "TransformationExecutionHooksHint": TransformationExecutionHooksHint,
+                "ExecutionHooks": ExecutionHooksHint,
+                "Scheduling": SchedulingHint,
+                "TransformationExecutionHooks": TransformationExecutionHooksHint,
             }
         )
         logger.info("Collected core metadata models")
     except ImportError as e:
-        logger.error(f"Failed to import core models: {e}")
+        logger.error("Failed to import core models: %s", e)
 
     # Import submission models
     try:
-        from dirac_cwl_proto.submission_models import (
+        from dirac_cwl.submission_models import (
             JobInputModel,
             JobSubmissionModel,
             ProductionSubmissionModel,
@@ -75,18 +75,18 @@ def collect_pydantic_models() -> Dict[str, Any]:
         )
         logger.info("Collected submission models")
     except ImportError as e:
-        logger.error(f"Failed to import submission models: {e}")
+        logger.error("Failed to import submission models: %s", e)
 
     # Collect all registered metadata plugins
     try:
-        from dirac_cwl_proto.execution_hooks import get_registry
+        from dirac_cwl.execution_hooks import get_registry
 
         registry = get_registry()
         registry.discover_plugins()
 
         # Get all registered plugins
         all_experiments = registry.list_virtual_organizations()
-        logger.info(f"Found experiments: {all_experiments}")
+        logger.info("Found experiments: %s", all_experiments)
 
         for experiment in all_experiments + [None]:  # Include global plugins
             plugin_names = registry.list_plugins(experiment)
@@ -95,7 +95,7 @@ def collect_pydantic_models() -> Dict[str, Any]:
                 if plugin_class:
                     key = f"{experiment}_{plugin_name}" if experiment else plugin_name
                     models[key] = plugin_class
-                    logger.info(f"Collected plugin: {key} ({plugin_class.__name__})")
+                    logger.info("Collected plugin: %s (%s)", key, plugin_class.__name__)
 
         excluded_prefixes = (
             "BaseMetadata",
@@ -103,12 +103,10 @@ def collect_pydantic_models() -> Dict[str, Any]:
             "Transformation",
             "Production",
         )
-        plugin_count = len(
-            [k for k in models.keys() if not k.startswith(excluded_prefixes)]
-        )
-        logger.info(f"Collected {plugin_count} metadata plugins")
+        plugin_count = len([k for k in models.keys() if not k.startswith(excluded_prefixes)])
+        logger.info("Collected %s metadata plugins", plugin_count)
     except ImportError as e:
-        logger.error(f"Failed to import metadata registry: {e}")
+        logger.error("Failed to import metadata registry: %s", e)
 
     return models
 
@@ -130,19 +128,14 @@ def create_cwl_schema_shim(model_class: Any, model_name: str) -> Dict[str, Any]:
         annotation = field_info.annotation
 
         # Handle CWL Workflow type specifically
-        if (
-            hasattr(annotation, "__name__")
-            and getattr(annotation, "__name__", None) == "Workflow"
-        ):
+        if hasattr(annotation, "__name__") and getattr(annotation, "__name__", None) == "Workflow":
             properties = cast(Dict[str, Any], schema["properties"])
             properties[field_name] = {
                 "description": "CWL Workflow definition",
                 "$ref": "https://json.schemastore.org/cwl-workflow.json",
             }
         # Handle other CWL types
-        elif hasattr(annotation, "__module__") and "cwl_utils.parser" in str(
-            getattr(annotation, "__module__", "")
-        ):
+        elif hasattr(annotation, "__module__") and "cwl_utils.parser" in str(getattr(annotation, "__module__", "")):
             annotation_name = getattr(annotation, "__name__", "Unknown")
             properties = cast(Dict[str, Any], schema["properties"])
             properties[field_name] = {
@@ -150,10 +143,7 @@ def create_cwl_schema_shim(model_class: Any, model_name: str) -> Dict[str, Any]:
                 "$ref": "https://json.schemastore.org/cwlc.json",
             }
         # Handle dict types
-        elif (
-            hasattr(annotation, "__origin__")
-            and getattr(annotation, "__origin__", None) is dict
-        ):
+        elif hasattr(annotation, "__origin__") and getattr(annotation, "__origin__", None) is dict:
             # Try to get the value type for dict[str, SomeType]
             args = getattr(annotation, "__args__", [])
             if len(args) == 2:
@@ -211,21 +201,16 @@ def generate_schema(model_class: Any, model_name: str) -> Dict[str, Any]:
         return schema
     except Exception as e:
         # Handle CWL-related models specially
-        if (
-            "cwl_utils.parser" in str(e)
-            or "IsInstanceSchema" in str(e)
-            or "Workflow" in str(e)
-        ):
-            logger.info(f"Creating CWL schema reference for {model_name}")
+        if "cwl_utils.parser" in str(e) or "IsInstanceSchema" in str(e) or "Workflow" in str(e):
+            logger.info("Creating CWL schema reference for %s", model_name)
             return create_cwl_schema_shim(model_class, model_name)
 
-        logger.warning(f"Skipping schema generation for {model_name}: {e}")
+        logger.warning("Skipping schema generation for %s: %s", model_name, e)
         return {}
 
 
 def generate_unified_dirac_schema(models: Dict[str, Any]) -> Dict[str, Any]:
     """Generate a unified DIRAC metadata schema that references all plugins."""
-
     # Base schema structure
     schema = {
         "$schema": "http://json-schema.org/draft-07/schema#",
@@ -258,9 +243,7 @@ def generate_unified_dirac_schema(models: Dict[str, Any]) -> Dict[str, Any]:
     return schema
 
 
-def save_schema(
-    schema: Dict[str, Any], output_path: Path, format: str = "json"
-) -> None:
+def save_schema(schema: Dict[str, Any], output_path: Path, format: str = "json") -> None:
     """Save schema to file in specified format."""
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -273,14 +256,12 @@ def save_schema(
     else:
         raise ValueError(f"Unsupported format: {format}")
 
-    logger.info(f"Saved schema to {output_path}")
+    logger.info("Saved schema to %s", output_path)
 
 
 def main():
-    """Main entry point for schema generation."""
-    parser = argparse.ArgumentParser(
-        description="Generate JSON schemas from Pydantic metadata models"
-    )
+    """Generate schemas from Pydantic metadata models."""
+    parser = argparse.ArgumentParser(description="Generate JSON schemas from Pydantic metadata models")
     parser.add_argument(
         "--output-dir",
         type=Path,
@@ -315,7 +296,7 @@ def main():
         logger.error("No models found. Exiting.")
         return 1
 
-    logger.info(f"Found {len(models)} models to process")
+    logger.info("Found %s models to process", len(models))
 
     # Create output directory
     args.output_dir.mkdir(parents=True, exist_ok=True)
@@ -344,11 +325,7 @@ def main():
             "plugins": {
                 name: {
                     "class": model_class.__name__,
-                    "hook_plugin": (
-                        model_class.name()
-                        if hasattr(model_class, "get_hook_plugin")
-                        else None
-                    ),
+                    "hook_plugin": (model_class.name() if hasattr(model_class, "get_hook_plugin") else None),
                     "description": getattr(model_class, "description", None),
                     "vo": getattr(model_class, "vo", None),
                     "module": model_class.__module__,

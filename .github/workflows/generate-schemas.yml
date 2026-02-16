@@ -4,15 +4,15 @@ on:
   push:
     branches: ["main"]          # publish "main" to Pages
     paths:
-      - "src/dirac_cwl_proto/metadata/**"
-      - "src/dirac_cwl_proto/submission_models.py"
+      - "src/dirac_cwl/metadata/**"
+      - "src/dirac_cwl/submission_models.py"
       - "scripts/generate_schemas.py"
       - "pyproject.toml"
   pull_request:
     branches: ["main"]          # PR preview sites
     paths:
-      - "src/dirac_cwl_proto/metadata/**"
-      - "src/dirac_cwl_proto/submission_models.py"
+      - "src/dirac_cwl/metadata/**"
+      - "src/dirac_cwl/submission_models.py"
       - "scripts/generate_schemas.py"
       - "pyproject.toml"
   workflow_dispatch:
@@ -69,8 +69,8 @@ jobs:
           cat > site/index.html <<'HTML'
           <!doctype html>
           <meta charset="utf-8">
-          <title>dirac_cwl_proto schemas</title>
-          <h1>dirac_cwl_proto schemas</h1>
+          <title>dirac_cwl schemas</title>
+          <h1>dirac_cwl schemas</h1>
           <ul>
             <li><a href="schemas/">schemas/</a> (from generated_schemas/)</li>
             <li><a href="test-schemas/">test-schemas/</a> (copies used in tests)</li>

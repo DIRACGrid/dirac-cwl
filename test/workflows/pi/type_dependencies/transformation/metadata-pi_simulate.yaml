@@ -1,3 +1,4 @@
 # Override hints from CWL workflow
-configuration:
-  num_points: 2000  # Override default 1000 from CWL
+- class: dirac:ExecutionHooks
+  configuration:
+    num_points: 2000  # Override default 1000 from CWL
