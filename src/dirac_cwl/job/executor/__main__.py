@@ -542,15 +542,19 @@ def main(
         )
         console.print()
 
-        # Run cwltool with our custom executor
-        # Use a StreamHandler to show cwltool output
-        cwltool_handler = logging.StreamHandler(sys.stdout)
-        cwltool_handler.setFormatter(logging.Formatter("%(message)s"))
+        # Let cwltool manage its own logging (coloredlogs to stderr).
+        # Only set up a handler for dirac-cwl-run so our executor messages
+        # go to stdout without duplicating cwltool output.
+        _dcr = logging.getLogger("dirac-cwl-run")
+        _dcr.propagate = False
+        _dcr_handler = logging.StreamHandler(sys.stdout)
+        _dcr_handler.setFormatter(logging.Formatter("%(message)s"))
+        _dcr.addHandler(_dcr_handler)
+        _dcr.setLevel(logging.INFO)
 
         exit_code = cwltool_main(
             argsl=cwltool_args,
             executor=dirac_executor,
-            logger_handler=cwltool_handler,
         )
 
         # Record end time and calculate duration
