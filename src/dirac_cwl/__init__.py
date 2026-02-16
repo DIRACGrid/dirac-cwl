@@ -1,5 +1,6 @@
 """DIRAC CWL Proto - Common Workflow Language integration for DIRAC."""
 
+import logging
 from importlib.metadata import PackageNotFoundError, version
 
 import typer
@@ -15,6 +16,16 @@ except PackageNotFoundError:
     pass
 
 app = typer.Typer()
+
+
+@app.callback(invoke_without_command=True)
+def _configure_logging():
+    """Configure logging when the CLI is invoked (not on import)."""
+    logging.basicConfig(
+        level=logging.DEBUG,
+        format="%(asctime)s | %(name)s | %(levelname)s | %(message)s",
+    )
+
 
 # Add sub-apps
 app.add_typer(production_app, name="production")
