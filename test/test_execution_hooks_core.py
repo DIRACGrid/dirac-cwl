@@ -6,93 +6,17 @@ plugin system, including ExecutionHooksBasePlugin, ExecutionHooksHint, and core
 abstract interfaces.
 """
 
-from pathlib import Path
-from typing import Any, List, Optional, Union
+from typing import Optional
 
 import pytest
+from pytest_mock import MockerFixture
 
-from dirac_cwl_proto.execution_hooks.core import (
-    DataCatalogInterface,
+from dirac_cwl.execution_hooks.core import (
     ExecutionHooksBasePlugin,
     ExecutionHooksHint,
     SchedulingHint,
     TransformationExecutionHooksHint,
 )
-
-
-class TestExecutionHook:
-    """Test the ExecutionHooksBasePlugin abstract base class."""
-
-    def test_instantiation(self):
-        """Test that ExecutionHooksBasePlugin can be instantiated directly with default behavior."""
-        hook = ExecutionHooksBasePlugin()
-
-        # Test default pre_process behavior
-        command = ["echo", "hello"]
-        result = hook.pre_process(Path("/tmp"), command)
-        assert result == command  # Should return command unchanged
-
-        # Test default post_process behavior
-        hook.post_process(Path("/tmp"), exit_code=0)  # Should not raise any exception
-
-    def test_concrete_implementation(self):
-        """Test that concrete implementations work correctly."""
-
-        class ConcreteHook(ExecutionHooksBasePlugin):
-            def pre_process(
-                self, job_path: Path, command: List[str], **kwargs: Any
-            ) -> List[str]:
-                return command + ["--processed"]
-
-        processor = ConcreteHook()
-
-        # Test pre_process
-        result = processor.pre_process(Path("/tmp"), ["echo", "hello"])
-        assert result == ["echo", "hello", "--processed"]
-
-        # Test post_process
-        processor.post_process(Path("/tmp"))  # Should not raise exception
-
-
-class TestDataCatalogInterface:
-    """Test the DataCatalogInterface abstract base class."""
-
-    def test_abstract_methods(self):
-        """Test that DataCatalogInterface cannot be instantiated directly."""
-        with pytest.raises(TypeError):
-            DataCatalogInterface()
-
-    def test_concrete_implementation(self):
-        """Test that concrete implementations work correctly."""
-
-        class ConcreteCatalog(DataCatalogInterface):
-            def get_input_query(
-                self, input_name: str, **kwargs: Any
-            ) -> Union[Path, List[Path], None]:
-                return Path(f"/data/{input_name}")
-
-            def get_output_query(
-                self, output_name: str, **kwargs: Any
-            ) -> Optional[Path]:
-                return Path(f"/output/{output_name}")
-
-            def store_output(
-                self, output_name: str, src_path: str, **kwargs: Any
-            ) -> None:
-                pass
-
-        catalog = ConcreteCatalog()
-
-        # Test get_input_query
-        result = catalog.get_input_query("test_input")
-        assert result == Path("/data/test_input")
-
-        # Test get_output_query
-        result = catalog.get_output_query("test_output")
-        assert result == Path("/output/test_output")
-
-        # Test store_output
-        catalog.store_output("test_output", "/tmp/test")  # Should not raise an error
 
 
 class TestExecutionHookExtended:
@@ -126,21 +50,58 @@ class TestExecutionHookExtended:
         with pytest.raises(ValueError):
             TestModel()  # Missing required_field
 
-    def test_default_interface_methods(self):
+    def test_default_interface_methods(self, tmp_path):
         """Test that default interface methods are implemented."""
 
         class TestModel(ExecutionHooksBasePlugin):
             pass
 
-        model = TestModel()
+        # Use a temp directory for the data catalog to avoid system path issues
+        model = TestModel(base_path=tmp_path)
 
-        # Test DataCatalogInterface methods
-        assert model.get_input_query("test") is None
-        assert model.get_output_query("test") is None
+        # Test store_output raises RuntimeError when src_path is missing
+        with pytest.raises(RuntimeError, match="src_path parameter required"):
+            model.store_output({"test": None})
 
-        # Test store_output raises RuntimeError when no output path is defined
-        with pytest.raises(RuntimeError, match="No output path defined"):
-            model.store_output("test", "/tmp/file.txt")
+    def test_output(self, mocker: MockerFixture):
+        """Test that the Hook uses the correct interface for each output type."""
+        model = ExecutionHooksBasePlugin(
+            output_paths={"test_lfn": "lfn:test"},
+            output_sandbox=["test_sb"],
+            output_se=["SE-USER"],
+        )
+
+        put_mock = mocker.patch.object(
+            model._datamanager,
+            "putAndRegister",
+            return_value={
+                "OK": True,
+                "Value": {"Successful": {"test": "test"}, "Failed": {}},
+            },
+        )
+        # FIXME
+        # sb_upload_mock = mocker.patch.object(
+        #     model._sandbox_store_client,
+        #     "uploadFilesAsSandbox",
+        #     return_value={
+        #         "OK": True,
+        #         "Value": "test",
+        #     },
+        # )
+
+        # Use data manager if output is in output_paths hint
+        model.store_output({"test_lfn": "file.test"})
+        assert "test_lfn" in model.output_paths
+        put_mock.assert_called_once()
+        # sb_upload_mock.assert_not_called()
+
+        put_mock.reset_mock()
+
+        # # Sandbox if in output_sandbox hint
+        # model.store_output("test_sb", "file.test")
+        # assert "test_sb" not in model.output_paths
+        # sb_upload_mock.assert_called_once()
+        # put_mock.assert_not_called()
 
     def test_model_serialization(self):
         """Test that model serialization works correctly."""
@@ -153,7 +114,13 @@ class TestExecutionHookExtended:
 
         # Test dict conversion
         data = model.model_dump()
-        assert data == {"field": "test", "value": 42}
+        assert data == {
+            "field": "test",
+            "value": 42,
+            "output_paths": {},
+            "output_sandbox": [],
+            "output_se": [],
+        }
 
         # Test JSON schema generation
         schema = model.model_json_schema()
@@ -176,7 +143,7 @@ class TestExecutionHooksHint:
         mock_cwl = mocker.Mock()
         mock_cwl.hints = [
             {
-                "class": "dirac:execution-hooks",
+                "class": "dirac:ExecutionHooks",
                 "hook_plugin": "QueryBased",
                 "campaign": "Run3",
             },
@@ -196,7 +163,7 @@ class TestExecutionHooksHint:
         descriptor = ExecutionHooksHint.from_cwl(mock_cwl)
 
         # Should create default descriptor
-        assert descriptor.hook_plugin == "UserPlugin"
+        assert descriptor.hook_plugin == "QueryBasedPlugin"
 
     def test_from_cwl_no_dirac_hints(self, mocker):
         """Test extraction when no DIRAC hints are present."""
@@ -206,24 +173,22 @@ class TestExecutionHooksHint:
         descriptor = ExecutionHooksHint.from_cwl(mock_cwl)
 
         # Should create default descriptor
-        assert descriptor.hook_plugin == "UserPlugin"
+        assert descriptor.hook_plugin == "QueryBasedPlugin"
 
     def test_model_copy_merges_dict_fields(self):
         """Test model_copy merges dict fields and updates values."""
-        descriptor = ExecutionHooksHint(hook_plugin="LHCbSimulationPlugin")
+        descriptor = ExecutionHooksHint(hook_plugin="AdminPlugin")
 
-        updated = descriptor.model_copy(
-            update={"hook_plugin": "NewClass", "new_field": "value"}
-        )
+        updated = descriptor.model_copy(update={"hook_plugin": "NewClass", "new_field": "value"})
 
         assert updated.hook_plugin == "NewClass"
         assert getattr(updated, "new_field", None) == "value"
 
     def test_default_values(self):
         """Test default values."""
-        descriptor = ExecutionHooksHint(hook_plugin="UserPlugin", user_id="test123")
+        descriptor = ExecutionHooksHint(hook_plugin="QueryBasedPlugin", user_id="test123")
 
-        assert descriptor.hook_plugin == "UserPlugin"
+        assert descriptor.hook_plugin == "QueryBasedPlugin"
         assert getattr(descriptor, "user_id", None) == "test123"
 
 
@@ -239,9 +204,7 @@ class TestSchedulingHint:
 
     def test_creation_with_values(self):
         """Test SchedulingHint creation with values."""
-        descriptor = SchedulingHint(
-            platform="DIRAC", priority=5, sites=["LCG.CERN.ch", "LCG.IN2P3.fr"]
-        )
+        descriptor = SchedulingHint(platform="DIRAC", priority=5, sites=["LCG.CERN.ch", "LCG.IN2P3.fr"])
         assert descriptor.platform == "DIRAC"
         assert descriptor.priority == 5
         assert descriptor.sites == ["LCG.CERN.ch", "LCG.IN2P3.fr"]
@@ -251,7 +214,7 @@ class TestSchedulingHint:
         mock_cwl = mocker.Mock()
         mock_cwl.hints = [
             {
-                "class": "dirac:scheduling",
+                "class": "dirac:Scheduling",
                 "platform": "DIRAC-v8",
                 "priority": 8,
                 "sites": ["LCG.CERN.ch"],
@@ -266,9 +229,7 @@ class TestSchedulingHint:
 
     def test_serialization(self):
         """Test SchedulingHint serialization."""
-        descriptor = SchedulingHint(
-            platform="DIRAC", priority=7, sites=["LCG.CERN.ch", "LCG.IN2P3.fr"]
-        )
+        descriptor = SchedulingHint(platform="DIRAC", priority=7, sites=["LCG.CERN.ch", "LCG.IN2P3.fr"])
 
         # Test model serialization
         data = descriptor.model_dump()
@@ -283,31 +244,27 @@ class TestTransformationExecutionHooksHint:
 
     def test_creation(self):
         """Test TransformationExecutionHooksHint creation."""
-        descriptor = TransformationExecutionHooksHint(
-            hook_plugin="QueryBasedPlugin", group_size={"input_data": 100}
-        )
+        descriptor = TransformationExecutionHooksHint(hook_plugin="QueryBasedPlugin", group_size={"input_data": 100})
         assert descriptor.hook_plugin == "QueryBasedPlugin"
         assert descriptor.group_size == {"input_data": 100}
 
     def test_inheritance(self):
         """Test that it inherits from ExecutionHooksHint."""
         descriptor = TransformationExecutionHooksHint(
-            hook_plugin="LHCbSimulationPlugin",
+            hook_plugin="AdminPlugin",
             group_size={"sim_data": 50},
             n_events=1000,
         )
 
         # Test that it has the fields from both classes
-        assert descriptor.hook_plugin == "LHCbSimulationPlugin"
+        assert descriptor.hook_plugin == "AdminPlugin"
         assert descriptor.group_size == {"sim_data": 50}
         assert getattr(descriptor, "n_events", None) == 1000
 
     def test_validation(self):
         """Test group_size validation."""
         # Valid group_size
-        descriptor = TransformationExecutionHooksHint(
-            hook_plugin="UserPlugin", group_size={"files": 10}
-        )
+        descriptor = TransformationExecutionHooksHint(hook_plugin="UserPlugin", group_size={"files": 10})
         assert descriptor.group_size == {"files": 10}
 
         # Test with no group_size

@@ -1,4 +1,0 @@
-hook_plugin: PiGather
-configuration:
-  num_points: 1000
-  input-data: 2

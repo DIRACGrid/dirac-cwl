@@ -1,0 +1,425 @@
+{
+  "$defs": {
+    "ExecutionHooks": {
+      "additionalProperties": true,
+      "description": "Data management configuration for DIRAC jobs",
+      "properties": {
+        "configuration": {
+          "additionalProperties": true,
+          "description": "Additional parameters for metadata plugins",
+          "title": "Configuration",
+          "type": "object"
+        },
+        "hook_plugin": {
+          "default": "QueryBasedPlugin",
+          "description": "Registry key for the metadata implementation class",
+          "title": "Hook Plugin",
+          "type": "string"
+        },
+        "output_paths": {
+          "additionalProperties": true,
+          "description": "LFNs for outputs on the Data Catalog",
+          "title": "Output Paths",
+          "type": "object"
+        },
+        "output_sandbox": {
+          "description": "List of the outputs stored in the output sandbox",
+          "items": {
+            "type": "string"
+          },
+          "title": "Output Sandbox",
+          "type": "array"
+        },
+        "output_se": {
+          "description": "List of Storage Elements that can be used to store the outputs",
+          "items": {
+            "type": "string"
+          },
+          "title": "Output Se",
+          "type": "array"
+        }
+      },
+      "title": "DIRAC Data Manager",
+      "type": "object"
+    },
+    "ExecutionHooksBasePlugin": {
+      "description": "Base metadata model for DIRAC jobs",
+      "dirac_description": "Base metadata model",
+      "dirac_vo": null,
+      "properties": {
+        "output_paths": {
+          "additionalProperties": true,
+          "default": {},
+          "title": "Output Paths",
+          "type": "object"
+        },
+        "output_sandbox": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Output Sandbox",
+          "type": "array"
+        },
+        "output_se": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Output Se",
+          "type": "array"
+        }
+      },
+      "title": "DIRAC Metadata Model",
+      "type": "object"
+    },
+    "JobInputModel": {
+      "description": "Input data and sandbox files for a job execution.",
+      "properties": {
+        "cwl": {
+          "additionalProperties": true,
+          "title": "Cwl",
+          "type": "object"
+        },
+        "lfns_input": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Lfns Input"
+        },
+        "sandbox": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Sandbox"
+        }
+      },
+      "required": [
+        "sandbox",
+        "cwl",
+        "lfns_input"
+      ],
+      "title": "JobInputModel",
+      "type": "object"
+    },
+    "JobSubmissionModel": {
+      "$defs": {
+        "JobInputModel": {
+          "description": "Input data and sandbox files for a job execution.",
+          "properties": {
+            "cwl": {
+              "additionalProperties": true,
+              "title": "Cwl",
+              "type": "object"
+            },
+            "lfns_input": {
+              "anyOf": [
+                {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Lfns Input"
+            },
+            "sandbox": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Sandbox"
+            }
+          },
+          "required": [
+            "sandbox",
+            "cwl",
+            "lfns_input"
+          ],
+          "title": "JobInputModel",
+          "type": "object"
+        }
+      },
+      "description": "Job definition sent to the router.",
+      "properties": {
+        "inputs": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/JobInputModel"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Inputs"
+        },
+        "task": {
+          "anyOf": [],
+          "title": "Task"
+        }
+      },
+      "required": [
+        "task"
+      ],
+      "title": "JobSubmissionModel",
+      "type": "object"
+    },
+    "ProductionSubmissionModel": {
+      "additionalProperties": false,
+      "description": "Schema for ProductionSubmissionModel with CWL type references",
+      "properties": {
+        "task": {
+          "$ref": "https://json.schemastore.org/cwl-workflow.json",
+          "description": "CWL Workflow definition"
+        }
+      },
+      "required": [
+        "task"
+      ],
+      "title": "ProductionSubmissionModel",
+      "type": "object"
+    },
+    "QueryBasedPlugin": {
+      "description": "Base metadata model for DIRAC jobs",
+      "dirac_description": "LFN-based metadata for structured data discovery",
+      "dirac_vo": null,
+      "properties": {
+        "campaign": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Campaign name for LFN path",
+          "title": "Campaign"
+        },
+        "data_type": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Data type classification",
+          "title": "Data Type"
+        },
+        "output_paths": {
+          "additionalProperties": true,
+          "default": {},
+          "title": "Output Paths",
+          "type": "object"
+        },
+        "output_sandbox": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Output Sandbox",
+          "type": "array"
+        },
+        "output_se": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Output Se",
+          "type": "array"
+        },
+        "query_root": {
+          "default": "/grid/data",
+          "description": "Base path for LFN structure",
+          "title": "Query Root",
+          "type": "string"
+        },
+        "site": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Site identifier for LFN path",
+          "title": "Site"
+        }
+      },
+      "title": "DIRAC Metadata Model",
+      "type": "object"
+    },
+    "Scheduling": {
+      "additionalProperties": false,
+      "description": "Descriptor for job execution configuration.",
+      "properties": {
+        "platform": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Target platform (e.g., 'DIRAC', 'DIRACX')",
+          "title": "Platform"
+        },
+        "priority": {
+          "default": 10,
+          "description": "Job priority (higher values = higher priority)",
+          "title": "Priority",
+          "type": "integer"
+        },
+        "sites": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Candidate execution sites",
+          "title": "Sites"
+        }
+      },
+      "title": "SchedulingHint",
+      "type": "object"
+    },
+    "TransformationExecutionHooks": {
+      "additionalProperties": true,
+      "description": "Data management configuration for DIRAC jobs",
+      "properties": {
+        "configuration": {
+          "additionalProperties": true,
+          "description": "Additional parameters for metadata plugins",
+          "title": "Configuration",
+          "type": "object"
+        },
+        "group_size": {
+          "anyOf": [
+            {
+              "additionalProperties": {
+                "type": "integer"
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Input grouping configuration for transformation jobs",
+          "title": "Group Size"
+        },
+        "hook_plugin": {
+          "default": "QueryBasedPlugin",
+          "description": "Registry key for the metadata implementation class",
+          "title": "Hook Plugin",
+          "type": "string"
+        },
+        "output_paths": {
+          "additionalProperties": true,
+          "description": "LFNs for outputs on the Data Catalog",
+          "title": "Output Paths",
+          "type": "object"
+        },
+        "output_sandbox": {
+          "description": "List of the outputs stored in the output sandbox",
+          "items": {
+            "type": "string"
+          },
+          "title": "Output Sandbox",
+          "type": "array"
+        },
+        "output_se": {
+          "description": "List of Storage Elements that can be used to store the outputs",
+          "items": {
+            "type": "string"
+          },
+          "title": "Output Se",
+          "type": "array"
+        }
+      },
+      "title": "DIRAC Data Manager",
+      "type": "object"
+    },
+    "TransformationSubmissionModel": {
+      "description": "Transformation definition sent to the router.",
+      "properties": {
+        "task": {
+          "anyOf": [],
+          "title": "Task"
+        }
+      },
+      "required": [
+        "task"
+      ],
+      "title": "TransformationSubmissionModel",
+      "type": "object"
+    }
+  },
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "additionalProperties": false,
+  "description": "Complete schema for DIRAC CWL metadata including all registered plugins",
+  "properties": {
+    "description": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/TaskDescriptor"
+        }
+      ],
+      "description": "Task description and execution parameters",
+      "type": "object"
+    },
+    "metadata": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/MetadataDescriptor"
+        }
+      ],
+      "description": "Metadata descriptor for the task",
+      "type": "object"
+    }
+  },
+  "title": "DIRAC Metadata Schema",
+  "type": "object"
+}

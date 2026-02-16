@@ -109,6 +109,9 @@ ipython_config.py
 #   https://pdm.fming.dev/#use-with-ide
 .pdm.toml
 
+# pixi
+.pixi/
+
 # PEP 582; used by e.g. github.com/David-OConnor/pyflow and github.com/pdm-project/pdm
 __pypackages__/
 
@@ -171,3 +174,8 @@ filecatalog
 generated_schemas/*
 # But keep test schemas that are copied from generated ones
 !test/workflows/test_meta/schemas/dirac-metadata.json
+
+.DS_Store
+
+*.sim
+task.cwl

@@ -7,7 +7,7 @@ reconstruction, and analysis execution hooks implementations.
 
 from pathlib import Path
 
-from dirac_cwl_proto.execution_hooks.plugins.lhcb import (
+from dirac_cwl.execution_hooks.plugins.lhcb import (
     LHCbAnalysisPlugin,
     LHCbBasePlugin,
     LHCbReconstructionPlugin,
@@ -26,11 +26,11 @@ class TestLHCbBasePlugin:
         assert plugin.vo == "lhcb"
 
         # Test LHCb-specific path generation through data catalog interface
-        from dirac_cwl_proto.execution_hooks.plugins.lhcb import (
+        from dirac_cwl.execution_hooks.plugins.lhcb import (
             LHCbDataCatalogInterface,
         )
 
-        data_catalog = LHCbDataCatalogInterface()
+        data_catalog = LHCbDataCatalogInterface(task_id=123, run_id=456)
         path = data_catalog.get_lhcb_base_path(task_id=12345, run_id=1)
         expected = Path("filecatalog/lhcb/12345/1")
         assert path == expected
@@ -79,7 +79,7 @@ class TestLHCbSimulationPlugin:
         plugin = LHCbSimulationPlugin(task_id=123, run_id=1, generator_config="Pythia8")
 
         command = ["lhcb-simulation", "workflow.cwl"]
-        result = plugin.pre_process(Path("/tmp/job"), command)
+        result = plugin.pre_process({}, None, Path("/tmp/job"), command)
 
         # The pre_process method calculates optimal events and updates parameters
         # It returns the original command unchanged
@@ -92,11 +92,9 @@ class TestLHCbSimulationPlugin:
         plugin = LHCbSimulationPlugin(task_id=123, run_id=1)
 
         # Mock parameter file loading
-        mock_load_inputfile = mocker.patch(
-            "dirac_cwl_proto.execution_hooks.plugins.lhcb.load_inputfile"
-        )
+        mock_load_inputfile = mocker.patch("dirac_cwl.execution_hooks.plugins.lhcb.load_inputfile")
         mock_open = mocker.patch("builtins.open")
-        mock_yaml = mocker.patch("dirac_cwl_proto.execution_hooks.plugins.lhcb.YAML")
+        mock_yaml = mocker.patch("dirac_cwl.execution_hooks.plugins.lhcb.YAML")
         mock_load_inputfile.return_value = {"n_events": 1500, "generator": "Pythia8"}
 
         job_path = Path("/tmp/job")
@@ -116,11 +114,9 @@ class TestLHCbSimulationPlugin:
         plugin = LHCbSimulationPlugin(task_id=123, run_id=1)
 
         # Mock file loading error
-        mock_load_inputfile = mocker.patch(
-            "dirac_cwl_proto.execution_hooks.plugins.lhcb.load_inputfile"
-        )
+        mock_load_inputfile = mocker.patch("dirac_cwl.execution_hooks.plugins.lhcb.load_inputfile")
         mock_open = mocker.patch("builtins.open")
-        mock_yaml = mocker.patch("dirac_cwl_proto.execution_hooks.plugins.lhcb.YAML")
+        mock_yaml = mocker.patch("dirac_cwl.execution_hooks.plugins.lhcb.YAML")
         mock_load_inputfile.side_effect = Exception("File not found")
 
         job_path = Path("/tmp/job")
@@ -139,7 +135,7 @@ class TestLHCbSimulationPlugin:
         plugin = LHCbSimulationPlugin(task_id=123, run_id=1, generator_config="Pythia8")
 
         command = ["lhcb-simulation", "workflow.cwl"]
-        result = plugin.pre_process(Path("/tmp/job"), command)
+        result = plugin.pre_process({}, None, Path("/tmp/job"), command)
 
         # The pre_process method calculates optimal events and updates parameters
         # It returns the original command unchanged (actual implementation doesn't modify command)
@@ -156,11 +152,9 @@ class TestLHCbSimulationPlugin:
         job_path = Path("/tmp/job")
 
         # Mock glob to find simulation files
-        mock_glob = mocker.patch(
-            "dirac_cwl_proto.execution_hooks.plugins.lhcb.glob.glob"
-        )
-        # Mock the store_output method on the data_catalog instance
-        mock_store = mocker.patch.object(plugin.data_catalog, "store_output")
+        mock_glob = mocker.patch("dirac_cwl.execution_hooks.plugins.lhcb.glob.glob")
+        # Mock the store_output method
+        mock_store = mocker.patch.object(plugin.__class__, "store_output")
         mock_glob.side_effect = [
             ["/tmp/job/output.sim"],  # sim files
             ["/tmp/job/pool_xml_catalog.xml"],  # catalog files
@@ -198,9 +192,7 @@ class TestLHCbReconstructionPlugin:
     def test_validate_data_types(self):
         """Test data type validation."""
         # Valid data types
-        plugin = LHCbReconstructionPlugin(
-            task_id=456, run_id=1, input_data_type="SIM", output_data_type="DST"
-        )
+        plugin = LHCbReconstructionPlugin(task_id=456, run_id=1, input_data_type="SIM", output_data_type="DST")
         assert plugin.input_data_type == "SIM"
         assert plugin.output_data_type == "DST"
 
@@ -222,12 +214,10 @@ class TestLHCbReconstructionPlugin:
 
     def test_pre_process(self):
         """Test reconstruction pre_process method."""
-        plugin = LHCbReconstructionPlugin(
-            task_id=456, run_id=1, reconstruction_version="v50r1"
-        )
+        plugin = LHCbReconstructionPlugin(task_id=456, run_id=1, reconstruction_version="v50r1")
 
         command = ["lhcb-reconstruction", "--input", "sim.dst"]
-        result = plugin.pre_process(Path("/tmp/job"), command)
+        result = plugin.pre_process({}, None, Path("/tmp/job"), command)
 
         # Should add reconstruction-specific parameters
         assert "--version" in result
@@ -243,9 +233,7 @@ class TestLHCbAnalysisPlugin:
 
     def test_creation(self):
         """Test LHCbAnalysisPlugin creation."""
-        plugin = LHCbAnalysisPlugin(
-            task_id=789, run_id=1, analysis_name="TestAnalysis", user_name="testuser"
-        )
+        plugin = LHCbAnalysisPlugin(task_id=789, run_id=1, analysis_name="TestAnalysis", user_name="testuser")
         assert plugin.name() == "LHCbAnalysisPlugin"
         assert "LHCb analysis" in plugin.description
 
@@ -264,9 +252,7 @@ class TestLHCbAnalysisPlugin:
 
     def test_user_path_generation(self):
         """Test user-specific path generation."""
-        plugin = LHCbAnalysisPlugin(
-            task_id=789, run_id=1, user_name="alice", analysis_name="B2KstarMuMu"
-        )
+        plugin = LHCbAnalysisPlugin(task_id=789, run_id=1, user_name="alice", analysis_name="B2KstarMuMu")
 
         result = plugin.get_input_query("input_data")
         expected = Path("filecatalog/lhcb/analysis/alice/B2KstarMuMu/input")
@@ -274,9 +260,7 @@ class TestLHCbAnalysisPlugin:
 
     def test_get_output_query_with_analysis(self):
         """Test output query with analysis-specific paths."""
-        plugin = LHCbAnalysisPlugin(
-            task_id=789, run_id=1, user_name="alice", analysis_name="B2KstarMuMu"
-        )
+        plugin = LHCbAnalysisPlugin(task_id=789, run_id=1, user_name="alice", analysis_name="B2KstarMuMu")
 
         result = plugin.get_output_query("results")
         expected = Path("filecatalog/lhcb/analysis/alice/B2KstarMuMu/results")
@@ -284,12 +268,10 @@ class TestLHCbAnalysisPlugin:
 
     def test_pre_process(self):
         """Test analysis pre_process method."""
-        plugin = LHCbAnalysisPlugin(
-            task_id=789, run_id=1, analysis_name="B2KstarMuMu", user_name="alice"
-        )
+        plugin = LHCbAnalysisPlugin(task_id=789, run_id=1, analysis_name="B2KstarMuMu", user_name="alice")
 
         command = ["python", "analysis.py"]
-        result = plugin.pre_process(Path("/tmp/job"), command)
+        result = plugin.pre_process({}, None, Path("/tmp/job"), command)
 
         # Should add analysis-specific parameters
         assert "--analysis" in result
@@ -299,18 +281,14 @@ class TestLHCbAnalysisPlugin:
 
     def test_post_process_with_user_output(self, mocker):
         """Test analysis post_process with user-specific output handling."""
-        plugin = LHCbAnalysisPlugin(
-            task_id=789, run_id=1, user_name="alice", analysis_name="TestAnalysis"
-        )
+        plugin = LHCbAnalysisPlugin(task_id=789, run_id=1, user_name="alice", analysis_name="TestAnalysis")
 
         job_path = Path("/tmp/job")
 
         # Mock glob to find ROOT files and plot files
-        mock_glob = mocker.patch(
-            "dirac_cwl_proto.execution_hooks.plugins.lhcb.glob.glob"
-        )
-        # Mock the store_output method on the data_catalog instance
-        mock_store = mocker.patch.object(plugin.data_catalog, "store_output")
+        mock_glob = mocker.patch("dirac_cwl.execution_hooks.plugins.lhcb.glob.glob")
+        # Mock the store_output method
+        mock_store = mocker.patch.object(plugin.__class__, "store_output")
         mock_glob.side_effect = [
             ["/tmp/job/results.root"],  # ROOT files
             [],  # PNG files
@@ -361,9 +339,7 @@ class TestLHCbBasePluginIntegration:
             ("reconstruction", LHCbReconstructionPlugin(task_id=2, run_id=2)),
             (
                 "analysis",
-                LHCbAnalysisPlugin(
-                    task_id=3, run_id=3, analysis_name="test", user_name="test"
-                ),
+                LHCbAnalysisPlugin(task_id=3, run_id=3, analysis_name="test", user_name="test"),
             ),
         ]
 

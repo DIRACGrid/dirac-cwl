@@ -1,0 +1,167 @@
+"""
+Enhanced submission models for DIRAC CWL integration.
+
+This module provides improved submission models with proper separation of concerns,
+modern Python typing, and comprehensive numpydoc documentation.
+"""
+
+from __future__ import annotations
+
+from typing import Any, Optional
+
+from cwl_utils.parser import WorkflowStep, save
+from cwl_utils.parser.cwl_v1_2 import (
+    CommandLineTool,
+    ExpressionTool,
+    ResourceRequirement,
+    Workflow,
+)
+from pydantic import BaseModel, ConfigDict, field_serializer, model_validator
+
+from dirac_cwl.execution_hooks import (
+    ExecutionHooksHint,
+    SchedulingHint,
+    TransformationExecutionHooksHint,
+)
+
+# -----------------------------------------------------------------------------
+# Job models
+# -----------------------------------------------------------------------------
+
+
+class JobInputModel(BaseModel):
+    """Input data and sandbox files for a job execution."""
+
+    # Allow arbitrary types to be passed to the model
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    sandbox: list[str] | None
+    cwl: dict[str, Any]
+
+    @field_serializer("cwl")
+    def serialize_cwl(self, value):
+        """Serialize CWL object to dictionary.
+
+        :param value: CWL object to serialize.
+        :return: Serialized CWL dictionary.
+        """
+        return save(value)
+
+
+class BaseJobModel(BaseModel):
+    """Base class for Job definition."""
+
+    # Allow arbitrary types to be passed to the model
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    task: CommandLineTool | Workflow | ExpressionTool
+
+    @model_validator(mode="before")
+    def validate_job(cls, values):
+        task = values.get("task")
+
+        # Validate Resource Requirement values of CWLObject, will raise ValueError if needed.
+        validate_resource_requirements(task)
+
+        return values
+
+    @field_serializer("task")
+    def serialize_task(self, value):
+        """Serialize CWL task object to dictionary.
+
+        :param value: CWL task object to serialize.
+        :return: Serialized task dictionary.
+        :raises TypeError: If value is not a valid CWL task type.
+        """
+        if isinstance(value, (CommandLineTool, Workflow, ExpressionTool)):
+            return save(value)
+        else:
+            raise TypeError(f"Cannot serialize type {type(value)}")
+
+    @model_validator(mode="before")
+    def validate_hints(cls, values):
+        """Validate execution hooks and scheduling hints in the task.
+
+        :param values: Model values dictionary.
+        :return: Validated values dictionary.
+        """
+        task = values.get("task")
+        ExecutionHooksHint.from_cwl(task), SchedulingHint.from_cwl(task)
+        return values
+
+
+class JobSubmissionModel(BaseJobModel):
+    """Job definition sent to the router."""
+
+    inputs: list[JobInputModel] | None = None
+
+
+class JobModel(BaseJobModel):
+    """Job definition sent to the job wrapper."""
+
+    input: Optional[JobInputModel] = None
+
+
+# -----------------------------------------------------------------------------
+# Transformation models
+# -----------------------------------------------------------------------------
+
+
+class TransformationSubmissionModel(BaseModel):
+    """Transformation definition sent to the router."""
+
+    # Allow arbitrary types to be passed to the model
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    task: CommandLineTool | Workflow | ExpressionTool
+
+    @field_serializer("task")
+    def serialize_task(self, value):
+        """Serialize CWL task object to dictionary.
+
+        :param value: CWL task object to serialize.
+        :return: Serialized task dictionary.
+        :raises TypeError: If value is not a valid CWL task type.
+        """
+        if isinstance(value, (CommandLineTool, Workflow, ExpressionTool)):
+            return save(value)
+        else:
+            raise TypeError(f"Cannot serialize type {type(value)}")
+
+    @model_validator(mode="before")
+    def validate_hints(cls, values):
+        """Validate transformation execution hooks and scheduling hints in the task.
+
+        :param values: Model values dictionary.
+        :return: Validated values dictionary.
+        """
+        task = values.get("task")
+        TransformationExecutionHooksHint.from_cwl(task), SchedulingHint.from_cwl(task)
+        return values
+
+
+# -----------------------------------------------------------------------------
+# Production models
+# -----------------------------------------------------------------------------
+
+
+class ProductionSubmissionModel(BaseModel):
+    """Production definition sent to the router."""
+
+    # Allow arbitrary types to be passed to the model
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    task: Workflow
+
+    @field_serializer("task")
+    def serialize_task(self, value):
+        """Serialize CWL workflow object to dictionary.
+
+        :param value: CWL workflow object to serialize.
+        :return: Serialized workflow dictionary.
+        :raises TypeError: If value is not a valid CWL workflow type.
+        """
+        if isinstance(value, (ExpressionTool, CommandLineTool, Workflow)):
+            return save(value)
+        else:
+            raise TypeError(f"Cannot serialize type {type(value)}")

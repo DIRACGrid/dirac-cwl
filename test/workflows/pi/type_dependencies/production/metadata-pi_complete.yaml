@@ -1,9 +1,0 @@
-simulate:
-  execution-hooks:
-    hook_plugin: PiSimulatePlugin
-gathering:
-  execution-hooks:
-    hook_plugin: PiGatherPlugin
-    group_size:
-      input-data: 1
-    configuration: {}

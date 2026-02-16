@@ -1,6 +1,0 @@
-hook_plugin: LHCbReconstructionPlugin
-group_size:
-  files: 3
-configuration:
-  run-id: 123
-  task-id: 456
