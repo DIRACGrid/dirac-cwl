@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.1](https://github.com/DIRACGrid/dirac-cwl/compare/v1.1.0...v1.1.1) (2026-02-16)
+
+
+### Bug Fixes
+
+* remove library-level basicConfig and clean up logging ([#113](https://github.com/DIRACGrid/dirac-cwl/issues/113)) ([5c8f200](https://github.com/DIRACGrid/dirac-cwl/commit/5c8f2008d9c91212d920fc062a8ed1cec48b214d))
+
 ## [1.1.0](https://github.com/DIRACGrid/dirac-cwl/compare/v1.0.2...v1.1.0) (2026-02-06)
 
 
