@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.3](https://github.com/DIRACGrid/dirac-cwl/compare/v1.1.2...v1.1.3) (2026-02-17)
+
+
+### Bug Fixes
+
+* **executor:** run pure_python hook before ANY cwltool import ([#120](https://github.com/DIRACGrid/dirac-cwl/issues/120)) ([747a4b2](https://github.com/DIRACGrid/dirac-cwl/commit/747a4b239288ed78987b2179ee8802ea5d27ba8c))
+
 ## [1.1.2](https://github.com/DIRACGrid/dirac-cwl/compare/v1.1.1...v1.1.2) (2026-02-17)
 
 
