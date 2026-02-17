@@ -479,10 +479,19 @@ def main(
         cwltool_args.extend(workflow_params)
 
     try:
-        # Create our custom DIRAC executor with replica map support
+        # Install import hook BEFORE any cwltool import — forces pure Python
+        # loading for cwltool.command_line_tool so that our subclass override
+        # of make_path_mapper works even when cwltool is mypyc-compiled.
+        from ._mypyc_compat import install as _install_pure_python_hook
+
+        _install_pure_python_hook()
+
+        # Now safe to import cwltool modules
+        from cwltool.context import LoadingContext
         from cwltool.main import main as cwltool_main
 
         from . import DiracExecutor
+        from .tool import dirac_make_tool
 
         dirac_executor = DiracExecutor(global_map_path=actual_replica_map)
 
@@ -552,9 +561,16 @@ def main(
         _dcr.addHandler(_dcr_handler)
         _dcr.setLevel(logging.INFO)
 
+        # Create LoadingContext with our custom tool factory so cwltool
+        # uses DiracCommandLineTool (which supports custom path mappers)
+        # instead of the default CommandLineTool.
+        loading_context = LoadingContext()
+        loading_context.construct_tool_object = dirac_make_tool
+
         exit_code = cwltool_main(
             argsl=cwltool_args,
             executor=dirac_executor,
+            loadingContext=loading_context,
         )
 
         # Record end time and calculate duration
