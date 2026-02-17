@@ -31,7 +31,6 @@ dependencies = [
     "diracx-client>=0.0.8",
     "diracx-cli>=0.0.8",
     "lbprodrun",
-    "mypy",              # usually dev-only, see note below
     "pydantic",
     "pyyaml",
     "typer",
@@ -41,7 +40,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-testing = ["pytest>=6", "pytest-mock"]
+testing = ["pytest>=6", "pytest-mock", "mypy"]
 
 [project.scripts]
 dirac-cwl = "dirac_cwl:app"
