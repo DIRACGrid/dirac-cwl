@@ -6,49 +6,19 @@ from collections.abc import MutableMapping
 from pathlib import Path
 from typing import cast
 
-from cwltool.command_line_tool import CommandLineTool
 from cwltool.context import RuntimeContext
 from cwltool.errors import WorkflowException
 from cwltool.executors import SingleJobExecutor
 from cwltool.job import CommandLineJob
-from cwltool.pathmapper import PathMapper
 from cwltool.process import Process
 from cwltool.stdfsaccess import StdFsAccess
-from cwltool.utils import CWLObjectType, CWLOutputType
+from cwltool.utils import CWLOutputType
 from cwltool.workflow_job import WorkflowJob
 from diracx.core.models.replica_map import ReplicaMap
 
 from .fs_access import DiracReplicaMapFsAccess
-from .pathmapper import DiracPathMapper
 
 logger = logging.getLogger("dirac-cwl-run")
-
-
-# Monkey-patch CommandLineTool.make_path_mapper to respect runtime_context.path_mapper
-_original_make_path_mapper = CommandLineTool.make_path_mapper
-
-
-def _custom_make_path_mapper(
-    reffiles: list[CWLObjectType],
-    stagedir: str,
-    runtimeContext: RuntimeContext,
-    separateDirs: bool,
-) -> PathMapper:
-    """Create path mapper using runtime_context.path_mapper if available.
-
-    This allows us to inject our custom DiracPathMapper into the workflow execution.
-    """
-    # Check if runtime_context has a custom path_mapper (like Toil does)
-    if hasattr(runtimeContext, "path_mapper") and runtimeContext.path_mapper != PathMapper:
-        # Use the custom path_mapper from runtime context
-        return runtimeContext.path_mapper(reffiles, runtimeContext.basedir, stagedir, separateDirs)
-    else:
-        # Fall back to original implementation
-        return _original_make_path_mapper(reffiles, stagedir, runtimeContext, separateDirs)
-
-
-# Apply the monkey-patch
-CommandLineTool.make_path_mapper = staticmethod(_custom_make_path_mapper)  # type: ignore[method-assign]
 
 
 class DiracExecutor(SingleJobExecutor):
@@ -94,12 +64,9 @@ class DiracExecutor(SingleJobExecutor):
             functools.partial(DiracReplicaMapFsAccess, replica_map=self.global_map),
         )
 
-        # Set up custom path mapper that can resolve LFN: URIs using the replica map
-        # This intercepts file objects BEFORE the default PathMapper strips the LFN: prefix
-        runtime_context.path_mapper = functools.partial(  # type: ignore[assignment]
-            DiracPathMapper,
-            replica_map=self.global_map,
-        )
+        # Store the replica map on the runtime context so DiracCommandLineTool
+        # can pass it to DiracPathMapper in make_path_mapper()
+        runtime_context.replica_map = self.global_map  # type: ignore[attr-defined]
 
         # Get job iterator - this yields ALL jobs including nested ones
         jobiter = process.job(job_order_object, self.output_callback, runtime_context)
