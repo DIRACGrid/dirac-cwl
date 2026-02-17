@@ -126,14 +126,20 @@ class TransformationSubmissionModel(BaseModel):
             raise TypeError(f"Cannot serialize type {type(value)}")
 
     @model_validator(mode="before")
-    def validate_hints(cls, values):
-        """Validate transformation execution hooks and scheduling hints in the task.
+    def validate_transformation(cls, values):
+        """Validate transformation workflow.
 
         :param values: Model values dictionary.
         :return: Validated values dictionary.
         """
         task = values.get("task")
+
+        # ResourceRequirement validation
+        validate_resource_requirements(task)
+
+        # Hints validation
         TransformationExecutionHooksHint.from_cwl(task), SchedulingHint.from_cwl(task)
+
         return values
 
 
