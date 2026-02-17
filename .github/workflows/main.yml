@@ -14,6 +14,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Install Pixi
         uses: prefix-dev/setup-pixi@v0.8.1
@@ -25,6 +27,14 @@ jobs:
           pixi info
           pixi list --locked
         shell: bash
+
+      - name: Validate commit messages
+        if: github.event_name == 'pull_request'
+        run: |
+          pixi run check-commits
+        shell: pixi run bash -e {0}
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
 
       - name: Run pre-commit
         run: |
