@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.2](https://github.com/DIRACGrid/dirac-cwl/compare/v1.1.1...v1.1.2) (2026-02-17)
+
+
+### Bug Fixes
+
+* move mypy to optional-deps ([#118](https://github.com/DIRACGrid/dirac-cwl/issues/118)) ([d59d4c0](https://github.com/DIRACGrid/dirac-cwl/commit/d59d4c04a7f1d1fe9a47f4ebcd908c95e2d42d64))
+
 ## [1.1.1](https://github.com/DIRACGrid/dirac-cwl/compare/v1.1.0...v1.1.1) (2026-02-16)
 
 
