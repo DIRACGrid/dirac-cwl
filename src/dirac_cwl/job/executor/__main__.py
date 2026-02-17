@@ -479,14 +479,7 @@ def main(
         cwltool_args.extend(workflow_params)
 
     try:
-        # Install import hook BEFORE any cwltool import — forces pure Python
-        # loading for cwltool.command_line_tool so that our subclass override
-        # of make_path_mapper works even when cwltool is mypyc-compiled.
-        from ._mypyc_compat import install as _install_pure_python_hook
-
-        _install_pure_python_hook()
-
-        # Now safe to import cwltool modules
+        # Import hook is installed by __init__.py before any cwltool import.
         from cwltool.context import LoadingContext
         from cwltool.main import main as cwltool_main
 
