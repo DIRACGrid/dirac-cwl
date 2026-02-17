@@ -24,24 +24,15 @@ class _PurePythonFinder(importlib.abc.MetaPathFinder):
     """Meta path finder that forces .py over .so for specific modules."""
 
     def find_spec(self, fullname, path, target=None):
-        if fullname not in _FORCE_PURE_PYTHON:
+        """Find a pure Python (.py) module spec, ignoring mypyc .so files."""
+        if fullname not in _FORCE_PURE_PYTHON or path is None:
             return None
 
-        # Find the .py file in the parent package's search path
-        parts = fullname.rsplit(".", 1)
-        module_name = parts[-1]
-        parent_pkg = parts[0] if len(parts) > 1 else None
+        # path is the parent package's __path__, provided by Python for
+        # submodule imports (e.g. cwltool.__path__ for cwltool.command_line_tool)
+        module_name = fullname.rsplit(".", 1)[-1]
 
-        search_paths = None
-        if parent_pkg:
-            parent = sys.modules.get(parent_pkg)
-            if parent and hasattr(parent, "__path__"):
-                search_paths = parent.__path__
-
-        if search_paths is None:
-            return None
-
-        for search_path in search_paths:
+        for search_path in path:
             py_file = os.path.join(search_path, module_name + ".py")
             if os.path.isfile(py_file):
                 logger.debug("Forcing pure Python import: %s from %s", fullname, py_file)
