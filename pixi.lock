@@ -1458,8 +1458,8 @@ packages:
   requires_python: '>=3.11'
 - pypi: ./
   name: dirac-cwl
-  version: 1.1.2.dev2+g5cce17cb7.d20260217
-  sha256: d6bb828550f34ab067e67f6c7518014bce29b623a4a83382aeab2ed082da8418
+  version: 1.1.2.dev3+g773310367
+  sha256: 0b624b7b1adb33bc3b4cb29dbf85bb2db495122acda95aaa775f0aedef77767f
   requires_dist:
   - cwl-utils
   - cwlformat
@@ -1470,7 +1470,6 @@ packages:
   - diracx-client>=0.0.8
   - diracx-cli>=0.0.8
   - lbprodrun
-  - mypy
   - pydantic
   - pyyaml
   - typer
@@ -1479,6 +1478,7 @@ packages:
   - ruamel-yaml
   - pytest>=6 ; extra == 'testing'
   - pytest-mock ; extra == 'testing'
+  - mypy ; extra == 'testing'
   requires_python: '>=3.11'
 - pypi: https://files.pythonhosted.org/packages/9f/90/279f55fff9481f9e0424c3c97b24dc10004ec8d8f98ddf5afd07a7b79194/diraccfg-1.0.1-py2.py3-none-any.whl
   name: diraccfg
