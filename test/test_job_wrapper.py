@@ -12,16 +12,14 @@ os.environ["DIRAC_PROTO_LOCAL"] = "1"
 
 from dirac_cwl.core.exceptions import WorkflowProcessingException
 from dirac_cwl.execution_hooks.core import ExecutionHooksBasePlugin
-from dirac_cwl.job.job_wrapper import JobWrapper
 
 
 class TestJobWrapper:
     """Test the JobWrapper class."""
 
-    def test_instantiation(self, sample_job):
+    def test_instantiation(self, sample_job, job_wrapper):
         """Test that ExecutionHooksBasePlugin can be instantiated directly with default behavior."""
         hook = ExecutionHooksBasePlugin()
-        job_wrapper = JobWrapper()
         job_wrapper.execution_hooks_plugin = hook
 
         # Test default pre_process behavior
@@ -37,7 +35,7 @@ class TestJobWrapper:
         result = job_wrapper.run_job(sample_job)
         assert result
 
-    def test_execute(self, job_type_testing, sample_job, mocker, monkeypatch):
+    def test_execute(self, job_type_testing, sample_job, mocker, monkeypatch, job_wrapper):
         """Test the execution of the preprocess and postprocess commands.
 
         The fixture "job_type_testing" is the class "JobTypeTestingPlugin".
@@ -59,7 +57,6 @@ class TestJobWrapper:
                 return
 
         plugin = job_type_testing()
-        job_wrapper = JobWrapper()
         job_wrapper.execution_hooks_plugin = plugin
 
         # Mock the "execute" commands to be able to spy them
@@ -97,7 +94,7 @@ class TestJobWrapper:
         with pytest.raises(TypeError):
             job_wrapper.post_process(0, "{}", "{}")
 
-    def test_command_exception(self, job_type_testing, sample_job, mocker, monkeypatch):
+    def test_command_exception(self, job_type_testing, sample_job, mocker, monkeypatch, job_wrapper):
         """Test exception report when a command fails.
 
         The fixture "job_type_testing" is the class "JobTypeTestingPlugin".
@@ -111,7 +108,6 @@ class TestJobWrapper:
                 raise NotImplementedError()
 
         plugin = job_type_testing()
-        job_wrapper = JobWrapper()
         job_wrapper.execution_hooks_plugin = plugin
 
         plugin.preprocess_commands = [Command]

@@ -81,18 +81,6 @@
           "title": "Cwl",
           "type": "object"
         },
-        "lfns_input": {
-          "anyOf": [
-            {
-              "additionalProperties": true,
-              "type": "object"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "title": "Lfns Input"
-        },
         "sandbox": {
           "anyOf": [
             {
@@ -110,8 +98,7 @@
       },
       "required": [
         "sandbox",
-        "cwl",
-        "lfns_input"
+        "cwl"
       ],
       "title": "JobInputModel",
       "type": "object"
@@ -125,18 +112,6 @@
               "additionalProperties": true,
               "title": "Cwl",
               "type": "object"
-            },
-            "lfns_input": {
-              "anyOf": [
-                {
-                  "additionalProperties": true,
-                  "type": "object"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Lfns Input"
             },
             "sandbox": {
               "anyOf": [
@@ -155,8 +130,7 @@
           },
           "required": [
             "sandbox",
-            "cwl",
-            "lfns_input"
+            "cwl"
           ],
           "title": "JobInputModel",
           "type": "object"
@@ -194,6 +168,9 @@
       "additionalProperties": false,
       "description": "Schema for ProductionSubmissionModel with CWL type references",
       "properties": {
+        "input_data": {
+          "description": "Field of type list[str | cwl_utils.parser.cwl_v1_0.File | cwl_utils.parser.cwl_v1_1.File | cwl_utils.parser.cwl_v1_2.File] | None"
+        },
         "task": {
           "$ref": "https://json.schemastore.org/cwl-workflow.json",
           "description": "CWL Workflow definition"
@@ -337,10 +314,7 @@
         "group_size": {
           "anyOf": [
             {
-              "additionalProperties": {
-                "type": "integer"
-              },
-              "type": "object"
+              "type": "integer"
             },
             {
               "type": "null"
@@ -385,6 +359,21 @@
     "TransformationSubmissionModel": {
       "description": "Transformation definition sent to the router.",
       "properties": {
+        "input_data": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Input Data"
+        },
         "task": {
           "anyOf": [],
           "title": "Task"

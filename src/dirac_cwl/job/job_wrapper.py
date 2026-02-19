@@ -36,11 +36,6 @@ from dirac_cwl.submission_models import (
     JobModel,
 )
 
-if os.getenv("DIRAC_PROTO_LOCAL") == "1":
-    from dirac_cwl.data_management_mocks.sandbox import create_sandbox, download_sandbox  # type: ignore[no-redef]
-else:
-    from diracx.api.jobs import create_sandbox, download_sandbox  # type: ignore[no-redef]
-
 # -----------------------------------------------------------------------------
 # JobWrapper
 # -----------------------------------------------------------------------------
@@ -56,6 +51,17 @@ class JobWrapper:
         self.execution_hooks_plugin: ExecutionHooksBasePlugin | None = None
         self.job_path: Path = Path()
 
+        if os.getenv("DIRAC_PROTO_LOCAL") == "1":
+            from dirac_cwl.data_management_mocks.sandbox import (  # type: ignore[no-redef]
+                create_sandbox,
+                download_sandbox,
+            )
+        else:
+            from diracx.api.jobs import create_sandbox, download_sandbox  # type: ignore[no-redef]
+
+        self._create_sandbox = create_sandbox
+        self._download_sandbox = download_sandbox
+
     def __download_input_sandbox(self, arguments: JobInputModel, job_path: Path) -> None:
         """Download the files from the sandbox store.
 
@@ -66,7 +72,7 @@ class JobWrapper:
         if not self.execution_hooks_plugin:
             raise RuntimeError("Could not download sandboxes")
         for sandbox in arguments.sandbox:
-            download_sandbox(sandbox, job_path)
+            self._download_sandbox(sandbox, job_path)
 
     def __upload_output_sandbox(
         self,
@@ -83,7 +89,7 @@ class JobWrapper:
                 for path in src_path:
                     outputs_to_sandbox.append(path)
 
-        sb_path = Path(create_sandbox(outputs_to_sandbox))
+        sb_path = Path(self._create_sandbox(outputs_to_sandbox))
         logger.info("Successfully stored output %s in Sandbox %s", self.execution_hooks_plugin.output_sandbox, sb_path)
 
     def __download_input_data(self, inputs: JobInputModel, job_path: Path) -> dict[str, Path | list[Path]]:
