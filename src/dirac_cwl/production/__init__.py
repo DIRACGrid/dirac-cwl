@@ -13,7 +13,6 @@ from typing import List, Optional
 import typer
 from cwl_utils.pack import pack
 from cwl_utils.parser import load_document
-from cwl_utils.parser.cwl_v1_2_utils import load_inputfile
 from cwl_utils.parser.cwl_v1_2 import (
     CommandLineTool,
     ExpressionTool,
@@ -21,6 +20,7 @@ from cwl_utils.parser.cwl_v1_2 import (
     WorkflowInputParameter,
     WorkflowStep,
 )
+from cwl_utils.parser.cwl_v1_2_utils import load_inputfile
 from rich import print_json
 from rich.console import Console
 from schema_salad.exceptions import ValidationException
@@ -167,14 +167,11 @@ def _get_transformations(
     # Create a subworkflow and a transformation for each step
     transformations = []
 
-    for index, step in production.task.steps:
+    for index, step in enumerate(production.task.steps):
         step_task = _create_subworkflow(step, str(production.task.cwlVersion), production.task.inputs)
 
         transformations.append(
-            TransformationSubmissionModel(
-                task=step_task,
-                input_data=production.input_data if index == 0 else None
-            )
+            TransformationSubmissionModel(task=step_task, input_data=production.input_data if index == 0 else None)
         )
     return transformations
 
