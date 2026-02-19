@@ -168,6 +168,9 @@
       "additionalProperties": false,
       "description": "Schema for ProductionSubmissionModel with CWL type references",
       "properties": {
+        "input_data": {
+          "description": "Field of type list[str | cwl_utils.parser.cwl_v1_0.File | cwl_utils.parser.cwl_v1_1.File | cwl_utils.parser.cwl_v1_2.File] | None"
+        },
         "task": {
           "$ref": "https://json.schemastore.org/cwl-workflow.json",
           "description": "CWL Workflow definition"

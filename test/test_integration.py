@@ -20,7 +20,6 @@ from dirac_cwl.execution_hooks.core import (
     ExecutionHooksHint,
     SchedulingHint,
 )
-from dirac_cwl.job.job_wrapper import JobWrapper
 
 
 class TestSystemIntegration:
@@ -71,7 +70,7 @@ class TestSystemIntegration:
 class TestRealWorldScenarios:
     """Test real-world usage scenarios."""
 
-    def test_user_workflow_scenario(self, sample_job):
+    def test_user_workflow_scenario(self, sample_job, job_wrapper):
         """Test a typical user workflow scenario."""
         # Use any available plugin for a generic runtime smoke test
         registry = get_registry()
@@ -86,7 +85,6 @@ class TestRealWorldScenarios:
         # Simulate job execution
 
         # Pre-process should return a command list (may be modified by plugin)
-        job_wrapper = JobWrapper()
         job_wrapper.execution_hooks_plugin = user_runtime
         processed_command = job_wrapper.pre_process(sample_job.task, None)
         assert isinstance(processed_command, list)
@@ -95,10 +93,7 @@ class TestRealWorldScenarios:
         result = job_wrapper.post_process(0, "{}", "{}")
         assert isinstance(result, bool)
 
-        task_file = job_wrapper.job_path / "task.cwl"
-        task_file.unlink(missing_ok=True)
-
-    def test_admin_workflow_scenario(self, sample_job):
+    def test_admin_workflow_scenario(self, sample_job, job_wrapper):
         """Test an administrative workflow scenario."""
         # Generic admin-style smoke test: ensure a plugin accepts configuration
         registry = get_registry()
@@ -119,13 +114,9 @@ class TestRealWorldScenarios:
             pytest.skip(f"Plugin {plugin_name} cannot be instantiated with configuration")
 
         # Simulate job execution
-        job_wrapper = JobWrapper()
         job_wrapper.execution_hooks_plugin = admin_runtime
         processed_command = job_wrapper.pre_process(sample_job.task, None)
         assert isinstance(processed_command, list)
-
-        task_file = job_wrapper.job_path / "task.cwl"
-        task_file.unlink(missing_ok=True)
 
     def test_data_analysis_workflow_scenario(self):
         """Test a data analysis workflow scenario."""
