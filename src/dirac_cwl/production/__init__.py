@@ -13,6 +13,7 @@ from typing import List, Optional
 import typer
 from cwl_utils.pack import pack
 from cwl_utils.parser import load_document
+from cwl_utils.parser.cwl_v1_2_utils import load_inputfile
 from cwl_utils.parser.cwl_v1_2 import (
     CommandLineTool,
     ExpressionTool,
@@ -74,6 +75,7 @@ console = Console()
 @app.command("submit")
 def submit_production_client(
     task_path: str = typer.Argument(..., help="Path to the CWL file"),
+    inputs_file: str | None = typer.Option(None, help="Path to the CWL inputs file"),
     # Specific parameter for the purpose of the prototype
     local: Optional[bool] = typer.Option(True, help="Run the job locally instead of submitting it to the router"),
 ):
@@ -90,6 +92,12 @@ def submit_production_client(
     console.print("[blue]:information_source:[/blue] [bold]CLI:[/bold] Validating the production...")
     try:
         task = load_document(pack(task_path))
+
+        # Load Production inputs if existing (1st Transformation inputs)
+        input_data = None
+        if inputs_file:
+            input_data = load_inputfile(inputs_file).get("input-data")
+
     except FileNotFoundError as ex:
         console.print(f"[red]:heavy_multiplication_x:[/red] [bold]CLI:[/bold] Failed to load the task:\n{ex}")
         return typer.Exit(code=1)
@@ -100,7 +108,7 @@ def submit_production_client(
     console.print("\t[green]:heavy_check_mark:[/green] Metadata")
 
     # Create the production
-    production = ProductionSubmissionModel(task=task)
+    production = ProductionSubmissionModel(task=task, input_data=input_data)
     console.print("[green]:heavy_check_mark:[/green] [bold]CLI:[/bold] Production validated.")
 
     # Submit the tranaformation
@@ -159,12 +167,13 @@ def _get_transformations(
     # Create a subworkflow and a transformation for each step
     transformations = []
 
-    for step in production.task.steps:
+    for index, step in production.task.steps:
         step_task = _create_subworkflow(step, str(production.task.cwlVersion), production.task.inputs)
 
         transformations.append(
             TransformationSubmissionModel(
                 task=step_task,
+                input_data=production.input_data if index == 0 else None
             )
         )
     return transformations
