@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.0](https://github.com/DIRACGrid/dirac-cwl/compare/v1.1.3...v1.2.0) (2026-02-20)
+
+
+### Features
+
+* **executor:** deal with remote PFNs ([#122](https://github.com/DIRACGrid/dirac-cwl/issues/122)) ([d96cb63](https://github.com/DIRACGrid/dirac-cwl/commit/d96cb633e9ae9dc325fee9bc2b4bd247306f7206))
+
 ## [1.1.3](https://github.com/DIRACGrid/dirac-cwl/compare/v1.1.2...v1.1.3) (2026-02-17)
 
 
