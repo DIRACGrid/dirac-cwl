@@ -116,5 +116,25 @@ class DiracPathMapper(PathMapper):
                     list(self.replica_map.root.keys())[:5],
                 )
 
+        # Handle remote protocol URLs (root://, https://, etc.) that should not be staged
+        if obj.get("class") == "File" and any(
+            tgt.startswith(scheme) for scheme in ("root://", "xroot://", "https://", "http://")
+        ):
+            logger.info("DiracPathMapper: Using remote URL directly: %s", tgt)
+            self._pathmap[tgt] = MapperEnt(
+                resolved=tgt,
+                target=tgt,
+                type="File",
+                staged=False,
+            )
+            self.visitlisting(
+                cast(List[CWLObjectType], obj.get("secondaryFiles", [])),
+                stagedir,
+                basedir,
+                copy=copy,
+                staged=staged,
+            )
+            return
+
         # For non-LFN files or when LFN resolution failed, delegate to parent class
         super().visit(obj, stagedir, basedir, copy, staged)
