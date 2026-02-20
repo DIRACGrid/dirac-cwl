@@ -105,7 +105,7 @@ class ExecutionHooksBasePlugin(BaseModel):
         """Auto-derive hook plugin identifier from class name."""
         return cls.__name__
 
-    def store_output(
+    async def store_output(
         self,
         outputs: dict[str, str | Path | Sequence[str | Path]],
         **kwargs: Any,
@@ -118,15 +118,20 @@ class ExecutionHooksBasePlugin(BaseModel):
         :param Any **kwargs:
             Additional keyword arguments for extensibility.
         """
+        if os.getenv("DIRAC_PROTO_LOCAL") == "1":
+            from dirac_cwl.data_management_mocks.status import set_job_status  # type: ignore[no-redef]
+        else:
+            from diracx.api.jobs import set_job_status  # type: ignore[no-redef]
         for output_name, src_path in outputs.items():
-            logger.info("Storing output %s, with source %s", output_name, src_path)
-
             if not src_path:
                 raise RuntimeError(f"src_path parameter required for filesystem storage of {output_name}")
 
             lfn = self.output_paths.get(output_name, None)
 
             if lfn:
+                logger.info("Storing output %s, with source %s", output_name, src_path)
+                jobID = os.environ["JOBID"] if "JOBID" in os.environ else "0"
+                await set_job_status(jobID, minor_status="Uploading Output Data", source="JobWrapper")
                 if isinstance(src_path, str) or isinstance(src_path, Path):
                     src_path = [src_path]
                 for src in src_path:
@@ -138,7 +143,13 @@ class ExecutionHooksBasePlugin(BaseModel):
                             logger.info("Successfully saved file %s with LFN %s", src, file_lfn)
                             break
                     if res and not res["OK"]:
+                        await set_job_status(
+                            jobID, status="Failed", minor_status="Uploading Output Data", source="JobWrapper"
+                        )
                         raise RuntimeError(f"Could not save file {src} with LFN {str(lfn)} : {res['Message']}")
+                await set_job_status(
+                    jobID, status="Completing", minor_status="Output Data Uploaded", source="JobWrapper"
+                )
 
     def get_input_query(self, input_name: str, **kwargs: Any) -> Union[Path, List[Path], None]:
         """Generate LFN-based input query path.

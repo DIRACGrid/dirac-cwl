@@ -6,6 +6,8 @@ plugin system, including ExecutionHooksBasePlugin, ExecutionHooksHint, and core
 abstract interfaces.
 """
 
+import asyncio
+import os
 from typing import Optional
 
 import pytest
@@ -52,6 +54,7 @@ class TestExecutionHookExtended:
 
     def test_default_interface_methods(self, tmp_path):
         """Test that default interface methods are implemented."""
+        os.environ["DIRAC_PROTO_LOCAL"] = "1"
 
         class TestModel(ExecutionHooksBasePlugin):
             pass
@@ -61,7 +64,7 @@ class TestExecutionHookExtended:
 
         # Test store_output raises RuntimeError when src_path is missing
         with pytest.raises(RuntimeError, match="src_path parameter required"):
-            model.store_output({"test": None})
+            asyncio.run(model.store_output({"test": None}))
 
     def test_output(self, mocker: MockerFixture):
         """Test that the Hook uses the correct interface for each output type."""
@@ -90,7 +93,7 @@ class TestExecutionHookExtended:
         # )
 
         # Use data manager if output is in output_paths hint
-        model.store_output({"test_lfn": "file.test"})
+        asyncio.run(model.store_output({"test_lfn": "file.test"}))
         assert "test_lfn" in model.output_paths
         put_mock.assert_called_once()
         # sb_upload_mock.assert_not_called()
