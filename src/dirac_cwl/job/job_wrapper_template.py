@@ -15,9 +15,6 @@ from ruamel.yaml import YAML
 
 if os.getenv("DIRAC_PROTO_LOCAL") != "1":
     DIRAC.initialize()
-    from diracx.api.jobs import set_job_status
-else:
-    from dirac_cwl.data_management_mocks.status import set_job_status
 
 from dirac_cwl.job.job_wrapper import JobWrapper
 from dirac_cwl.submission_models import JobModel
@@ -29,13 +26,10 @@ async def main():
         logging.error("2 arguments required, <json-file> <jobID>")
         sys.exit(1)
 
-    jobID = int(sys.argv[2])
-    src = "JobWrapper"
-
-    os.environ["JOBID"] = str(jobID)
+    job_id = int(sys.argv[2])
 
     job_json_file = sys.argv[1]
-    job_wrapper = JobWrapper()
+    job_wrapper = JobWrapper(job_id)
     await job_wrapper.initialize()
     with open(job_json_file, "r") as file:
         job_model_dict = json.load(file)
@@ -57,23 +51,11 @@ async def main():
     res = await job_wrapper.run_job(job)
     if res:
         logging.info("Job done.")
-        ret = await set_job_status(
-            jobID,
-            "Done",
-            "Execution Complete",
-            source=src,
-        )
-        logging.info(ret)
+        return 0
     else:
         logging.info("Job failed.")
-        ret = await set_job_status(
-            jobID,
-            "Failed",
-            source=src,
-        )
-        logging.info(ret)
-        sys.exit(1)
+        return 1
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    sys.exit(asyncio.run(main()))

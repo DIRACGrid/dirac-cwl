@@ -23,6 +23,7 @@ from cwl_utils.parser.cwl_v1_2 import (
 from DIRACCommon.Core.Utilities.ReturnValues import (  # type: ignore[import-untyped]
     returnValueOrRaise,
 )
+from diracx.client.aio import AsyncDiracClient
 from rich.text import Text
 from ruamel.yaml import YAML
 
@@ -31,16 +32,17 @@ from dirac_cwl.core.exceptions import WorkflowProcessingException
 from dirac_cwl.core.utility import get_lfns
 from dirac_cwl.execution_hooks import ExecutionHooksHint
 from dirac_cwl.execution_hooks.core import ExecutionHooksBasePlugin
+from dirac_cwl.job.job_report import JobMinorStatus, JobReport, JobStatus
 from dirac_cwl.submission_models import (
     JobInputModel,
     JobModel,
 )
 
 if os.getenv("DIRAC_PROTO_LOCAL") == "1":
-    from dirac_cwl.data_management_mocks.sandbox import create_sandbox, download_sandbox  # type: ignore[no-redef]
-    from dirac_cwl.data_management_mocks.status import set_job_status  # type: ignore[no-redef]
+    from dirac_cwl.mocks.sandbox import create_sandbox, download_sandbox  # type: ignore[no-redef]
+    from dirac_cwl.mocks.status import JobReportMock
 else:
-    from diracx.api.jobs import create_sandbox, download_sandbox, set_job_status  # type: ignore[no-redef]
+    from diracx.api.jobs import create_sandbox, download_sandbox  # type: ignore[no-redef]
 
 
 # -----------------------------------------------------------------------------
@@ -48,23 +50,26 @@ else:
 # -----------------------------------------------------------------------------
 
 logger = logging.getLogger(__name__)
-src = "JobWrapper"
 
 
 class JobWrapper:
     """Job Wrapper for the execution hook."""
 
-    def __init__(self) -> None:
+    def __init__(self, job_id=0) -> None:
         """Initialize the job wrapper."""
         self.execution_hooks_plugin: ExecutionHooksBasePlugin | None = None
         self.job_path: Path = Path()
-        self.jobID = "0"
-        if "JOBID" in os.environ:
-            self.jobID = os.environ["JOBID"]
+        self.job_id = job_id
+        src = "JobWrapper"
+        if os.getenv("DIRAC_PROTO_LOCAL") == "1":
+            self.job_report: JobReport = JobReportMock(self.job_id, src, None)
+        else:
+            self.job_report = JobReport(self.job_id, src, AsyncDiracClient())
 
     async def initialize(self) -> None:
         """Initialize the JobWrapper."""
-        await set_job_status(self.jobID, "Running", "Job Initialization", source=src)
+        self.job_report.setJobStatus(JobStatus.RUNNING, JobMinorStatus.JOB_INITIALIZATION)
+        await self.job_report.commit()
 
     async def __download_input_sandbox(self, arguments: JobInputModel, job_path: Path) -> None:
         """Download the files from the sandbox store.
@@ -73,9 +78,9 @@ class JobWrapper:
         :param job_path: Path to the job working directory.
         """
         assert arguments.sandbox is not None
-        await set_job_status(self.jobID, minor_status="Downloading InputSandbox", source=src)
+        self.job_report.setJobStatus(minor_status=JobMinorStatus.DOWNLOADING_INPUT_SANDBOX)
         if not self.execution_hooks_plugin:
-            await set_job_status(self.jobID, minor_status="Failed Downloading InputSandbox", source=src)
+            self.job_report.setJobStatus(minor_status=JobMinorStatus.FAILED_DOWNLOADING_INPUT_SANDBOX)
             raise RuntimeError("Could not download sandboxes")
         for sandbox in arguments.sandbox:
             download_sandbox(sandbox, job_path)
@@ -95,12 +100,12 @@ class JobWrapper:
                 for path in src_path:
                     outputs_to_sandbox.append(path)
         if outputs_to_sandbox:
-            await set_job_status(self.jobID, status="Completing", minor_status="Uploading Output Sandbox", source=src)
+            self.job_report.setJobStatus(JobStatus.COMPLETING, minor_status=JobMinorStatus.UPLOADING_OUTPUT_SANDBOX)
             sb_path = Path(create_sandbox(outputs_to_sandbox))
             logger.info(
                 "Successfully stored output %s in Sandbox %s", self.execution_hooks_plugin.output_sandbox, sb_path
             )
-            await set_job_status(self.jobID, status="Completing", minor_status="Output Sandbox Uploaded", source=src)
+            self.job_report.setJobStatus(JobStatus.COMPLETING, minor_status=JobMinorStatus.OUTPUT_SANDBOX_UPLOADED)
 
     async def __download_input_data(self, inputs: JobInputModel, job_path: Path) -> dict[str, Path | list[Path]]:
         """Download LFNs into the job working directory.
@@ -115,7 +120,7 @@ class JobWrapper:
             file path(s) located in the working directory.
         """
         new_paths: dict[str, Path | list[Path]] = {}
-        await set_job_status(self.jobID, minor_status="Input Data Resolution", source=src)
+        self.job_report.setJobStatus(minor_status=JobMinorStatus.INPUT_DATA_RESOLUTION)
 
         if not self.execution_hooks_plugin:
             raise RuntimeWarning("Could not download input data: Execution hook is not defined.")
@@ -336,7 +341,13 @@ class JobWrapper:
                 logger.exception(msg)
                 raise WorkflowProcessingException(msg) from e
 
-        await self.execution_hooks_plugin.store_output(outputs)
+        self.job_report.setJobStatus(minor_status=JobMinorStatus.UPLOADING_OUTPUT_DATA)
+        try:
+            await self.execution_hooks_plugin.store_output(outputs)
+            self.job_report.setJobStatus(status=JobStatus.COMPLETING, minor_status=JobMinorStatus.OUTPUT_DATA_UPLOADED)
+        except RuntimeError as err:
+            self.job_report.setJobStatus(status=JobStatus.FAILED, minor_status=JobMinorStatus.UPLOADING_OUTPUT_DATA)
+            raise err
         return True
 
     async def run_job(self, job: JobModel) -> bool:
@@ -365,19 +376,16 @@ class JobWrapper:
 
             # Execute the task
             logger.info("Executing Task: %s", command)
-            await set_job_status(self.jobID, minor_status="Application", source=src)
+            self.job_report.setJobStatus(minor_status=JobMinorStatus.APPLICATION)
             result = subprocess.run(command, capture_output=True, text=True, cwd=self.job_path)
 
             if result.returncode != 0:
                 logger.error("Error in executing workflow:\n%s", Text.from_ansi(result.stderr))
-                await set_job_status(
-                    self.jobID, status="Completing", minor_status="Application Finished With Errors", source=src
-                )
+                self.job_report.setJobStatus(JobStatus.COMPLETING, minor_status=JobMinorStatus.APP_ERRORS)
+                self.job_report.setJobStatus(JobStatus.FAILED)
                 return False
             logger.info("Task executed successfully!")
-            await set_job_status(
-                self.jobID, status="Completing", minor_status="Application Finished Successfully", source=src
-            )
+            self.job_report.setJobStatus(JobStatus.COMPLETING, minor_status=JobMinorStatus.APP_SUCCESS)
             # Post-process the job
             logger.info("Post-processing Task...")
             if await self.post_process(
@@ -386,12 +394,18 @@ class JobWrapper:
                 result.stderr,
             ):
                 logger.info("Task post-processed successfully!")
+                self.job_report.setJobStatus(JobStatus.DONE, JobMinorStatus.EXEC_COMPLETE)
+                await self.job_report.commit()
                 return True
             logger.error("Failed to post-process Task")
+            self.job_report.setJobStatus(JobStatus.FAILED)
+            await self.job_report.commit()
             return False
 
         except Exception:
             logger.exception("JobWrapper: Failed to execute workflow")
+            self.job_report.setJobStatus(JobStatus.FAILED)
+            await self.job_report.commit()
             return False
         finally:
             # Clean up

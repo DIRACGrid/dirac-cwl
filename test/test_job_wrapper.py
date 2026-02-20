@@ -4,7 +4,6 @@ Tests for the job wrapper class.
 This module tests the functionalities of the job wrapper.
 """
 
-import asyncio
 import os
 
 import pytest
@@ -19,7 +18,8 @@ from dirac_cwl.job.job_wrapper import JobWrapper
 class TestJobWrapper:
     """Test the JobWrapper class."""
 
-    def test_instantiation(self, sample_job):
+    @pytest.mark.asyncio
+    async def test_instantiation(self, sample_job):
         """Test that ExecutionHooksBasePlugin can be instantiated directly with default behavior."""
         hook = ExecutionHooksBasePlugin()
         job_wrapper = JobWrapper()
@@ -27,18 +27,19 @@ class TestJobWrapper:
 
         # Test default pre_process behavior
         command = ["cwltool", "--parallel", "task.cwl"]
-        result = asyncio.run(job_wrapper.pre_process(sample_job.task, None))
+        result = await job_wrapper.pre_process(sample_job.task, None)
         assert result == command  # Should return command unchanged
 
         # Test default post_process behavior
-        result = asyncio.run(job_wrapper.post_process(0, "{}", "{}"))  # Should not raise any exception
+        result = await job_wrapper.post_process(0, "{}", "{}")  # Should not raise any exception
         assert result
 
         # Test default run_job behavior
-        result = asyncio.run(job_wrapper.run_job(sample_job))
+        result = await job_wrapper.run_job(sample_job)
         assert result
 
-    def test_execute(self, job_type_testing, sample_job, mocker, monkeypatch):
+    @pytest.mark.asyncio
+    async def test_execute(self, job_type_testing, sample_job, mocker, monkeypatch):
         """Test the execution of the preprocess and postprocess commands.
 
         The fixture "job_type_testing" is the class "JobTypeTestingPlugin".
@@ -77,13 +78,13 @@ class TestJobWrapper:
         plugin.preprocess_commands = [PreProcessCmd, DualProcessCmd]
         plugin.postprocess_commands = [PostProcessCmd, DualProcessCmd]
 
-        asyncio.run(job_wrapper.pre_process(sample_job.task, None))
+        await job_wrapper.pre_process(sample_job.task, None)
         execute_preprocess_mock.assert_called_once()
         execute_dualprocess_mock.assert_called_once()
 
         execute_dualprocess_mock.reset_mock()  # Reset the mock to be able to call "assert_called_once"
 
-        asyncio.run(job_wrapper.post_process(0, "{}", "{}"))
+        await job_wrapper.post_process(0, "{}", "{}")
         execute_postprocess_mock.assert_called_once()
         execute_dualprocess_mock.assert_called_once()
 
@@ -93,12 +94,13 @@ class TestJobWrapper:
         plugin.postprocess_commands = [PreProcessCmd, DualProcessCmd]
 
         with pytest.raises(TypeError):
-            asyncio.run(job_wrapper.pre_process(sample_job.task, None))
+            await job_wrapper.pre_process(sample_job.task, None)
 
         with pytest.raises(TypeError):
-            asyncio.run(job_wrapper.post_process(0, "{}", "{}"))
+            await job_wrapper.post_process(0, "{}", "{}")
 
-    def test_command_exception(self, job_type_testing, sample_job, mocker, monkeypatch):
+    @pytest.mark.asyncio
+    async def test_command_exception(self, job_type_testing, sample_job, mocker, monkeypatch):
         """Test exception report when a command fails.
 
         The fixture "job_type_testing" is the class "JobTypeTestingPlugin".
@@ -120,7 +122,7 @@ class TestJobWrapper:
 
         # The processing steps should raise a "WorkflowProcessingException"
         with pytest.raises(WorkflowProcessingException):
-            asyncio.run(job_wrapper.pre_process(sample_job.task, None))
+            await job_wrapper.pre_process(sample_job.task, None)
 
         with pytest.raises(WorkflowProcessingException):
-            asyncio.run(job_wrapper.post_process(0, "{}", "{}"))
+            await job_wrapper.post_process(0, "{}", "{}")

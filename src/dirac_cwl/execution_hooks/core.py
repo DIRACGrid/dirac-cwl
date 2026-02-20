@@ -32,7 +32,7 @@ from DIRACCommon.Core.Utilities.ReturnValues import (  # type: ignore[import-unt
 from pydantic import BaseModel, ConfigDict, Field, PrivateAttr
 
 from dirac_cwl.commands import PostProcessCommand, PreProcessCommand
-from dirac_cwl.data_management_mocks.data_manager import MockDataManager
+from dirac_cwl.mocks.data_manager import MockDataManager
 
 logger = logging.getLogger(__name__)
 
@@ -118,10 +118,6 @@ class ExecutionHooksBasePlugin(BaseModel):
         :param Any **kwargs:
             Additional keyword arguments for extensibility.
         """
-        if os.getenv("DIRAC_PROTO_LOCAL") == "1":
-            from dirac_cwl.data_management_mocks.status import set_job_status  # type: ignore[no-redef]
-        else:
-            from diracx.api.jobs import set_job_status  # type: ignore[no-redef]
         for output_name, src_path in outputs.items():
             if not src_path:
                 raise RuntimeError(f"src_path parameter required for filesystem storage of {output_name}")
@@ -130,8 +126,6 @@ class ExecutionHooksBasePlugin(BaseModel):
 
             if lfn:
                 logger.info("Storing output %s, with source %s", output_name, src_path)
-                jobID = os.environ["JOBID"] if "JOBID" in os.environ else "0"
-                await set_job_status(jobID, minor_status="Uploading Output Data", source="JobWrapper")
                 if isinstance(src_path, str) or isinstance(src_path, Path):
                     src_path = [src_path]
                 for src in src_path:
@@ -143,13 +137,7 @@ class ExecutionHooksBasePlugin(BaseModel):
                             logger.info("Successfully saved file %s with LFN %s", src, file_lfn)
                             break
                     if res and not res["OK"]:
-                        await set_job_status(
-                            jobID, status="Failed", minor_status="Uploading Output Data", source="JobWrapper"
-                        )
                         raise RuntimeError(f"Could not save file {src} with LFN {str(lfn)} : {res['Message']}")
-                await set_job_status(
-                    jobID, status="Completing", minor_status="Output Data Uploaded", source="JobWrapper"
-                )
 
     def get_input_query(self, input_name: str, **kwargs: Any) -> Union[Path, List[Path], None]:
         """Generate LFN-based input query path.

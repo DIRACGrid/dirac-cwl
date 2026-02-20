@@ -240,9 +240,6 @@ def run_job(job_id: int, job: JobModel, logger: logging.Logger) -> bool:
     # Clean up the job JSON file
     job_json_path.unlink()
 
-    status_path = f"status_{job_id}"
-    Path(status_path).unlink()
-
     # Log output
     if result.stdout:
         logger.info("STDOUT %s:\n%s", job_id, result.stdout)

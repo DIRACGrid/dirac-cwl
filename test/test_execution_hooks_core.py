@@ -6,7 +6,6 @@ plugin system, including ExecutionHooksBasePlugin, ExecutionHooksHint, and core
 abstract interfaces.
 """
 
-import asyncio
 import os
 from typing import Optional
 
@@ -52,7 +51,8 @@ class TestExecutionHookExtended:
         with pytest.raises(ValueError):
             TestModel()  # Missing required_field
 
-    def test_default_interface_methods(self, tmp_path):
+    @pytest.mark.asyncio
+    async def test_default_interface_methods(self, tmp_path):
         """Test that default interface methods are implemented."""
         os.environ["DIRAC_PROTO_LOCAL"] = "1"
 
@@ -64,9 +64,10 @@ class TestExecutionHookExtended:
 
         # Test store_output raises RuntimeError when src_path is missing
         with pytest.raises(RuntimeError, match="src_path parameter required"):
-            asyncio.run(model.store_output({"test": None}))
+            await model.store_output({"test": None})
 
-    def test_output(self, mocker: MockerFixture):
+    @pytest.mark.asyncio
+    async def test_output(self, mocker: MockerFixture):
         """Test that the Hook uses the correct interface for each output type."""
         model = ExecutionHooksBasePlugin(
             output_paths={"test_lfn": "lfn:test"},
@@ -93,7 +94,7 @@ class TestExecutionHookExtended:
         # )
 
         # Use data manager if output is in output_paths hint
-        asyncio.run(model.store_output({"test_lfn": "file.test"}))
+        await model.store_output({"test_lfn": "file.test"})
         assert "test_lfn" in model.output_paths
         put_mock.assert_called_once()
         # sb_upload_mock.assert_not_called()

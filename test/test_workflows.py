@@ -13,7 +13,7 @@ import pytest
 from typer.testing import CliRunner
 
 from dirac_cwl import app
-from dirac_cwl.data_management_mocks.sandbox import SANDBOX_STORE_DIR, download_sandbox
+from dirac_cwl.mocks.sandbox import SANDBOX_STORE_DIR, download_sandbox
 
 
 def strip_ansi_codes(text: str) -> str:
@@ -35,6 +35,7 @@ def cleanup():
         shutil.rmtree("filecatalog", ignore_errors=True)
         shutil.rmtree("sandboxstore", ignore_errors=True)
         shutil.rmtree("workernode", ignore_errors=True)
+        shutil.rmtree("status", ignore_errors=True)
 
     _cleanup()
     yield

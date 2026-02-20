@@ -54,7 +54,7 @@ class PrototypeSubmissionClient(SubmissionClient):
         :param parameter_path: Path to the parameter file (not used in local mode)
         :return: Sandbox PFN or None
         """
-        from dirac_cwl.data_management_mocks.sandbox import (
+        from dirac_cwl.mocks.sandbox import (
             create_sandbox,
         )
 

@@ -6,7 +6,6 @@ including plugin discovery, registration, CWL integration, and real-world
 usage scenarios.
 """
 
-import asyncio
 import os
 
 import pytest
@@ -72,7 +71,8 @@ class TestSystemIntegration:
 class TestRealWorldScenarios:
     """Test real-world usage scenarios."""
 
-    def test_user_workflow_scenario(self, sample_job):
+    @pytest.mark.asyncio
+    async def test_user_workflow_scenario(self, sample_job):
         """Test a typical user workflow scenario."""
         # Use any available plugin for a generic runtime smoke test
         registry = get_registry()
@@ -89,14 +89,15 @@ class TestRealWorldScenarios:
         # Pre-process should return a command list (may be modified by plugin)
         job_wrapper = JobWrapper()
         job_wrapper.execution_hooks_plugin = user_runtime
-        processed_command = asyncio.run(job_wrapper.pre_process(sample_job.task, None))
+        processed_command = await job_wrapper.pre_process(sample_job.task, None)
         assert isinstance(processed_command, list)
 
         # Post-process should return a boolean
-        result = asyncio.run(job_wrapper.post_process(0, "{}", "{}"))
+        result = await job_wrapper.post_process(0, "{}", "{}")
         assert isinstance(result, bool)
 
-    def test_admin_workflow_scenario(self, sample_job):
+    @pytest.mark.asyncio
+    async def test_admin_workflow_scenario(self, sample_job):
         """Test an administrative workflow scenario."""
         # Generic admin-style smoke test: ensure a plugin accepts configuration
         registry = get_registry()
@@ -119,7 +120,7 @@ class TestRealWorldScenarios:
         # Simulate job execution
         job_wrapper = JobWrapper()
         job_wrapper.execution_hooks_plugin = admin_runtime
-        processed_command = asyncio.run(job_wrapper.pre_process(sample_job.task, None))
+        processed_command = await job_wrapper.pre_process(sample_job.task, None)
         assert isinstance(processed_command, list)
 
     def test_data_analysis_workflow_scenario(self):
