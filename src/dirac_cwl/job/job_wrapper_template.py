@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 """Job wrapper template for executing CWL jobs."""
 
+import asyncio
 import json
 import logging
 import os
@@ -19,14 +20,17 @@ from dirac_cwl.job.job_wrapper import JobWrapper
 from dirac_cwl.submission_models import JobModel
 
 
-def main():
+async def main():
     """Execute the job wrapper for a given job model."""
-    if len(sys.argv) != 2:
-        logging.error("1 argument is required")
+    if len(sys.argv) != 3:
+        logging.error("2 arguments required, <json-file> <jobID>")
         sys.exit(1)
 
+    job_id = int(sys.argv[2])
+
     job_json_file = sys.argv[1]
-    job_wrapper = JobWrapper()
+    job_wrapper = JobWrapper(job_id)
+    await job_wrapper.initialize()
     with open(job_json_file, "r") as file:
         job_model_dict = json.load(file)
 
@@ -44,13 +48,14 @@ def main():
 
     job = JobModel.model_validate(job_model_dict)
 
-    res = job_wrapper.run_job(job)
+    res = await job_wrapper.run_job(job)
     if res:
         logging.info("Job done.")
+        return 0
     else:
         logging.info("Job failed.")
-        sys.exit(1)
+        return 1
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(asyncio.run(main()))

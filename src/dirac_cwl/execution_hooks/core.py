@@ -32,7 +32,7 @@ from DIRACCommon.Core.Utilities.ReturnValues import (  # type: ignore[import-unt
 from pydantic import BaseModel, ConfigDict, Field, PrivateAttr
 
 from dirac_cwl.commands import PostProcessCommand, PreProcessCommand
-from dirac_cwl.data_management_mocks.data_manager import MockDataManager
+from dirac_cwl.mocks.data_manager import MockDataManager
 
 logger = logging.getLogger(__name__)
 
@@ -105,7 +105,7 @@ class ExecutionHooksBasePlugin(BaseModel):
         """Auto-derive hook plugin identifier from class name."""
         return cls.__name__
 
-    def store_output(
+    async def store_output(
         self,
         outputs: dict[str, str | Path | Sequence[str | Path]],
         **kwargs: Any,
@@ -119,14 +119,13 @@ class ExecutionHooksBasePlugin(BaseModel):
             Additional keyword arguments for extensibility.
         """
         for output_name, src_path in outputs.items():
-            logger.info("Storing output %s, with source %s", output_name, src_path)
-
             if not src_path:
                 raise RuntimeError(f"src_path parameter required for filesystem storage of {output_name}")
 
             lfn = self.output_paths.get(output_name, None)
 
             if lfn:
+                logger.info("Storing output %s, with source %s", output_name, src_path)
                 if isinstance(src_path, str) or isinstance(src_path, Path):
                     src_path = [src_path]
                 for src in src_path:
