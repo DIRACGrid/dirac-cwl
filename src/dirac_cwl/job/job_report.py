@@ -82,7 +82,7 @@ class JobReport:
         :param client: DiracX client instance
         """
         self.job_status_info: list = []  # where job status updates are cumulated
-        # self.job_parameters: list = []  # where job parameters are cumulated
+        self.job_parameters: list = []  # where job parameters are cumulated
         self.job_id = job_id
         self.source = source
         self._client = client
@@ -114,18 +114,26 @@ class JobReport:
         if appStatus:
             self.job_status_info.append(("", "", (appStatus.strip(' "' + "'"), timeStamp)))
 
-    # def setJobParameter(self, par_name, par_value):
-    #     pass
+    def setJobParameter(self, par_name, par_value):
+        """Set job parameter.
 
-    # def setJobParameters(self, parameters):
-    #     pass
+        :param par_name: name of the parameter
+        :param par_value: value of the parameter
+        """
+        self.job_parameters.append((par_name, par_value))
+
+    def setJobParameters(self, parameters):
+        """Set job parameters for jobID.
+
+        :param parameters: names and values of job parameters: [(name, value), ...]
+        """
+        for pname, pvalue in parameters:
+            self.job_parameters.append((pname, pvalue))
 
     async def sendStoredStatusInfo(self):
-        """
-        Send all the accumulated information.
-
-        :param self: Description
-        """
+        """Send all the accumulated job status information."""
+        if not self.job_status_info:
+            return
         body = {
             self.job_id: {
                 timestamp: JobStatusUpdate(
@@ -141,15 +149,23 @@ class JobReport:
         if ret.success:
             self.job_status_info = []
         else:
-            raise RuntimeError("Could not set job statuses :", ret)
+            raise RuntimeError("Could not set job statuses:", ret)
 
-    # def sendStoredJobParameters(self):
-    #     pass
+    async def sendStoredJobParameters(self):
+        """Send all the accumulated job parameters information."""
+        if not self.job_parameters:
+            return
+        body = {self.job_id: {name: val for name, val in self.job_parameters}}
+        ret = await self._client.jobs.patch_metadata(body)
+        if ret.success:
+            self.job_parameters = []
+        else:
+            raise RuntimeError("Could not set job parameters:", ret)
 
     async def commit(self):
         """Send all the accumulated information."""
         await self.sendStoredStatusInfo()
-        # self.sendStoredJobParameters()
+        await self.sendStoredJobParameters()
 
     def dump(self):
         """Print out the contents of the internal cached information."""
@@ -161,6 +177,6 @@ class JobReport:
                 minor = ""
             print(status.ljust(20), minor.ljust(30), app.ljust(30), timeStamp)
 
-        # print("Job parameters:")
-        # for pname, pvalue in self.jobParameters:
-        #     print(pname.ljust(20), pvalue.ljust(30))
+        print("Job parameters:")
+        for pname, pvalue in self.job_parameters:
+            print(pname.ljust(20), pvalue.ljust(30))

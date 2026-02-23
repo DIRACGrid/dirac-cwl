@@ -25,3 +25,11 @@ class JobReportMock(JobReport):
                     " | ".join((timestamp, self.source, status.ljust(20), minor_status.ljust(35), application_status))
                     + "\n"
                 )
+
+    async def sendStoredJobParameters(self):
+        """Mock sendStoredJobParameters."""
+        STATUS_DIR.mkdir(exist_ok=True)
+        file_path = STATUS_DIR / f"job_params_{self.job_id}"
+        with open(file_path, "w+") as f:
+            for name, val in self.job_parameters:
+                f.write(" | ".join((name.ljust(20), val.ljust(30))) + "\n")
