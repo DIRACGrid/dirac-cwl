@@ -39,10 +39,10 @@ class TestQueryBasedPlugin:
         """Test get_input_query with query parameters."""
         plugin = QueryBasedPlugin(query_root="/data", campaign="Run3", site="CERN", data_type="AOD")
 
-        result = plugin.get_input_query("test_input")
+        result = plugin.get_input_query()
 
-        # Should build path from query parameters (includes campaign/site/data_type and filename)
-        expected = Path("/data/Run3/CERN/AOD/test_input")
+        # Should build path from query parameters (includes campaign/site/data_type)
+        expected = Path("/data/Run3/CERN/AOD")
         assert result == expected
 
     def test_get_input_query_partial_parameters(self):
@@ -54,30 +54,30 @@ class TestQueryBasedPlugin:
             # No site
         )
 
-        result = plugin.get_input_query("test_input")
+        result = plugin.get_input_query()
 
         # Should build path from available parameters (includes campaign/data_type and filename)
-        expected = Path("/data/Run3/AOD/test_input")
+        expected = Path("/data/Run3/AOD")
         assert result == expected
 
     def test_get_input_query_no_parameters(self):
         """Test get_input_query with no query parameters."""
         plugin = QueryBasedPlugin()
 
-        result = plugin.get_input_query("test_input")
+        result = plugin.get_input_query()
 
         # Should return a path under the default root when no parameters are set
-        expected = Path("/grid/data/test_input")
+        expected = Path("/grid/data")
         assert result == expected
 
     def test_get_input_query_default_root(self):
         """Test get_input_query with default root."""
         plugin = QueryBasedPlugin(campaign="Test")
 
-        result = plugin.get_input_query("test_input")
+        result = plugin.get_input_query()
 
         # Should use default "/grid/data" root with campaign
-        expected = Path("/grid/data/Test/test_input")
+        expected = Path("/grid/data/Test")
         assert result == expected
 
     def test_get_input_query_with_kwargs(self):
@@ -85,10 +85,10 @@ class TestQueryBasedPlugin:
         plugin = QueryBasedPlugin(query_root="/data", campaign="Run3")
 
         # Additional kwargs should be available for custom implementations
-        result = plugin.get_input_query("test_input", custom_param="value")
+        result = plugin.get_input_query(custom_param="value")
 
         # Base implementation should still work (includes campaign and filename)
-        expected = Path("/data/Run3/test_input")
+        expected = Path("/data/Run3")
         assert result == expected
 
     def test_store_output(self):

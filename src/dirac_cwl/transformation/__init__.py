@@ -9,8 +9,9 @@ from typing import Dict, List, Optional
 
 import typer
 from cwl_utils.pack import pack
-from cwl_utils.parser import load_document
+from cwl_utils.parser import load_document, save
 from cwl_utils.parser.cwl_v1_2 import File
+from cwl_utils.parser.cwl_v1_2_utils import load_inputfile
 from rich import print_json
 from rich.console import Console
 from schema_salad.exceptions import ValidationException
@@ -37,6 +38,7 @@ console = Console()
 @app.command("submit")
 def submit_transformation_client(
     task_path: str = typer.Argument(..., help="Path to the CWL file"),
+    inputs_file: str | None = typer.Option(None, help="Path to the CWL inputs file"),
     # Specific parameter for the purpose of the prototype
     local: Optional[bool] = typer.Option(True, help="Run the jobs locally instead of submitting them to the router"),
 ):
@@ -52,6 +54,12 @@ def submit_transformation_client(
     console.print("[blue]:information_source:[/blue] [bold]CLI:[/bold] Validating the transformation...")
     try:
         task = load_document(pack(task_path))
+
+        # Load Transformation inputs if existing
+        input_data = None
+        if inputs_file:
+            input_data = load_inputfile(inputs_file).get("input-data")
+
     except FileNotFoundError as ex:
         console.print(f"[red]:heavy_multiplication_x:[/red] [bold]CLI:[/bold] Failed to load the task:\n{ex}")
         return typer.Exit(code=1)
@@ -60,7 +68,7 @@ def submit_transformation_client(
         return typer.Exit(code=1)
     console.print(f"\t[green]:heavy_check_mark:[/green] Task {task_path}")
 
-    transformation = TransformationSubmissionModel(task=task)
+    transformation = TransformationSubmissionModel(task=task, input_data=input_data)
     console.print("[green]:heavy_check_mark:[/green] [bold]CLI:[/bold] Transformation validated.")
 
     # Submit the transformation
@@ -103,37 +111,48 @@ def submit_transformation_router(transformation: TransformationSubmissionModel) 
     except Exception as exc:
         raise ValueError(f"Invalid DIRAC hints:\n{exc}") from exc
 
+    # Inputs from Transformation inputs_file
+    if transformation.input_data:
+        nb_files = len(transformation.input_data)
+        group_size = transformation_execution_hooks.group_size or 1
+        nb_groups = (nb_files + group_size - 1) // group_size
+        logger.info("Creating %s jobs for the transformation with group size of %s...", nb_groups, group_size)
+
+        input_data = transformation.input_data
+        for i, start in enumerate(range(0, len(input_data), group_size)):
+            files_chunk = input_data[start : start + group_size]
+
+            logger.info(
+                "Group %i files: %s",
+                i + 1,
+                [save(file).get("path") if isinstance(file, File) else file for file in files_chunk],
+            )
+            job_model_params.append(JobInputModel(sandbox=None, cwl={"input-data": files_chunk}))
+
+    # Inputs from DataCatalog/Bookkeeping service
     if transformation_execution_hooks.configuration and transformation_execution_hooks.group_size:
         # Get the metadata class
         transformation_metadata = transformation_execution_hooks.to_runtime(transformation)
 
         # Build the input cwl for the jobs to submit
         logger.info("Getting the input data for the transformation...")
-        input_data_dict = {}
-        min_length = None
-        for input_name, group_size in transformation_execution_hooks.group_size.items():
-            # Get input query
-            logger.info("\t- Getting input query for %s...", input_name)
-            input_query = transformation_metadata.get_input_query(input_name)
-            if not input_query:
-                raise RuntimeError("Input query not found.")
+        input_query = transformation_metadata.get_input_query()
+        if not input_query:
+            raise RuntimeError("Input query not found.")
 
-            # Wait for the input to be available
-            logger.info("\t- Waiting for input data for %s...", input_name)
-            logger.debug("\t\t- Query: %s", input_query)
-            logger.debug("\t\t- Group Size: %s", group_size)
-            while not (inputs := _get_inputs(input_query, group_size)):
-                logger.debug("\t\t- Result: %s", inputs)
-                time.sleep(5)
-            logger.info("\t- Input data for %s available.", input_name)
-            if not min_length or len(inputs) < min_length:
-                min_length = len(inputs)
+        # Wait for the input to be available
+        logger.info("\t- Waiting for input data...")
+        logger.debug("\t\t- Query: %s", input_query)
+        logger.debug("\t\t- Group Size: %s", transformation_execution_hooks.group_size)
 
-            # Update the input data in the metadata
-            # Only keep the first min_length inputs
-            input_data_dict[input_name] = inputs[:min_length]
+        while not (inputs := _get_inputs(input_query, transformation_execution_hooks.group_size)):
+            logger.debug("\t\t- Result: %s", inputs)
+            time.sleep(5)
+
+        logger.info("\t- Input data available.")
 
         # Get the JobModelParameter for each input
+        input_data_dict = {"input-data": inputs}
         job_model_params = _generate_job_model_parameter(input_data_dict)
         logger.info("Input data for the transformation retrieved!")
 

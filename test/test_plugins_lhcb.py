@@ -39,7 +39,7 @@ class TestLHCbBasePlugin:
         """Test base get_input_query implementation."""
         plugin = LHCbBasePlugin(task_id=1, run_id=1)
 
-        result = plugin.get_input_query("input_file")
+        result = plugin.get_input_query()
         # Base LHCbBasePlugin returns None - only derived classes implement queries
         assert result is None
 
@@ -200,7 +200,7 @@ class TestLHCbReconstructionPlugin:
         """Test input query with data type filtering."""
         plugin = LHCbReconstructionPlugin(task_id=456, run_id=1, input_data_type="SIM")
 
-        result = plugin.get_input_query("input_files")
+        result = plugin.get_input_query()
         expected = Path("filecatalog/lhcb/456/1/sim")
         assert result == expected
 
@@ -254,7 +254,7 @@ class TestLHCbAnalysisPlugin:
         """Test user-specific path generation."""
         plugin = LHCbAnalysisPlugin(task_id=789, run_id=1, user_name="alice", analysis_name="B2KstarMuMu")
 
-        result = plugin.get_input_query("input_data")
+        result = plugin.get_input_query()
         expected = Path("filecatalog/lhcb/analysis/alice/B2KstarMuMu/input")
         assert result == expected
 
@@ -344,7 +344,7 @@ class TestLHCbBasePluginIntegration:
         ]
 
         for _plugin_type, plugin in plugins:
-            input_path = plugin.get_input_query("test_input")
+            input_path = plugin.get_input_query()
             output_path = plugin.get_output_query("test_output")
 
             # All paths should exist (not None for these plugins)

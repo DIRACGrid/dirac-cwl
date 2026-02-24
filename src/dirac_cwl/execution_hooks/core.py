@@ -140,12 +140,12 @@ class ExecutionHooksBasePlugin(BaseModel):
                     if res and not res["OK"]:
                         raise RuntimeError(f"Could not save file {src} with LFN {str(lfn)} : {res['Message']}")
 
-    def get_input_query(self, input_name: str, **kwargs: Any) -> Union[Path, List[Path], None]:
+    def get_input_query(self, **kwargs: Any) -> Union[Path, List[Path], None]:
         """Generate LFN-based input query path.
 
         Accepts and ignores extra kwargs for interface compatibility.
         """
-        # Build LFN: /query_root/vo/campaign/site/data_type/input_name
+        # Build LFN: /query_root/vo/campaign/site/data_type
         pass
 
     @classmethod
@@ -337,6 +337,4 @@ class ExecutionHooksHint(BaseModel, Hint):
 class TransformationExecutionHooksHint(ExecutionHooksHint):
     """Extended data manager for transformations."""
 
-    group_size: Optional[Dict[str, int]] = Field(
-        default=None, description="Input grouping configuration for transformation jobs"
-    )
+    group_size: Optional[int] = Field(default=None, description="Input grouping configuration for transformation jobs")

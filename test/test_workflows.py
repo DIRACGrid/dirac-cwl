@@ -65,6 +65,15 @@ def pi_test_files():
             result_file.unlink()
 
 
+def create_test_input_datafiles(destination_source_input_data):
+    """Create test input files, mostly used to mock filecatalog."""
+    for destination, inputs_data in destination_source_input_data.items():
+        dest_path = Path(destination)
+        dest_path.mkdir(parents=True, exist_ok=True)
+        for input_file in inputs_data:
+            shutil.copy(input_file, dest_path)
+
+
 # -----------------------------------------------------------------------------
 # Job tests
 # -----------------------------------------------------------------------------
@@ -148,7 +157,7 @@ def test_run_job_success(cli_runner, cleanup, pi_test_files, cwl_file, inputs):
 
     # Add the input file(s)
     for input in inputs:
-        command.extend(["--parameter-path", input])
+        command.extend(["--input-files", input])
 
     result = cli_runner.invoke(app, command)
     # Remove ANSI color codes for assertion
@@ -195,7 +204,7 @@ def test_run_job_validation_failure(cli_runner, cleanup, cwl_file, inputs, expec
     """Test job submission fails with invalid workflow or inputs."""
     command = ["job", "submit", cwl_file]
     for input in inputs:
-        command.extend(["--parameter-path", input])
+        command.extend(["--input-files", input])
     result = cli_runner.invoke(app, command)
     clean_stdout = strip_ansi_codes(result.stdout)
     assert "Job(s) done" not in clean_stdout, "The job did complete successfully."
@@ -302,33 +311,20 @@ def test_run_job_parallely(tmp_path, cleanup):
         (
             "test/workflows/pi/pigather.cwl",
             ["test/workflows/pi/type_dependencies/job/inputs-pi_gather_catalog.yaml"],
-            {
-                "filecatalog/pi/100": [
-                    "test/workflows/pi/type_dependencies/job/result_1.sim",
-                    "test/workflows/pi/type_dependencies/job/result_2.sim",
-                    "test/workflows/pi/type_dependencies/job/result_3.sim",
-                    "test/workflows/pi/type_dependencies/job/result_4.sim",
-                    "test/workflows/pi/type_dependencies/job/result_5.sim",
-                ]
-            },
+            {"filecatalog/pi/100": [f"test/workflows/pi/type_dependencies/job/result_{i}.sim" for i in range(1, 6)]},
         ),
     ],
 )
 def test_run_job_with_input_data(cli_runner, cleanup, pi_test_files, cwl_file, inputs, destination_source_input_data):
     """Test job execution with input data from file catalog."""
-    for destination, inputs_data in destination_source_input_data.items():
-        # Copy the input data to the destination
-        destination = Path(destination)
-        destination.mkdir(parents=True, exist_ok=True)
-        for input in inputs_data:
-            shutil.copy(input, destination)
+    create_test_input_datafiles(destination_source_input_data)
 
     # CWL file is the first argument
     command = ["job", "submit", cwl_file]
 
     # Add the input file(s)
     for input in inputs:
-        command.extend(["--parameter-path", input])
+        command.extend(["--input-files", input])
 
     result = cli_runner.invoke(app, command)
     # Remove ANSI color codes for assertion
@@ -373,6 +369,8 @@ def test_run_nonblocking_transformation_success(cli_runner, cleanup, cwl_file):
     assert "Transformation done" in clean_output, f"Failed to run the transformation: {result.stdout}"
 
 
+# TODO: re-enable this test once approval on questions of new Job Grouping
+@pytest.mark.skip(reason="Waiting for approval on new Job Grouping (the tested code is currently commented)")
 @pytest.mark.parametrize(
     "cwl_file, destination_source_input_data",
     [
@@ -506,6 +504,34 @@ def test_run_transformation_validation_failure(cli_runner, cwl_file, cleanup, ex
             f"Expected error '{expected_error}' not found in "
             f"stdout: {clean_output}, stderr: {clean_stderr}, exception: {clean_exception}"
         )
+
+
+@pytest.mark.parametrize(
+    "cwl_file, inputs_file, destination_source_input_data",
+    [
+        # --- Job Grouping ---
+        # Count and list files in inputs_file
+        (
+            "test/workflows/job_grouping/job_grouping.cwl",
+            "test/workflows/pi/type_dependencies/job/inputs-pi_gather_catalog.yaml",
+            {"filecatalog/pi/100": [f"test/workflows/pi/type_dependencies/job/result_{i}.sim" for i in range(1, 6)]},
+        )
+    ],
+)
+def test_run_transformation_with_inputs_file(
+    cli_runner, cleanup, pi_test_files, cwl_file, inputs_file, destination_source_input_data
+):
+    """Test successful transformation submission and execution with inputs file."""
+    create_test_input_datafiles(destination_source_input_data)
+
+    command = ["transformation", "submit", cwl_file]
+
+    if inputs_file:
+        command.extend(["--inputs-file", inputs_file])
+
+    result = cli_runner.invoke(app, command)
+    clean_output = strip_ansi_codes(result.stdout)
+    assert "Transformation done" in clean_output, f"Failed to run the transformation: {result.stdout}"
 
 
 # -----------------------------------------------------------------------------

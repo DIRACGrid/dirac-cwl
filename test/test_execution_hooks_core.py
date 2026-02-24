@@ -244,28 +244,28 @@ class TestTransformationExecutionHooksHint:
 
     def test_creation(self):
         """Test TransformationExecutionHooksHint creation."""
-        descriptor = TransformationExecutionHooksHint(hook_plugin="QueryBasedPlugin", group_size={"input_data": 100})
+        descriptor = TransformationExecutionHooksHint(hook_plugin="QueryBasedPlugin", group_size=100)
         assert descriptor.hook_plugin == "QueryBasedPlugin"
-        assert descriptor.group_size == {"input_data": 100}
+        assert descriptor.group_size == 100
 
     def test_inheritance(self):
         """Test that it inherits from ExecutionHooksHint."""
         descriptor = TransformationExecutionHooksHint(
             hook_plugin="AdminPlugin",
-            group_size={"sim_data": 50},
+            group_size=50,
             n_events=1000,
         )
 
         # Test that it has the fields from both classes
         assert descriptor.hook_plugin == "AdminPlugin"
-        assert descriptor.group_size == {"sim_data": 50}
+        assert descriptor.group_size == 50
         assert getattr(descriptor, "n_events", None) == 1000
 
     def test_validation(self):
         """Test group_size validation."""
         # Valid group_size
-        descriptor = TransformationExecutionHooksHint(hook_plugin="UserPlugin", group_size={"files": 10})
-        assert descriptor.group_size == {"files": 10}
+        descriptor = TransformationExecutionHooksHint(hook_plugin="UserPlugin", group_size=10)
+        assert descriptor.group_size == 10
 
         # Test with no group_size
         descriptor2 = TransformationExecutionHooksHint(hook_plugin="UserPlugin")
