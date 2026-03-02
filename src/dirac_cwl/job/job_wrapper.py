@@ -65,11 +65,7 @@ class JobWrapper:
             self.job_report: JobReport = JobReportMock(self.job_id, src, None)
         else:
             self.job_report = JobReport(self.job_id, src, AsyncDiracClient())
-
-    async def initialize(self) -> None:
-        """Initialize the JobWrapper."""
         self.job_report.setJobStatus(JobStatus.RUNNING, JobMinorStatus.JOB_INITIALIZATION)
-        await self.job_report.commit()
 
     async def __download_input_sandbox(self, arguments: JobInputModel, job_path: Path) -> None:
         """Download the files from the sandbox store.

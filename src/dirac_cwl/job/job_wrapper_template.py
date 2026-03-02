@@ -30,7 +30,6 @@ async def main():
 
     job_json_file = sys.argv[1]
     job_wrapper = JobWrapper(job_id)
-    await job_wrapper.initialize()
     with open(job_json_file, "r") as file:
         job_model_dict = json.load(file)
 
