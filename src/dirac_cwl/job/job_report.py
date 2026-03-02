@@ -4,27 +4,7 @@ from datetime import datetime, timezone
 from enum import StrEnum
 
 from diracx.client.aio import AsyncDiracClient
-from diracx.core.models.job import JobStatusUpdate
-
-
-class JobStatus(StrEnum):
-    """List of all available job statuses."""
-
-    SUBMITTING = "Submitting"
-    RECEIVED = "Received"
-    CHECKING = "Checking"
-    STAGING = "Staging"
-    WAITING = "Waiting"
-    MATCHED = "Matched"
-    RUNNING = "Running"
-    STALLED = "Stalled"
-    COMPLETING = "Completing"
-    DONE = "Done"
-    COMPLETED = "Completed"
-    FAILED = "Failed"
-    DELETED = "Deleted"
-    KILLED = "Killed"
-    RESCHEDULED = "Rescheduled"
+from diracx.core.models.job import JobStatus, JobStatusUpdate
 
 
 class JobMinorStatus(StrEnum):
@@ -81,14 +61,17 @@ class JobReport:
         :param source: source for the reports
         :param client: DiracX client instance
         """
-        self.job_status_info: list = []  # where job status updates are cumulated
-        self.job_parameters: list = []  # where job parameters are cumulated
+        self.job_status_info: dict[str, JobStatusUpdate] = {}  # where job status updates are cumulated
+        self.job_parameters: dict[str, str] = {}  # where job parameters are cumulated
         self.job_id = job_id
         self.source = source
         self._client = client
 
     def setJobStatus(
-        self, status: JobStatus | None = None, minor_status: JobMinorStatus | None = None, application_status: str = ""
+        self,
+        status: JobStatus | None = None,
+        minor_status: JobMinorStatus | None = None,
+        application_status: str | None = None,
     ) -> None:
         """
         Add a new job status to the job report.
@@ -99,55 +82,66 @@ class JobReport:
         """
         timestamp = str(datetime.now(timezone.utc))
         # add job status record
-        self.job_status_info.append((status, minor_status, application_status.strip(' "' + "'"), timestamp))
+        self.job_status_info.update(
+            {
+                timestamp: JobStatusUpdate(
+                    Status=status,
+                    MinorStatus=minor_status,
+                    ApplicationStatus=application_status,
+                    Source=self.source,
+                )
+            }
+        )
 
-    def setApplicationStatus(self, appStatus):
+    def setApplicationStatus(self, application_status: str | None = None):
         """
         Accumulate application status.
 
         :param appStatus: application status to set
         """
         timeStamp = str(datetime.now(timezone.utc))
-        if not isinstance(appStatus, str):
-            appStatus = repr(appStatus)
+        if not isinstance(application_status, str):
+            application_status = repr(application_status)
         # add Application status record
-        if appStatus:
-            self.job_status_info.append(("", "", (appStatus.strip(' "' + "'"), timeStamp)))
+        if application_status:
+            self.job_status_info.update(
+                {
+                    timeStamp: JobStatusUpdate(
+                        Status=None,
+                        MinorStatus=None,
+                        ApplicationStatus=application_status,
+                        Source=self.source,
+                    )
+                }
+            )
 
-    def setJobParameter(self, par_name, par_value):
+    def setJobParameter(self, key: str, value: str):
         """Set job parameter.
 
         :param par_name: name of the parameter
         :param par_value: value of the parameter
         """
-        self.job_parameters.append((par_name, par_value))
+        self.job_parameters.update({key: value})
 
-    def setJobParameters(self, parameters):
+    def setJobParameters(self, parameters: list[tuple] | dict):
         """Set job parameters for jobID.
 
-        :param parameters: names and values of job parameters: [(name, value), ...]
+        :param parameters: names and values of job parameters: [(name, value), ...] or {name:value, ...}
         """
-        for pname, pvalue in parameters:
-            self.job_parameters.append((pname, pvalue))
+        if isinstance(parameters, dict):
+            self.job_parameters.update(parameters)
+        else:
+            for pname, pvalue in parameters:
+                self.job_parameters.update({pname: pvalue})
 
     async def sendStoredStatusInfo(self):
         """Send all the accumulated job status information."""
         if not self.job_status_info:
             return
-        body = {
-            self.job_id: {
-                timestamp: JobStatusUpdate(
-                    status=status,
-                    minor_status=minor_status,
-                    application_status=application_status,
-                    source=self.source,
-                )
-                for status, minor_status, application_status, timestamp in self.job_status_info
-            }
-        }
+        body = {self.job_id: self.job_status_info}
         ret = await self._client.jobs.set_job_statuses(body)
         if ret.success:
-            self.job_status_info = []
+            self.job_status_info = {}
         else:
             raise RuntimeError("Could not set job statuses:", ret)
 
@@ -155,10 +149,10 @@ class JobReport:
         """Send all the accumulated job parameters information."""
         if not self.job_parameters:
             return
-        body = {self.job_id: {name: val for name, val in self.job_parameters}}
+        body = {self.job_id: self.job_parameters}
         ret = await self._client.jobs.patch_metadata(body)
         if ret.success:
-            self.job_parameters = []
+            self.job_parameters = {}
         else:
             raise RuntimeError("Could not set job parameters:", ret)
 
@@ -166,17 +160,3 @@ class JobReport:
         """Send all the accumulated information."""
         await self.sendStoredStatusInfo()
         await self.sendStoredJobParameters()
-
-    def dump(self):
-        """Print out the contents of the internal cached information."""
-        print("Job status info:")
-        for status, minor, app, timeStamp in self.job_status_info:
-            if not status:
-                status = ""
-            if not minor:
-                minor = ""
-            print(status.ljust(20), minor.ljust(30), app.ljust(30), timeStamp)
-
-        print("Job parameters:")
-        for pname, pvalue in self.job_parameters:
-            print(pname.ljust(20), pvalue.ljust(30))
