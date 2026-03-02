@@ -231,6 +231,7 @@ class JobWrapper:
         if self.execution_hooks_plugin:
             return self.__pre_process_hooks(executable, arguments, self.job_path, command)
 
+        await self.job_report.commit()
         return command
 
     async def post_process(
@@ -259,7 +260,7 @@ class JobWrapper:
             success = await self.__post_process_hooks(self.job_path, outputs=outputs)
 
         await self.__upload_output_sandbox(outputs=outputs)
-
+        await self.job_report.commit()
         return success
 
     def __pre_process_hooks(
@@ -373,6 +374,7 @@ class JobWrapper:
             # Execute the task
             logger.info("Executing Task: %s", command)
             self.job_report.setJobStatus(minor_status=JobMinorStatus.APPLICATION)
+            await self.job_report.commit()
             result = subprocess.run(command, capture_output=True, text=True, cwd=self.job_path)
 
             if result.returncode != 0:
@@ -391,19 +393,18 @@ class JobWrapper:
             ):
                 logger.info("Task post-processed successfully!")
                 self.job_report.setJobStatus(JobStatus.DONE, JobMinorStatus.EXEC_COMPLETE)
-                await self.job_report.commit()
                 return True
             logger.error("Failed to post-process Task")
             self.job_report.setJobStatus(JobStatus.FAILED)
-            await self.job_report.commit()
             return False
 
         except Exception:
             logger.exception("JobWrapper: Failed to execute workflow")
             self.job_report.setJobStatus(JobStatus.FAILED)
-            await self.job_report.commit()
             return False
         finally:
+            # Commit all stored job reports
+            await self.job_report.commit()
             # Clean up
             if self.job_path.exists():
                 shutil.rmtree(self.job_path)
