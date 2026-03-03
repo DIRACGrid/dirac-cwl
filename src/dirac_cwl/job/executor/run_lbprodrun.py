@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Wrapper for lb-prod-run that handles CWL inputs and configuration merging."""
 
+from __future__ import annotations
+
 import argparse
 import asyncio
 import json
@@ -20,11 +22,11 @@ from diracx.core.models.replica_map import ReplicaMap
 # Configure logger to use UTC time
 logger = logging.getLogger("run_lbprodrun")
 logging.Formatter.converter = time.gmtime  # Use UTC for all log timestamps
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s UTC - %(levelname)s - %(message)s",
-    datefmt="%Y-%m-%d %H:%M:%S",
-)
+_handler = logging.StreamHandler(sys.stdout)
+_handler.setFormatter(logging.Formatter("%(asctime)s UTC - %(levelname)s - %(message)s", datefmt="%Y-%m-%d %H:%M:%S"))
+logger.addHandler(_handler)
+logger.setLevel(logging.INFO)
+logger.propagate = False
 
 
 def analyse_xml_summary(xml_path: Path) -> bool:
@@ -565,7 +567,7 @@ def main():
     xml_summary_filename = f"summary{cleaned_appname}_{args.output_prefix}.xml"
     config["input"]["xml_summary_file"] = xml_summary_filename
 
-    # Write merged configuration to profConf file
+    # Write merged configuration to prodConf file
     config_filename = f"prodConf_{cleaned_appname}_{args.output_prefix}.json"
     output_config = Path(config_filename)
     output_config.write_text(json.dumps(config, indent=2))
@@ -785,6 +787,10 @@ async def run_lbprodrun(
     logger.info("DEBUG: ANALYSIS_PRODUCTIONS_DYNAMIC = %s", analysis_prods_dynamic)
 
     os.environ["LBPRODRUN_PRMON_INTERVAL"] = "1"
+    # Force unbuffered stdout/stderr for all Python processes in the chain.
+    # lb-prod-run uses os.execvpe() which doesn't flush Python's IO buffers,
+    # and the child Gaudi process uses block buffering for piped stdout.
+    os.environ["PYTHONUNBUFFERED"] = "1"
 
     extra_env, franklin_downloaded = check_and_setup_franklin(Path(".").resolve(), Path(prodconf_file))
     if franklin_downloaded:
@@ -860,19 +866,16 @@ async def readlines(
 
 async def handle_output(stream: asyncio.StreamReader, fh):
     """Process output of lb-prod-run."""
+    line_count = 0
     async for line in readlines(stream):
-        if (
-            "INFO Evt" in line
-            or "Reading Event record" in line
-            or "lb-run" in line
-            or "Application Manager" in line
-            or "NTuples" in line
-        ):
-            # These ones will appear in the std.out log too
-            logger.info(line.rstrip())
+        line_count += 1
+        if line_count == 1:
+            logger.info("handle_output: first line received from subprocess")
+        logger.info(line.rstrip())
         if fh:
             fh.write(line + "\n")
             fh.flush()
+    logger.info("handle_output: stream ended after %d lines", line_count)
 
 
 if __name__ == "__main__":

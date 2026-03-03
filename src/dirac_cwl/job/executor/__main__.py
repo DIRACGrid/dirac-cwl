@@ -479,10 +479,12 @@ def main(
         cwltool_args.extend(workflow_params)
 
     try:
-        # Create our custom DIRAC executor with replica map support
+        # Import hook is installed by __init__.py before any cwltool import.
+        from cwltool.context import LoadingContext
         from cwltool.main import main as cwltool_main
 
         from . import DiracExecutor
+        from .tool import dirac_make_tool
 
         dirac_executor = DiracExecutor(global_map_path=actual_replica_map)
 
@@ -542,15 +544,26 @@ def main(
         )
         console.print()
 
-        # Run cwltool with our custom executor
-        # Use a StreamHandler to show cwltool output
-        cwltool_handler = logging.StreamHandler(sys.stdout)
-        cwltool_handler.setFormatter(logging.Formatter("%(message)s"))
+        # Let cwltool manage its own logging (coloredlogs to stderr).
+        # Only set up a handler for dirac-cwl-run so our executor messages
+        # go to stdout without duplicating cwltool output.
+        _dcr = logging.getLogger("dirac-cwl-run")
+        _dcr.propagate = False
+        _dcr_handler = logging.StreamHandler(sys.stdout)
+        _dcr_handler.setFormatter(logging.Formatter("%(message)s"))
+        _dcr.addHandler(_dcr_handler)
+        _dcr.setLevel(logging.INFO)
+
+        # Create LoadingContext with our custom tool factory so cwltool
+        # uses DiracCommandLineTool (which supports custom path mappers)
+        # instead of the default CommandLineTool.
+        loading_context = LoadingContext()
+        loading_context.construct_tool_object = dirac_make_tool
 
         exit_code = cwltool_main(
             argsl=cwltool_args,
             executor=dirac_executor,
-            logger_handler=cwltool_handler,
+            loadingContext=loading_context,
         )
 
         # Record end time and calculate duration

@@ -1,5 +1,33 @@
 # Changelog
 
+## [1.2.0](https://github.com/DIRACGrid/dirac-cwl/compare/v1.1.3...v1.2.0) (2026-02-20)
+
+
+### Features
+
+* **executor:** deal with remote PFNs ([#122](https://github.com/DIRACGrid/dirac-cwl/issues/122)) ([d96cb63](https://github.com/DIRACGrid/dirac-cwl/commit/d96cb633e9ae9dc325fee9bc2b4bd247306f7206))
+
+## [1.1.3](https://github.com/DIRACGrid/dirac-cwl/compare/v1.1.2...v1.1.3) (2026-02-17)
+
+
+### Bug Fixes
+
+* **executor:** run pure_python hook before ANY cwltool import ([#120](https://github.com/DIRACGrid/dirac-cwl/issues/120)) ([747a4b2](https://github.com/DIRACGrid/dirac-cwl/commit/747a4b239288ed78987b2179ee8802ea5d27ba8c))
+
+## [1.1.2](https://github.com/DIRACGrid/dirac-cwl/compare/v1.1.1...v1.1.2) (2026-02-17)
+
+
+### Bug Fixes
+
+* move mypy to optional-deps ([#118](https://github.com/DIRACGrid/dirac-cwl/issues/118)) ([d59d4c0](https://github.com/DIRACGrid/dirac-cwl/commit/d59d4c04a7f1d1fe9a47f4ebcd908c95e2d42d64))
+
+## [1.1.1](https://github.com/DIRACGrid/dirac-cwl/compare/v1.1.0...v1.1.1) (2026-02-16)
+
+
+### Bug Fixes
+
+* remove library-level basicConfig and clean up logging ([#113](https://github.com/DIRACGrid/dirac-cwl/issues/113)) ([5c8f200](https://github.com/DIRACGrid/dirac-cwl/commit/5c8f2008d9c91212d920fc062a8ed1cec48b214d))
+
 ## [1.1.0](https://github.com/DIRACGrid/dirac-cwl/compare/v1.0.2...v1.1.0) (2026-02-06)
 
 

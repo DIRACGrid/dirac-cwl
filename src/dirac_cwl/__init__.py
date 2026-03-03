@@ -9,8 +9,6 @@ from dirac_cwl.job import app as job_app
 from dirac_cwl.production import app as production_app
 from dirac_cwl.transformation import app as transformation_app
 
-logging.basicConfig(level=logging.DEBUG, format="%(asctime)s | %(name)s | %(levelname)s | %(message)s")
-
 try:
     __version__ = version("dirac-cwl")
 except PackageNotFoundError:
@@ -18,6 +16,16 @@ except PackageNotFoundError:
     pass
 
 app = typer.Typer()
+
+
+@app.callback(invoke_without_command=True)
+def _configure_logging():
+    """Configure logging when the CLI is invoked (not on import)."""
+    logging.basicConfig(
+        level=logging.DEBUG,
+        format="%(asctime)s | %(name)s | %(levelname)s | %(message)s",
+    )
+
 
 # Add sub-apps
 app.add_typer(production_app, name="production")
