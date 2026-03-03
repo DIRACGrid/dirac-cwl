@@ -61,7 +61,7 @@ class JobReport:
         :param source: source for the reports
         :param client: DiracX client instance
         """
-        self.job_status_info: dict[str, JobStatusUpdate] = {}  # where job status updates are cumulated
+        self.job_status_info: dict[str, dict[str, str]] = {}  # where job status updates are cumulated
         self.job_parameters: dict[str, str] = {}  # where job parameters are cumulated
         self.job_id = job_id
         self.source = source
@@ -89,7 +89,7 @@ class JobReport:
                     MinorStatus=minor_status,
                     ApplicationStatus=application_status,
                     Source=self.source,
-                )
+                ).model_dump()
             }
         )
 
@@ -111,7 +111,7 @@ class JobReport:
                         MinorStatus=None,
                         ApplicationStatus=application_status,
                         Source=self.source,
-                    )
+                    ).model_dump()
                 }
             )
 

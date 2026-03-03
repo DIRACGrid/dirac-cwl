@@ -30,10 +30,10 @@ class JobReportMock(JobReport):
             )
             f.write(" | ".join(("-" * 32, "-" * 10, "-" * 20, "-" * 35, "-" * 18)) + "\n")
             for timestamp, info in self.job_status_info.items():
-                status = info.Status or ""
-                minor_status = info.MinorStatus or ""
-                application_status = info.ApplicationStatus or ""
-                source = info.Source or ""
+                status = info["Status"] or ""
+                minor_status = info["MinorStatus"] or ""
+                application_status = info["ApplicationStatus"] or ""
+                source = info["Source"] or ""
                 f.write(
                     " | ".join(
                         (
