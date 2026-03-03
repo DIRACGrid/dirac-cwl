@@ -64,6 +64,8 @@ def assert_submission_fails(task):
         JobSubmissionModel(task=task)
     with pytest.raises(ValueError):
         TransformationSubmissionModel(task=task)
+    with pytest.raises(ValueError):
+        ProductionSubmissionModel(task=task)
 
 
 # -----------------------------------------------------------------------------
@@ -112,54 +114,3 @@ def test_bad_min_max_resource_reqs(bad_min_max_reqs):
     step = create_step(run=nest_workflow)
     workflow = create_workflow(steps=[step])
     assert_submission_fails(workflow)
-
-
-@pytest.mark.parametrize(
-    ("wf_level_requirements", "higher_requirements"),
-    [
-        (ResourceRequirement(coresMax=2), ResourceRequirement(coresMin=4)),
-        (ResourceRequirement(ramMax=512), ResourceRequirement(ramMin=1024)),
-        (ResourceRequirement(tmpdirMax=512), ResourceRequirement(tmpdirMin=1024)),
-        (ResourceRequirement(outdirMax=256), ResourceRequirement(outdirMin=512)),
-    ],
-)
-def test_bad_wf_level_requirements(wf_level_requirements, higher_requirements):
-    """Test global requirements conflicts."""
-    # Workflow - WorkflowStep conflict
-    step = create_step(requirements=[higher_requirements])
-    workflow = create_workflow(requirements=[wf_level_requirements], steps=[step])
-    assert_submission_fails(workflow)
-
-    # Workflow - WorkflowStep.run conflict
-    run = create_commandlinetool(requirements=[higher_requirements])
-    step = create_step(run=run)
-    workflow = create_workflow(requirements=[wf_level_requirements], steps=[step])
-    assert_submission_fails(workflow)
-
-    # Workflow - NestedWorkflow conflict
-    nest_workflow = create_workflow(requirements=[higher_requirements])
-    step = create_step(run=nest_workflow)
-    workflow = create_workflow(requirements=[wf_level_requirements], steps=[step])
-    assert_submission_fails(workflow)
-
-
-@pytest.mark.parametrize(
-    "requirements",
-    [
-        ResourceRequirement(coresMin=2, coresMax=4),
-        ResourceRequirement(ramMin=1024, ramMax=2048),
-        ResourceRequirement(tmpdirMin=512, tmpdirMax=1024),
-        ResourceRequirement(outdirMin=256, outdirMax=512),
-    ],
-)
-def test_production_requirements(requirements):
-    """Test production case requirements."""
-    # Production workflows can't have Workflow-level requirements
-    workflow = create_workflow(requirements=[requirements])
-    with pytest.raises(ValueError):
-        ProductionSubmissionModel(task=workflow)
-
-    # Production workflows can have step requirements
-    step = create_step(requirements=[requirements])
-    workflow = create_workflow(steps=[step])
-    ProductionSubmissionModel(task=workflow)
