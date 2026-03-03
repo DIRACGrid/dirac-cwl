@@ -175,8 +175,7 @@ class ProductionSubmissionModel(BaseModel):
         task = values.get("task")
 
         # ResourceRequirement validation
-        if any(req.class_ == "ResourceRequirement" for req in task.requirements):
-            raise ValueError("ResourceRequirement is not allowed at Production-level.")
+        validate_resource_requirements(task)
 
         return values
 
@@ -267,6 +266,6 @@ def _get_resource_requirement(
     """
     requirements = getattr(cwl_object, "requirements", []) or []
     for requirement in requirements:
-        if requirement.class_ == "ResourceRequirement":
+        if isinstance(requirement, ResourceRequirement):
             return requirement
     return None
