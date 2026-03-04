@@ -5,6 +5,8 @@ This module tests the functionalities of the job wrapper.
 """
 
 import os
+from random import randint
+from shutil import rmtree
 
 import pytest
 
@@ -12,7 +14,9 @@ os.environ["DIRAC_PROTO_LOCAL"] = "1"
 
 from dirac_cwl.core.exceptions import WorkflowProcessingException
 from dirac_cwl.execution_hooks.core import ExecutionHooksBasePlugin
+from dirac_cwl.job.job_report import JobMinorStatus, JobStatus
 from dirac_cwl.job.job_wrapper import JobWrapper
+from dirac_cwl.mocks.status import STATUS_DIR
 
 
 class TestJobWrapper:
@@ -126,3 +130,74 @@ class TestJobWrapper:
 
         with pytest.raises(WorkflowProcessingException):
             await job_wrapper.post_process(0, "{}", "{}")
+
+    @pytest.mark.asyncio
+    async def test_job_status(self):
+        """Test the job status methods of the job report work as intended."""
+        job_id = randint(0, 9999)
+        job_wrapper = JobWrapper(job_id)
+        file_path = STATUS_DIR / f"status_{job_id}"
+        assert len(job_wrapper.job_report.job_status_info) == 1  # One status expected for initialization
+        assert not file_path.exists()
+
+        job_wrapper.job_report.setJobStatus(status=JobStatus.RUNNING, minor_status=JobMinorStatus.APPLICATION)
+        assert len(job_wrapper.job_report.job_status_info) == 2
+        assert not file_path.exists()
+
+        job_wrapper.job_report.setApplicationStatus("Test")
+        assert len(job_wrapper.job_report.job_status_info) == 3
+        assert not file_path.exists()
+
+        await job_wrapper.job_report.commit()
+        assert file_path.exists()
+        with open(file_path) as f:
+            content = f.read()
+            assert JobStatus.RUNNING in content
+            assert JobMinorStatus.APPLICATION in content
+            assert "Test" in content
+        rmtree(STATUS_DIR)
+
+    @pytest.mark.asyncio
+    async def test_job_params(self):
+        """Test the job parameters methods of the job report work as intended."""
+        job_id = randint(0, 9999)
+        job_wrapper = JobWrapper(job_id)
+        file_path = STATUS_DIR / f"job_params_{job_id}"
+        assert len(job_wrapper.job_report.job_parameters) == 0
+        assert not file_path.exists()
+
+        job_wrapper.job_report.setJobParameter("test-key", "test-value")
+        assert len(job_wrapper.job_report.job_parameters) == 1
+        assert not file_path.exists()
+
+        params = {"test1": "1234", "test2": "4321"}
+        job_wrapper.job_report.setJobParameters(params)
+        assert len(job_wrapper.job_report.job_parameters) == 3
+        assert not file_path.exists()
+
+        job_wrapper.job_report.setJobParameter("test-key", "test!")
+        assert len(job_wrapper.job_report.job_parameters) == 3
+        assert not file_path.exists()
+
+        await job_wrapper.job_report.commit()
+        assert file_path.exists()
+        with open(file_path) as f:
+            content = f.read()
+            assert "test-key" in content
+            assert "1234" in content
+            assert "4321" in content
+            assert "test!" in content
+            assert "test-value" not in content
+        rmtree(STATUS_DIR)
+
+    @pytest.mark.asyncio
+    async def test_run_job_reports(self, sample_job):
+        """Test job statuses are reported in the job wrapper."""
+        job_id = randint(0, 9999)
+        job_wrapper = JobWrapper(job_id)
+        success = await job_wrapper.run_job(sample_job)
+        assert success
+        # Status info only stays accumulated for local testing, status info is emptied when committing to diracx
+        assert len(job_wrapper.job_report.job_status_info) > 0
+        assert (STATUS_DIR / f"status_{job_id}").exists()
+        rmtree(STATUS_DIR)
