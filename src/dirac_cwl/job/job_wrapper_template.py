@@ -9,7 +9,7 @@ import tempfile
 
 import DIRAC  # type: ignore[import-untyped]
 from cwl_utils.parser import load_document_by_uri
-from cwl_utils.parser.cwl_v1_2_utils import load_inputfile
+from cwl_utils.parser.utils import load_inputfile
 from ruamel.yaml import YAML
 
 if os.getenv("DIRAC_PROTO_LOCAL") != "1":
@@ -38,7 +38,7 @@ def main():
         task_obj = load_document_by_uri(f.name)
 
     if job_model_dict["input"]:
-        cwl_inputs_obj = load_inputfile(job_model_dict["input"]["cwl"])
+        cwl_inputs_obj = load_inputfile(task_obj.cwlVersion, job_model_dict["input"]["cwl"])
         job_model_dict["input"]["cwl"] = cwl_inputs_obj
     job_model_dict["task"] = task_obj
 

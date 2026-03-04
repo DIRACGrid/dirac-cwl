@@ -13,7 +13,7 @@ from cwl_utils.parser import load_document
 from cwl_utils.parser.cwl_v1_2 import (
     File,
 )
-from cwl_utils.parser.cwl_v1_2_utils import load_inputfile
+from cwl_utils.parser.utils import load_inputfile
 from diracx.cli.utils import AsyncTyper
 from rich import print_json
 from rich.console import Console
@@ -75,7 +75,7 @@ async def submit_job_client(
     if input_files:
         for file in input_files:
             try:
-                input_file = load_inputfile(file)
+                input_file = load_inputfile(task.cwlVersion, file)
             except Exception as ex:
                 console.print(
                     f"[red]:heavy_multiplication_x:[/red] [bold]CLI:[/bold] Failed to validate the input file:\n{ex}"

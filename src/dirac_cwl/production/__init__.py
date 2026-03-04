@@ -20,7 +20,7 @@ from cwl_utils.parser.cwl_v1_2 import (
     WorkflowInputParameter,
     WorkflowStep,
 )
-from cwl_utils.parser.cwl_v1_2_utils import load_inputfile
+from cwl_utils.parser.utils import load_inputfile
 from rich import print_json
 from rich.console import Console
 from schema_salad.exceptions import ValidationException
@@ -96,7 +96,7 @@ def submit_production_client(
         # Load Production inputs if existing (1st Transformation inputs)
         input_data = None
         if inputs_file:
-            input_data = load_inputfile(inputs_file).get("input-data")
+            input_data = load_inputfile(task.cwlVersion, inputs_file).get("input-data")
 
     except FileNotFoundError as ex:
         console.print(f"[red]:heavy_multiplication_x:[/red] [bold]CLI:[/bold] Failed to load the task:\n{ex}")
