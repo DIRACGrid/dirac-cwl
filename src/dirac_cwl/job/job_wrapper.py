@@ -92,9 +92,9 @@ class JobWrapper:
         for output_name, src_path in outputs.items():
             if self.execution_hooks_plugin.output_sandbox and output_name in self.execution_hooks_plugin.output_sandbox:
                 if isinstance(src_path, Path) or isinstance(src_path, str):
-                    src_path = [src_path]
+                    src_path = [Path(src_path)]
                 for path in src_path:
-                    outputs_to_sandbox.append(path)
+                    outputs_to_sandbox.append(Path(path))
         if outputs_to_sandbox:
             self.job_report.setJobStatus(JobStatus.COMPLETING, minor_status=JobMinorStatus.UPLOADING_OUTPUT_SANDBOX)
             sb_path = Path(await create_sandbox(outputs_to_sandbox))
