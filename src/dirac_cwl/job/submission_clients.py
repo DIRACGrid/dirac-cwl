@@ -61,7 +61,7 @@ class PrototypeSubmissionClient(SubmissionClient):
         if not isb_file_paths:
             return None
 
-        return create_sandbox(paths=isb_file_paths)
+        return await create_sandbox(paths=isb_file_paths)
 
     async def submit_job(self, job_submission: JobSubmissionModel) -> bool:
         """

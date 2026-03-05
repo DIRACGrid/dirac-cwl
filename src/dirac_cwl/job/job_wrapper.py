@@ -79,7 +79,7 @@ class JobWrapper:
             self.job_report.setJobStatus(minor_status=JobMinorStatus.FAILED_DOWNLOADING_INPUT_SANDBOX)
             raise RuntimeError("Could not download sandboxes")
         for sandbox in arguments.sandbox:
-            download_sandbox(sandbox, job_path)
+            await download_sandbox(sandbox, job_path)
 
     async def __upload_output_sandbox(
         self,
@@ -97,7 +97,7 @@ class JobWrapper:
                     outputs_to_sandbox.append(path)
         if outputs_to_sandbox:
             self.job_report.setJobStatus(JobStatus.COMPLETING, minor_status=JobMinorStatus.UPLOADING_OUTPUT_SANDBOX)
-            sb_path = Path(create_sandbox(outputs_to_sandbox))
+            sb_path = Path(await create_sandbox(outputs_to_sandbox))
             logger.info(
                 "Successfully stored output %s in Sandbox %s", self.execution_hooks_plugin.output_sandbox, sb_path
             )

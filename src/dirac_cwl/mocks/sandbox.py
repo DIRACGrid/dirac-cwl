@@ -21,7 +21,7 @@ PROJECT_ROOT = Path(__file__).parent.parent.parent.parent
 SANDBOX_STORE_DIR = PROJECT_ROOT / "sandboxstore"
 
 
-def create_sandbox(paths: Sequence[str | Path]):
+async def create_sandbox(paths: Sequence[str | Path]):
     """Upload a sandbox archive to the sandboxstore.
 
     :param paths: File paths to be uploaded in the sandbox.
@@ -76,7 +76,7 @@ def create_sandbox(paths: Sequence[str | Path]):
         return pfn
 
 
-def download_sandbox(pfn: str, destination: Path):
+async def download_sandbox(pfn: str, destination: Path):
     """Retrieve a sandbox from the sandboxstore and extract it to the given destination.
 
     :param pfn: Sandbox PFN
