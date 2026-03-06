@@ -9,7 +9,7 @@ from pathlib import Path
 import pytest
 from cwl_utils.pack import pack
 from cwl_utils.parser import load_document
-from cwl_utils.parser.cwl_v1_2_utils import load_inputfile
+from cwl_utils.parser.utils import load_inputfile
 
 from dirac_cwl.job.submission_clients import DIRACSubmissionClient, PrototypeSubmissionClient
 from dirac_cwl.submission_models import (
@@ -75,7 +75,7 @@ LFN:/pi/100/result_5.sim;""",
 
         task_input = None
         if cwl_input:
-            parameter = load_inputfile(cwl_input)
+            parameter = load_inputfile(task.cwlVersion, cwl_input)
             task_input = JobInputModel(
                 sandbox=[sandbox_id],
                 cwl=parameter,

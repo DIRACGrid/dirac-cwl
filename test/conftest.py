@@ -3,6 +3,7 @@
 import pytest
 from cwl_utils.parser.cwl_v1_2 import CommandLineTool
 
+from dirac_cwl.job.job_wrapper import JobWrapper
 from dirac_cwl.submission_models import JobModel
 
 
@@ -49,3 +50,13 @@ def sample_command_line_tool():
 def sample_job(sample_command_line_tool):
     """Create a sample JobModel."""
     return JobModel(task=sample_command_line_tool)
+
+
+@pytest.fixture
+def job_wrapper():
+    """Create a JobWrapper instance and cleanup test files."""
+    job_wrapper = JobWrapper()
+    yield job_wrapper
+
+    task_file = job_wrapper.job_path / "task.cwl"
+    task_file.unlink(missing_ok=True)
