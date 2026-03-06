@@ -369,8 +369,6 @@ def test_run_nonblocking_transformation_success(cli_runner, cleanup, cwl_file):
     assert "Transformation done" in clean_output, f"Failed to run the transformation: {result.stdout}"
 
 
-# TODO: re-enable this test once approval on questions of new Job Grouping
-@pytest.mark.skip(reason="Waiting for approval on new Job Grouping (the tested code is currently commented)")
 @pytest.mark.parametrize(
     "cwl_file, destination_source_input_data",
     [
@@ -379,7 +377,7 @@ def test_run_nonblocking_transformation_success(cli_runner, cleanup, cwl_file):
         (
             "test/workflows/pi/pigather.cwl",
             {
-                "filecatalog/pi/100/input-data": [
+                "filecatalog/pi/100": [
                     ("result_1.sim", "0.1 0.2\n-0.3 0.4\n0.5 -0.6\n"),
                     ("result_2.sim", "-0.1 0.8\n0.9 -0.2\n-0.7 0.3\n"),
                     ("result_3.sim", "0.4 0.5\n-0.8 -0.1\n0.6 0.7\n"),
