@@ -23,6 +23,7 @@ from dirac_cwl.execution_hooks.registry import (
 class TestPlugin(ExecutionHooksBasePlugin):
     """Test plugin for registry testing."""
 
+    __test__ = False
     description: ClassVar[str] = "Test plugin for unit tests"
 
     test_param: str = "default"
@@ -31,6 +32,7 @@ class TestPlugin(ExecutionHooksBasePlugin):
 class TestVOPlugin(ExecutionHooksBasePlugin):
     """Test vo-specific plugin."""
 
+    __test__ = False
     description: ClassVar[str] = "Test VO plugin"
     vo: ClassVar[Optional[str]] = "test_exp"
 
@@ -40,6 +42,7 @@ class TestVOPlugin(ExecutionHooksBasePlugin):
 class TestSecondVOPlugin(ExecutionHooksBasePlugin):
     """Test plugin for second vo."""
 
+    __test__ = False
     description: ClassVar[str] = "Test plugin for second VO"
     vo: ClassVar[Optional[str]] = "exp2"
 
