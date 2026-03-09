@@ -9,6 +9,7 @@ import shutil
 import subprocess
 from pathlib import Path
 from typing import Any, List, Sequence, cast
+from unittest.mock import AsyncMock
 
 from cwl_utils.parser import (
     save,
@@ -62,9 +63,11 @@ class JobWrapper:
         self.job_id = job_id
         src = "JobWrapper"
         if os.getenv("DIRAC_PROTO_LOCAL") == "1":
+            self.diracx_client: AsyncDiracClient = AsyncMock()
             self.job_report: JobReport = JobReportMock(self.job_id, src, None)
         else:
-            self.job_report = JobReport(self.job_id, src, AsyncDiracClient())
+            self.diracx_client = AsyncDiracClient()
+            self.job_report = JobReport(self.job_id, src, self.diracx_client)
         self.job_report.setJobStatus(JobStatus.RUNNING, JobMinorStatus.JOB_INITIALIZATION)
 
     async def __download_input_sandbox(self, arguments: JobInputModel, job_path: Path) -> None:
@@ -101,6 +104,7 @@ class JobWrapper:
             logger.info(
                 "Successfully stored output %s in Sandbox %s", self.execution_hooks_plugin.output_sandbox, sb_path
             )
+            await self.diracx_client.jobs.assign_sandbox_to_job(self.job_id, f'"{sb_path}"')
             self.job_report.setJobStatus(JobStatus.COMPLETING, minor_status=JobMinorStatus.OUTPUT_SANDBOX_UPLOADED)
 
     async def __download_input_data(self, inputs: JobInputModel, job_path: Path) -> dict[str, Path | list[Path]]:
