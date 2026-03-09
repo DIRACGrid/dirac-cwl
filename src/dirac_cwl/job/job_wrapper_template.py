@@ -56,5 +56,33 @@ async def main():
         return 1
 
 
+def setup_diracx() -> None:
+    """Get a DiracX client instance with the current user's credentials."""
+    import stat
+    from pathlib import Path
+
+    from DIRAC import gConfig
+    from DIRAC.Core.Security.Locations import getDefaultProxyLocation  # type: ignore[import-untyped]
+
+    diracxUrl = gConfig.getValue("/DiracX/URL")
+    if not diracxUrl:
+        raise ValueError("Missing mandatory /DiracX/URL configuration")
+
+    os.environ["DIRACX_URL"] = diracxUrl
+
+    proxyLocation = getDefaultProxyLocation()
+    diracxToken = DIRAC.Core.Security.DiracX.diracxTokenFromPEM(proxyLocation)
+    if not diracxToken:
+        raise ValueError(f"No diracx token in the proxy file {proxyLocation}")
+
+    token_file = Path.home() / ".cache" / "diracx" / "credentials.json"
+    token_file.parent.mkdir(parents=True, exist_ok=True)
+    fd = os.open(token_file, flags=os.O_WRONLY | os.O_CREAT | os.O_TRUNC, mode=stat.S_IRUSR | stat.S_IWUSR)
+    with open(fd, "w", encoding="utf-8") as fd:
+        fd.write(json.dumps(diracxToken))
+
+
 if __name__ == "__main__":
+    if os.getenv("DIRAC_PROTO_LOCAL") != "1":
+        setup_diracx()
     sys.exit(asyncio.run(main()))
