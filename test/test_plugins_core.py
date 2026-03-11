@@ -8,6 +8,7 @@ QueryBased plugin implementation.
 import os
 from pathlib import Path
 
+import pytest
 from DIRACCommon.Core.Utilities.ReturnValues import SErrorException
 
 from dirac_cwl.execution_hooks.plugins.core import (
@@ -91,7 +92,8 @@ class TestQueryBasedPlugin:
         expected = Path("/data/Run3/test_input")
         assert result == expected
 
-    def test_store_output(self):
+    @pytest.mark.asyncio
+    async def test_store_output(self):
         """Test store_output method."""
         os.environ["DIRAC_PROTO_LOCAL"] = "1"
         plugin = QueryBasedPlugin()
@@ -101,7 +103,7 @@ class TestQueryBasedPlugin:
 
         # This should work since QueryBasedPlugin provides an output path
         try:
-            plugin.store_output({"test_output": "/tmp/test_file.txt"})
+            await plugin.store_output({"test_output": "/tmp/test_file.txt"})
         except SErrorException:
             # Expected since the file doesn't exist
             pass
