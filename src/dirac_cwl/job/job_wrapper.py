@@ -64,7 +64,7 @@ class JobWrapper:
         src = "JobWrapper"
         if os.getenv("DIRAC_PROTO_LOCAL") == "1":
             self._diracx_client: AsyncDiracClient = AsyncMock()
-            self._job_report: JobReport = JobReportMock(self._job_id, src, None)
+            self._job_report: JobReport = JobReportMock(self._job_id, src, self._diracx_client)
         else:
             self._diracx_client = AsyncDiracClient()
             self._job_report = JobReport(self._job_id, src, self._diracx_client)

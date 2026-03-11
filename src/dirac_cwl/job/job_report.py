@@ -53,7 +53,7 @@ class JobMinorStatus(StrEnum):
 class JobReport:
     """JobReport."""
 
-    def __init__(self, job_id: int, source: str, client: AsyncDiracClient | None) -> None:
+    def __init__(self, job_id: int, source: str, client: AsyncDiracClient) -> None:
         """
         Initialize Job Report.
 
