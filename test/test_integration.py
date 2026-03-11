@@ -87,8 +87,8 @@ class TestRealWorldScenarios:
         # Simulate job execution
 
         # Pre-process should return a command list (may be modified by plugin)
-        job_wrapper = JobWrapper()
-        job_wrapper.execution_hooks_plugin = user_runtime
+        job_wrapper = JobWrapper(job_id=0)
+        job_wrapper._execution_hooks_plugin = user_runtime
         processed_command = await job_wrapper.pre_process(sample_job.task, None)
         assert isinstance(processed_command, list)
 
@@ -118,8 +118,8 @@ class TestRealWorldScenarios:
             pytest.skip(f"Plugin {plugin_name} cannot be instantiated with configuration")
 
         # Simulate job execution
-        job_wrapper = JobWrapper()
-        job_wrapper.execution_hooks_plugin = admin_runtime
+        job_wrapper = JobWrapper(job_id=0)
+        job_wrapper._execution_hooks_plugin = admin_runtime
         processed_command = await job_wrapper.pre_process(sample_job.task, None)
         assert isinstance(processed_command, list)
 

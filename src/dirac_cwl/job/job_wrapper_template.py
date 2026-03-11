@@ -58,7 +58,6 @@ async def main():
 
 def setup_diracx() -> None:
     """Get a DiracX client instance with the current user's credentials."""
-    import stat
     from pathlib import Path
 
     from DIRAC import gConfig
@@ -77,9 +76,8 @@ def setup_diracx() -> None:
 
     token_file = Path.home() / ".cache" / "diracx" / "credentials.json"
     token_file.parent.mkdir(parents=True, exist_ok=True)
-    fd = os.open(token_file, flags=os.O_WRONLY | os.O_CREAT | os.O_TRUNC, mode=stat.S_IRUSR | stat.S_IWUSR)
-    with open(fd, "w", encoding="utf-8") as fd:
-        fd.write(json.dumps(diracxToken))
+    with open(token_file, "w", encoding="utf-8", opener=lambda p, f: os.open(p, f | os.O_TRUNC, 0o600)) as f:
+        json.dump(diracxToken, f)
 
 
 if __name__ == "__main__":

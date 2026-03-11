@@ -62,12 +62,11 @@ class JobReport:
         :param client: DiracX client instance
         """
         self.job_status_info: dict[str, dict[str, str]] = {}  # where job status updates are cumulated
-        self.job_parameters: dict[str, str] = {}  # where job parameters are cumulated
         self.job_id = job_id
         self.source = source
         self._client = client
 
-    def setJobStatus(
+    def set_job_status(
         self,
         status: JobStatus | None = None,
         minor_status: JobMinorStatus | None = None,
@@ -77,8 +76,8 @@ class JobReport:
         Add a new job status to the job report.
 
         :param status: job status
-        :param minorStatus: job minor status
-        :param applicationStatus: application status
+        :param minor_status: job minor status
+        :param application_status: application status
         """
         timestamp = str(datetime.now(timezone.utc))
         # add job status record
@@ -93,48 +92,7 @@ class JobReport:
             }
         )
 
-    def setApplicationStatus(self, application_status: str | None = None):
-        """
-        Accumulate application status.
-
-        :param appStatus: application status to set
-        """
-        timeStamp = str(datetime.now(timezone.utc))
-        if not isinstance(application_status, str):
-            application_status = repr(application_status)
-        # add Application status record
-        if application_status:
-            self.job_status_info.update(
-                {
-                    timeStamp: JobStatusUpdate(
-                        Status=None,
-                        MinorStatus=None,
-                        ApplicationStatus=application_status,
-                        Source=self.source,
-                    ).model_dump()
-                }
-            )
-
-    def setJobParameter(self, key: str, value: str):
-        """Set job parameter.
-
-        :param par_name: name of the parameter
-        :param par_value: value of the parameter
-        """
-        self.job_parameters.update({key: value})
-
-    def setJobParameters(self, parameters: list[tuple] | dict):
-        """Set job parameters for jobID.
-
-        :param parameters: names and values of job parameters: [(name, value), ...] or {name:value, ...}
-        """
-        if isinstance(parameters, dict):
-            self.job_parameters.update(parameters)
-        else:
-            for pname, pvalue in parameters:
-                self.job_parameters.update({pname: pvalue})
-
-    async def sendStoredStatusInfo(self):
+    async def send_stored_status_info(self):
         """Send all the accumulated job status information."""
         if not self.job_status_info:
             return
@@ -143,20 +101,8 @@ class JobReport:
         if ret.success:
             self.job_status_info = {}
         else:
-            raise RuntimeError("Could not set job statuses:", ret)
-
-    async def sendStoredJobParameters(self):
-        """Send all the accumulated job parameters information."""
-        if not self.job_parameters:
-            return
-        body = {self.job_id: self.job_parameters}
-        ret = await self._client.jobs.patch_metadata(body)
-        if ret.success:
-            self.job_parameters = {}
-        else:
-            raise RuntimeError("Could not set job parameters:", ret)
+            raise RuntimeError(f"Could not set job statuses: {ret}")
 
     async def commit(self):
         """Send all the accumulated information."""
-        await self.sendStoredStatusInfo()
-        await self.sendStoredJobParameters()
+        await self.send_stored_status_info()

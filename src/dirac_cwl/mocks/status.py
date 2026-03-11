@@ -11,7 +11,7 @@ STATUS_DIR = PROJECT_ROOT / "status"
 class JobReportMock(JobReport):
     """Mock JobReport."""
 
-    async def sendStoredStatusInfo(self):
+    async def send_stored_status_info(self):
         """Mock sendStoredStatusInfo."""
         STATUS_DIR.mkdir(exist_ok=True)
         file_path = STATUS_DIR / f"status_{self.job_id}"
@@ -46,13 +46,3 @@ class JobReportMock(JobReport):
                     )
                     + "\n"
                 )
-
-    async def sendStoredJobParameters(self):
-        """Mock sendStoredJobParameters."""
-        STATUS_DIR.mkdir(exist_ok=True)
-        file_path = STATUS_DIR / f"job_params_{self.job_id}"
-        with open(file_path, "w+") as f:
-            f.write(" | ".join(("Name".ljust(20), "Value")) + "\n")
-            f.write(" | ".join(("-" * 20, "-" * 20)) + "\n")
-            for name, val in self.job_parameters.items():
-                f.write(" | ".join((name.ljust(20), val)) + "\n")

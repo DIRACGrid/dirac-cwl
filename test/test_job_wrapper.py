@@ -26,8 +26,8 @@ class TestJobWrapper:
     async def test_instantiation(self, sample_job):
         """Test that ExecutionHooksBasePlugin can be instantiated directly with default behavior."""
         hook = ExecutionHooksBasePlugin()
-        job_wrapper = JobWrapper()
-        job_wrapper.execution_hooks_plugin = hook
+        job_wrapper = JobWrapper(job_id=0)
+        job_wrapper._execution_hooks_plugin = hook
 
         # Test default pre_process behavior
         command = ["cwltool", "--parallel", "task.cwl"]
@@ -65,8 +65,8 @@ class TestJobWrapper:
                 return
 
         plugin = job_type_testing()
-        job_wrapper = JobWrapper()
-        job_wrapper.execution_hooks_plugin = plugin
+        job_wrapper = JobWrapper(job_id=0)
+        job_wrapper._execution_hooks_plugin = plugin
 
         # Mock the "execute" commands to be able to spy them
         execute_preprocess_mock = mocker.MagicMock()
@@ -118,8 +118,8 @@ class TestJobWrapper:
                 raise NotImplementedError()
 
         plugin = job_type_testing()
-        job_wrapper = JobWrapper()
-        job_wrapper.execution_hooks_plugin = plugin
+        job_wrapper = JobWrapper(job_id=0)
+        job_wrapper._execution_hooks_plugin = plugin
 
         plugin.preprocess_commands = [Command]
         plugin.postprocess_commands = [Command]
@@ -137,57 +137,24 @@ class TestJobWrapper:
         job_id = randint(0, 9999)
         job_wrapper = JobWrapper(job_id)
         file_path = STATUS_DIR / f"status_{job_id}"
-        assert len(job_wrapper.job_report.job_status_info) == 1  # One status expected for initialization
+        assert len(job_wrapper._job_report.job_status_info) == 1  # One status expected for initialization
         assert not file_path.exists()
 
-        job_wrapper.job_report.setJobStatus(status=JobStatus.RUNNING, minor_status=JobMinorStatus.APPLICATION)
-        assert len(job_wrapper.job_report.job_status_info) == 2
+        job_wrapper._job_report.set_job_status(status=JobStatus.RUNNING, minor_status=JobMinorStatus.APPLICATION)
+        assert len(job_wrapper._job_report.job_status_info) == 2
         assert not file_path.exists()
 
-        job_wrapper.job_report.setApplicationStatus("Test")
-        assert len(job_wrapper.job_report.job_status_info) == 3
+        job_wrapper._job_report.set_job_status(application_status="Test")
+        assert len(job_wrapper._job_report.job_status_info) == 3
         assert not file_path.exists()
 
-        await job_wrapper.job_report.commit()
+        await job_wrapper._job_report.commit()
         assert file_path.exists()
         with open(file_path) as f:
             content = f.read()
             assert JobStatus.RUNNING in content
             assert JobMinorStatus.APPLICATION in content
             assert "Test" in content
-        rmtree(STATUS_DIR)
-
-    @pytest.mark.asyncio
-    async def test_job_params(self):
-        """Test the job parameters methods of the job report work as intended."""
-        job_id = randint(0, 9999)
-        job_wrapper = JobWrapper(job_id)
-        file_path = STATUS_DIR / f"job_params_{job_id}"
-        assert len(job_wrapper.job_report.job_parameters) == 0
-        assert not file_path.exists()
-
-        job_wrapper.job_report.setJobParameter("test-key", "test-value")
-        assert len(job_wrapper.job_report.job_parameters) == 1
-        assert not file_path.exists()
-
-        params = {"test1": "1234", "test2": "4321"}
-        job_wrapper.job_report.setJobParameters(params)
-        assert len(job_wrapper.job_report.job_parameters) == 3
-        assert not file_path.exists()
-
-        job_wrapper.job_report.setJobParameter("test-key", "test!")
-        assert len(job_wrapper.job_report.job_parameters) == 3
-        assert not file_path.exists()
-
-        await job_wrapper.job_report.commit()
-        assert file_path.exists()
-        with open(file_path) as f:
-            content = f.read()
-            assert "test-key" in content
-            assert "1234" in content
-            assert "4321" in content
-            assert "test!" in content
-            assert "test-value" not in content
         rmtree(STATUS_DIR)
 
     @pytest.mark.asyncio
@@ -198,6 +165,6 @@ class TestJobWrapper:
         success = await job_wrapper.run_job(sample_job)
         assert success
         # Status info only stays accumulated for local testing, status info is emptied when committing to diracx
-        assert len(job_wrapper.job_report.job_status_info) > 0
+        assert len(job_wrapper._job_report.job_status_info) > 0
         assert (STATUS_DIR / f"status_{job_id}").exists()
         rmtree(STATUS_DIR)
