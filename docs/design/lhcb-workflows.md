@@ -520,3 +520,43 @@ Some commands have been removed, such as `UploadMC` or `ErrorLogging`, so they w
 - **Consumes**: Files that will be processed
 - **Creates**: Files that generates
 - **Requires**: Extra information required from the parameters or DIRAC
+
+### CreateDataFile
+
+Creates a `data.py` data file from the inputs to be used by Ganga.
+
+### AnalyseXMLSummary
+
+Performs a series of checks on the XMLSummary output to make sure the execution was done correctly.
+
+### BookkeepingReport
+
+Generates a bookkeeping report file based on the XMLSummary and the pool XML catalog.
+
+### WorkflowAccounting
+
+Prepare and send accounting information to the DIRAC Accounting system.
+
+### FileUsage
+
+Report file usage to a DataFileUsage service.
+
+### UploadOutputData
+
+Registers every output generated to the corresponding SE and to the Master Catalog or to the FailoverSE in case of failure.
+
+### FailoverTransfer
+
+Commits the status of the files in the file report. The status will be "Processed" if everything ended properly or "Unused" if it did not.
+
+### UploadLogFile
+
+Uploads a compressed list of outputs to a DIRAC LogSE.
+
+### RemoveInputData
+
+Removes the inputs and their replicas (if any) from every SE and File Catalog.
+
+### AnalyseFileAccess
+
+Uses the XMLCatalog and XMLSummary to check if the access of each input file was successful or not.
