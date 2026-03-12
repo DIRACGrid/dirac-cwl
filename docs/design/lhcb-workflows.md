@@ -256,14 +256,14 @@ flowchart LR
 
     getDestinationSEList{{**getDestinationSEList**}}
     getDestinationSEList getDestinationSEList_l@===> DataManager
-    getFileDescenents{{"**getFileDescenents (lhcb)**"}}
-    getFileDescenents getFileDescenents_l@===> DataManager
+    getFileDescendants{{"**getFileDescendants (lhcb)**"}}
+    getFileDescendants getFileDescendants_l@===> DataManager
     DataManager[**DataManager**]
 
     classDef DataManagerLink stroke:#A31E00
     classDef DataManagerNode fill:#FF542E,stroke:#A31E00,stroke-width:4px ;
-    class DataManager,getDestinationSEList,getFileDescenents DataManagerNode
-    class getDestinationSEList_l,getFileDescenents_l DataManagerLink
+    class DataManager,getDestinationSEList,getFileDescendants DataManagerNode
+    class getDestinationSEList_l,getFileDescendants_l DataManagerLink
 
     %% ======================
     %% OpsHelper
@@ -307,7 +307,7 @@ flowchart LR
     class addRegister_l DataStoreClientLink
 
     %% ======================
-    %% FailverTransfer
+    %% FailoverTransfer
     %% ======================
 
     transferAndRegisterFile{{**transferAndRegisterFile**}}
@@ -439,7 +439,7 @@ flowchart LR
 
     RemoveInputData("RemoveInputData")
 
-    RemoveInputData RemoveInputData_l1@===> getFileDescenents
+    RemoveInputData RemoveInputData_l1@===> getFileDescendants
     RemoveInputData RemoveInputData_l2@===> setApplicationStatus
 
     class RemoveInputData_l1 DataManagerLink
@@ -469,13 +469,13 @@ flowchart LR
 
     %% ======================
 
-    WorklflowAccounting("WorklflowAccounting
+    WorkflowAccounting("WorkflowAccounting
     (StepAccounting)")
 
-    WorklflowAccounting WorklflowAccounting_l1@===> addRegister
-    WorklflowAccounting WorklflowAccounting_l2@===> getValueGconf
-    class WorklflowAccounting_l1 DataStoreClientLink
-    class WorklflowAccounting_l2 ConfigurationSystemLink
+    WorkflowAccounting WorkflowAccounting_l1@===> addRegister
+    WorkflowAccounting WorkflowAccounting_l2@===> getValueGconf
+    class WorkflowAccounting_l1 DataStoreClientLink
+    class WorkflowAccounting_l2 ConfigurationSystemLink
 
     %% ======================
 
