@@ -5,8 +5,6 @@ environments:
     - url: https://conda.anaconda.org/conda-forge/
     indexes:
     - https://pypi.org/simple
-    options:
-      pypi-prerelease-mode: if-necessary-or-explicit
     packages:
       linux-64:
       - conda: https://conda.anaconda.org/conda-forge/linux-64/_libgcc_mutex-0.1-conda_forge.tar.bz2
@@ -1458,7 +1456,7 @@ packages:
   requires_python: '>=3.11'
 - pypi: ./
   name: dirac-cwl
-  version: 1.1.2.dev3+g773310367
+  version: 1.2.1.dev22+gf60c9bf3b.d20260303
   sha256: 0b624b7b1adb33bc3b4cb29dbf85bb2db495122acda95aaa775f0aedef77767f
   requires_dist:
   - cwl-utils
@@ -1480,6 +1478,7 @@ packages:
   - pytest-mock ; extra == 'testing'
   - mypy ; extra == 'testing'
   requires_python: '>=3.11'
+  editable: true
 - pypi: https://files.pythonhosted.org/packages/9f/90/279f55fff9481f9e0424c3c97b24dc10004ec8d8f98ddf5afd07a7b79194/diraccfg-1.0.1-py2.py3-none-any.whl
   name: diraccfg
   version: 1.0.1
