@@ -2,28 +2,69 @@
 
 ## Types of workflows
 
+Currently, the Workflow Modules execute in a predefined order.
+
+For the new approach with CWL, the modules are called "commands" and can be executed in any order, because they don't depend on any other's outputs. However, an order has to be defined while defining the `JobType`, which can be the same as the current order.
+
+### USER Job (setExecutable)
+
 ```mermaid
-flowchart TD
-    subgraph "USER Job (setExecutable)"
+flowchart LR
+    subgraph Current
         direction TB
-        subgraph PreProcessing0[PreProcessing]
-            CreateDataFile0[CreateDataFile]
-        end
-        subgraph Processing0[Processing]
-            CommandLineTool0[CommandLineTool]
-        end
-        subgraph PostProcessing0[PostProcessing]
-            direction TB
-            FileUsage0[FileUsage] 
-            UserJobFinalization0[UserJobFinalization]
-            
-            FileUsage0 ~~~ UserJobFinalization0
-        end
-        PreProcessing0 --> Processing0
-        Processing0 --> PostProcessing0
+
+        CreateDataFile0[CreateDataFile]
+        LHCbScript0[LHCbScript]
+        FileUsage0[FileUsage]
+        UserJobFinalization0[UserJobFinalization]
+
+        CreateDataFile0 --> LHCbScript0
+        LHCbScript0 --> FileUsage0
+        FileUsage0 --> UserJobFinalization0
     end
-    
-    subgraph "USER Job (setApplication)"
+
+    subgraph New
+        direction TB
+        subgraph PreProcessing1[PreProcessing]
+            CreateDataFile1[CreateDataFile]
+        end
+        subgraph Processing1[Processing]
+            CommandLineTool1[CommandLineTool]
+        end
+        subgraph PostProcessing1[PostProcessing]
+            direction TB
+            FileUsage1[FileUsage]
+            UserJobFinalization1[UserJobFinalization]
+
+            FileUsage1 ~~~ UserJobFinalization1
+        end
+        PreProcessing1 --> Processing1
+        Processing1 --> PostProcessing1
+    end
+
+    Current ~~~ New
+```
+
+### USER Job (setApplication)
+
+```mermaid
+flowchart LR
+    subgraph Current
+        direction TB
+
+        CreateDataFile0[CreateDataFile]
+        GaudiApplication0[GaudiApplication]
+        FileUsage0[FileUsage]
+        AnalyseFileAccess0[AnalyseFileAccess]
+        UserJobFinalization0[UserJobFinalization]
+
+        CreateDataFile0 --> GaudiApplication0
+        GaudiApplication0 --> FileUsage0
+        FileUsage0 --> AnalyseFileAccess0
+        AnalyseFileAccess0 --> UserJobFinalization0
+    end
+
+    subgraph New
         direction TB
         subgraph PreProcessing1[PreProcessing]
             CreateDataFile1[CreateDataFile]
@@ -31,62 +72,153 @@ flowchart TD
         subgraph Processing1[Processing]
         direction TB
             LbRunApp1[LbRunApp]
-            AnalyseXmlSummary1[AnalyseXmlSummary]
-            LbRunApp1 --> AnalyseXmlSummary1
         end
         subgraph PostProcessing1[PostProcessing]
             direction TB
+            AnalyseXmlSummary1[AnalyseXmlSummary]
             FileUsage1[FileUsage]
             AnalyseFileAccess1[AnalyseFileAccess]
             UserJobFinalization1[UserJobFinalization]
-            
+
+            AnalyseXmlSummary1 ~~~ FileUsage1
             FileUsage1 ~~~ AnalyseFileAccess1
             AnalyseFileAccess1 ~~~ UserJobFinalization1
         end
         PreProcessing1 --> Processing1
         Processing1 --> PostProcessing1
     end
+
+    Current ~~~ New
 ```
 
+### Simulation Job
+
+For this type of job and for the following one (Reconstruction), currently we have some kind of processing and a post-processing step. The main difference with the new approach is that the processing step also contained modules and as this step could be executed multiple times, so did those modules.
+
+Now, as we moved those commands out of the processing step, the commands that used to execute multiple times, now they need to deal with multiple outputs at a time, as they only execute once.
+
 ```mermaid
-flowchart TD
-    subgraph "Simulation Job"
+flowchart LR
+    direction TB
+
+    subgraph Current
         direction TB
-        subgraph Processing0[Processing]
+
+
+        subgraph Processing0[''Processing'']
             direction TB
-            LbRunApp0[LbRunApp]
+
+            GaudiApplication0[GaudiApplication]
             AnalyseXmlSummary0[AnalyseXmlSummary]
-            
-            LbRunApp0 --> AnalyseXmlSummary0
-        end
-        subgraph PostProcessing0[PostProcessing]
-        direction TB
-            UploadLogFile0[UploadLogFile]
-            UploadOutputData0[UploadOutputData]
-            FailoverTransfer0[FailoverTransfer]
+            ErrorLogging0[ErrorLogging]
             BookkeepingReport0[BookkeepingReport]
-            WorkflowAccounting0[WorkflowAccounting]
-            
-            UploadLogFile0 ~~~ UploadOutputData0
-            UploadOutputData0 ~~~ FailoverTransfer0
-            FailoverTransfer0 ~~~ BookkeepingReport0
-            BookkeepingReport0 ~~~ WorkflowAccounting0
+            StepAccounting0[StepAccounting]
+
+
+            GaudiApplication0 --> AnalyseXmlSummary0
+            AnalyseXmlSummary0 --> ErrorLogging0
+            ErrorLogging0 --> BookkeepingReport0
+            BookkeepingReport0 --> StepAccounting0
         end
-        
+
+        subgraph PostProcessing0[''PostProcessing'']
+            direction TB
+
+            UploadOutputData0[UploadOutputData]
+            UploadLogFile0[UploadLogFile]
+            UploadMC0[UploadMC]
+            FailoverTransfer0[FailoverTransfer]
+
+            UploadOutputData0 --> UploadLogFile0
+            UploadLogFile0 --> UploadMC0
+            UploadMC0 --> FailoverTransfer0
+        end
+
         Processing0 --> PostProcessing0
+
     end
-    
-    subgraph "Reconstruction Job"
+
+    subgraph New
         direction TB
         subgraph Processing1[Processing]
             direction TB
             LbRunApp1[LbRunApp]
+        end
+        subgraph PostProcessing1[PostProcessing]
+        direction TB
             AnalyseXmlSummary1[AnalyseXmlSummary]
+            UploadLogFile1[UploadLogFile]
+            UploadOutputData1[UploadOutputData]
+            FailoverTransfer1[FailoverTransfer]
+            BookkeepingReport1[BookkeepingReport]
+            WorkflowAccounting1[WorkflowAccounting]
 
-            LbRunApp1 --> AnalyseXmlSummary1
+            AnalyseXmlSummary1 ~~~ UploadLogFile1
+            UploadLogFile1 ~~~ UploadOutputData1
+            UploadOutputData1 ~~~ FailoverTransfer1
+            FailoverTransfer1 ~~~ BookkeepingReport1
+            BookkeepingReport1 ~~~ WorkflowAccounting1
+        end
+
+        Processing1 --> PostProcessing1
+    end
+
+    Current ~~~ New
+```
+
+### Reconstruction Job
+
+```mermaid
+flowchart LR
+    subgraph Current
+        direction TB
+
+
+        subgraph Processing0[''Processing'']
+            direction TB
+
+            GaudiApplication0[GaudiApplication]
+            AnalyseXmlSummary0[AnalyseXmlSummary]
+            ErrorLogging0[ErrorLogging]
+            BookkeepingReport0[BookkeepingReport]
+            StepAccounting0[StepAccounting]
+
+
+            GaudiApplication0 --> AnalyseXmlSummary0
+            AnalyseXmlSummary0 --> ErrorLogging0
+            ErrorLogging0 --> BookkeepingReport0
+            BookkeepingReport0 --> StepAccounting0
+        end
+
+        subgraph PostProcessing0[''PostProcessing'']
+            direction TB
+
+            UploadOutputData0[UploadOutputData]
+            RemoveInputData0[RemoveInputData]
+            UploadLogFile0[UploadLogFile]
+            UploadMC0[UploadMC]
+            FailoverTransfer0[FailoverTransfer]
+
+            UploadOutputData0 --> RemoveInputData0
+            RemoveInputData0 --> UploadLogFile0
+            UploadLogFile0 --> UploadMC0
+            UploadMC0 --> FailoverTransfer0
+        end
+
+        Processing0 --> PostProcessing0
+
+    end
+
+    subgraph New
+        direction TB
+        subgraph Processing1[Processing]
+            direction TB
+            LbRunApp1[LbRunApp]
+
         end
         subgraph PostProcessing1[PostProcessing]
             direction TB
+            AnalyseXmlSummary1[AnalyseXmlSummary]
             UploadLogFile1[UploadLogFile]
             UploadOutputData1[UploadOutputData]
             FailoverTransfer1[FailoverTransfer]
@@ -94,6 +226,7 @@ flowchart TD
             WorkflowAccounting1[WorkflowAccounting]
             RemoveInputData1[RemoveInputData]
 
+            AnalyseXmlSummary1 ~~~ UploadLogFile1
             UploadLogFile1 ~~~ UploadOutputData1
             UploadOutputData1 ~~~ RemoveInputData1
             RemoveInputData1 ~~~ FailoverTransfer1
@@ -102,10 +235,9 @@ flowchart TD
         end
         Processing1 --> PostProcessing1
     end
-```
 
-The commands are not in sequence as they can be executed in any order because they don't depend on any other's outputs.
-If this wasn't the case, that should be taken into account and ensure they are set in the required arrangement.
+    Current ~~~ New
+```
 
 ## Relations between commands and DIRAC Components
 
@@ -118,9 +250,9 @@ config:
         curve: linear
 ---
 flowchart LR
-    %% ====================== 
+    %% ======================
     %% DataManager
-    %% ====================== 
+    %% ======================
 
     getDestinationSEList{{**getDestinationSEList**}}
     getDestinationSEList getDestinationSEList_l@===> DataManager
@@ -133,9 +265,9 @@ flowchart LR
     class DataManager,getDestinationSEList,getFileDescenents DataManagerNode
     class getDestinationSEList_l,getFileDescenents_l DataManagerLink
 
-    %% ====================== 
+    %% ======================
     %% OpsHelper
-    %% ====================== 
+    %% ======================
 
     getValue{{**getValue**}}
     getValue getValue_opsHelper_l@===> OpsHelper
@@ -145,10 +277,10 @@ flowchart LR
     classDef OpsHelperNode fill:#FFA82E,stroke:#A35F00,stroke-width:4px ;
     class getValue,OpsHelper OpsHelperNode
     class getValue_opsHelper_l OpsHelperLink
-    
-    %% ====================== 
+
+    %% ======================
     %% StorageElement
-    %% ====================== 
+    %% ======================
 
     getUrl{{**getUrl**}}
     getUrl getUrl_l@===> StorageElement
@@ -161,9 +293,9 @@ flowchart LR
     class getUrl,putFile,StorageElement StorageElementNode
     class getUrl_l,putFile_l StorageElementLink
 
-    %% ====================== 
+    %% ======================
     %% DataStoreClient
-    %% ====================== 
+    %% ======================
 
     addRegister{{**addRegister**}}
     addRegister addRegister_l@===> DataStoreClient
@@ -174,24 +306,24 @@ flowchart LR
     class addRegister,DataStoreClient DataStoreClientNode
     class addRegister_l DataStoreClientLink
 
-    %% ====================== 
+    %% ======================
     %% FailverTransfer
-    %% ====================== 
+    %% ======================
 
     transferAndRegisterFile{{**transferAndRegisterFile**}}
     transferAndRegisterFile transferAndRegisterFile_l@===> FailoverTransfer
     setFileReplicationRequest{{**_setFileReplicationRequest**}}
     setFileReplicationRequest setFileReplicationRequest_l@===> FailoverTransfer
     FailoverTransfer[**FailoverTransfer**]
-    
+
     classDef FailoverTransferLink stroke:#3CA300 ;
     classDef FailoverTransferNode fill:#7BFF2E,stroke:#3CA300,stroke-width:4px ;
     class transferAndRegisterFile,setFileReplicationRequest,FailoverTransfer FailoverTransferNode
     class transferAndRegisterFile_l,setFileReplicationRequest_l FailoverTransferLink
 
-    %% ====================== 
+    %% ======================
     %% JobReport
-    %% ====================== 
+    %% ======================
 
     setJobParameter{{**setJobParameter**}}
     setJobParameter setJobParameter_l@===> JobReport
@@ -204,9 +336,9 @@ flowchart LR
     class setJobParameter,setApplicationStatus,JobReport JobReportNode
     class setJobParameter_l,setApplicationStatus_l JobReportLink
 
-    %% ====================== 
+    %% ======================
     %% BookkeepingClient
-    %% ====================== 
+    %% ======================
 
     getFileMetadata{{**getFileMetadata**}}
     getFileMetadata getFileMetadata_l@===> BookkeepingClient
@@ -221,9 +353,9 @@ flowchart LR
     class getFileMetadata,sendXMLBookkeepingReport,getFileTypes,BookkeepingClient BookkeepingClientNode
     class getFileMetadata_l,sendXMLBookkeepingReport_l,getFileTypes_l BookkeepingClientLink
 
-    %% ====================== 
+    %% ======================
     %% FileReport
-    %% ====================== 
+    %% ======================
 
     getFiles{{**getFiles**}}
     getFiles getFiles_l@===> FileReport
@@ -240,9 +372,9 @@ flowchart LR
     class getFiles,setFileStatus,commit,generateForwardDISET,FileReport FileReportNode
     class getFiles_l,setFileStatus_l,commit_l,generateForwardDISET_l FileReportLink
 
-    %% ====================== 
+    %% ======================
     %% ConfigurationSystem
-    %% ====================== 
+    %% ======================
 
     getValueGconf{{**getValue**}}
     getValueGconf getValue_Gconf_l@===> ConfigurationSystem
@@ -253,9 +385,9 @@ flowchart LR
     class getValueGconf,ConfigurationSystem ConfigurationSystemNode
     class getValue_Gconf_l ConfigurationSystemLink
 
-    %% ====================== 
+    %% ======================
     %% FileCatalog
-    %% ====================== 
+    %% ======================
 
     addFile{{**addFile**}}
     addFile addFile_l@===> FileCatalog
@@ -269,9 +401,9 @@ flowchart LR
     %% ======================
     %% Commands
     %% ======================
-    
+
     UploadLogFile("UploadLogFile")
-    
+
     UploadLogFile UploadLogFile_l1@===> getDestinationSEList
     UploadLogFile UploadLogFile_l2@===> getValue
     UploadLogFile UploadLogFile_l3@===> getUrl
@@ -316,7 +448,7 @@ flowchart LR
     %% ======================
 
     FailoverTransferC("FailoverTransfer")
-        
+
     FailoverTransferC FailoverTransferC_l1@===> getFiles
     FailoverTransferC FailoverTransferC_l2@===> setFileStatus
     FailoverTransferC FailoverTransferC_l3@===> generateForwardDISET
@@ -355,19 +487,21 @@ flowchart LR
     UserJobFinalization UserJobFinalization_l2@===> setFileReplicationRequest
     UserJobFinalization UserJobFinalization_l3@===> setJobParameter
     UserJobFinalization UserJobFinalization_l4@===> setApplicationStatus
-    
+
     class UserJobFinalization_l1,UserJobFinalization_l2 FailoverTransferLink
     class UserJobFinalization_l3,UserJobFinalization_l4 JobReportLink
 
     %% ======================
 
     FileUsage("FileUsage")
-    
+
     FileUsage FileUsage_l1@===> getValueGconf
     class FileUsage_l1 ConfigurationSystemLink
 ```
 
 ## Command's inputs & outputs
+
+Some commands have been removed, such as `UploadMC` or `ErrorLogging`, so they won't appear in this table.
 
 | Command | Consumes | Creates | Requires |
 | --- | --- | --- | --- |
