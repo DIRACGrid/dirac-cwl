@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.0](https://github.com/DIRACGrid/dirac-cwl/compare/v1.2.0...v1.3.0) (2026-03-16)
+
+
+### Features
+
+* **JobWrapper:** Report the status of the job to DiracX ([#111](https://github.com/DIRACGrid/dirac-cwl/issues/111)) ([4cf8c29](https://github.com/DIRACGrid/dirac-cwl/commit/4cf8c29b8c42e56c33bfc7db799afa5ce5a4416d))
+
 ## [1.2.0](https://github.com/DIRACGrid/dirac-cwl/compare/v1.1.3...v1.2.0) (2026-02-20)
 
 
