@@ -74,6 +74,11 @@ class JobWrapper:
         self._create_sandbox = create_sandbox
         self._download_sandbox = download_sandbox
 
+    @property
+    def job_path(self):
+        """Return the job path."""
+        return self._job_path
+
     async def __download_input_sandbox(self, arguments: JobInputModel, job_path: Path) -> None:
         """Download the files from the sandbox store.
 
