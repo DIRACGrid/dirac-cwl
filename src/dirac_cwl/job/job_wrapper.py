@@ -56,7 +56,7 @@ class JobWrapper:
         self._job_id = job_id
         src = "JobWrapper"
         if os.getenv("DIRAC_PROTO_LOCAL") == "1":
-            from dirac_cwl.data_management_mocks.sandbox import (  # type: ignore[no-redef]
+            from dirac_cwl.mocks.sandbox import (  # type: ignore[no-redef]
                 create_sandbox,
                 download_sandbox,
             )
