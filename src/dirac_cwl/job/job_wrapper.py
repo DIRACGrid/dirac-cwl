@@ -39,13 +39,6 @@ from dirac_cwl.submission_models import (
     JobModel,
 )
 
-if os.getenv("DIRAC_PROTO_LOCAL") == "1":
-    from dirac_cwl.mocks.sandbox import create_sandbox, download_sandbox  # type: ignore[no-redef]
-    from dirac_cwl.mocks.status import JobReportMock
-else:
-    from diracx.api.jobs import create_sandbox, download_sandbox  # type: ignore[no-redef]
-
-
 # -----------------------------------------------------------------------------
 # JobWrapper
 # -----------------------------------------------------------------------------
@@ -63,12 +56,28 @@ class JobWrapper:
         self._job_id = job_id
         src = "JobWrapper"
         if os.getenv("DIRAC_PROTO_LOCAL") == "1":
+            from dirac_cwl.mocks.sandbox import (  # type: ignore[no-redef]
+                create_sandbox,
+                download_sandbox,
+            )
+            from dirac_cwl.mocks.status import JobReportMock
+
             self._diracx_client: AsyncDiracClient = AsyncMock()
             self._job_report: JobReport = JobReportMock(self._job_id, src, self._diracx_client)
         else:
+            from diracx.api.jobs import create_sandbox, download_sandbox  # type: ignore[no-redef]
+
             self._diracx_client = AsyncDiracClient()
             self._job_report = JobReport(self._job_id, src, self._diracx_client)
+
         self._job_report.set_job_status(JobStatus.RUNNING, JobMinorStatus.JOB_INITIALIZATION)
+        self._create_sandbox = create_sandbox
+        self._download_sandbox = download_sandbox
+
+    @property
+    def job_path(self):
+        """Return the job path."""
+        return self._job_path
 
     async def __download_input_sandbox(self, arguments: JobInputModel, job_path: Path) -> None:
         """Download the files from the sandbox store.
@@ -82,7 +91,7 @@ class JobWrapper:
             self._job_report.set_job_status(minor_status=JobMinorStatus.FAILED_DOWNLOADING_INPUT_SANDBOX)
             raise RuntimeError("Could not download sandboxes")
         for sandbox in arguments.sandbox:
-            await download_sandbox(sandbox, job_path)
+            await self._download_sandbox(sandbox, job_path)
 
     async def __upload_output_sandbox(
         self,
@@ -103,7 +112,7 @@ class JobWrapper:
                     outputs_to_sandbox.append(Path(path))
         if outputs_to_sandbox:
             self._job_report.set_job_status(JobStatus.COMPLETING, minor_status=JobMinorStatus.UPLOADING_OUTPUT_SANDBOX)
-            sb_path = Path(await create_sandbox(outputs_to_sandbox))
+            sb_path = Path(await self._create_sandbox(outputs_to_sandbox))
             logger.info(
                 "Successfully stored output %s in Sandbox %s", self._execution_hooks_plugin.output_sandbox, sb_path
             )

@@ -23,6 +23,7 @@ from dirac_cwl.execution_hooks.registry import (
 class TestPlugin(ExecutionHooksBasePlugin):
     """Test plugin for registry testing."""
 
+    __test__ = False
     description: ClassVar[str] = "Test plugin for unit tests"
 
     test_param: str = "default"
@@ -31,6 +32,7 @@ class TestPlugin(ExecutionHooksBasePlugin):
 class TestVOPlugin(ExecutionHooksBasePlugin):
     """Test vo-specific plugin."""
 
+    __test__ = False
     description: ClassVar[str] = "Test VO plugin"
     vo: ClassVar[Optional[str]] = "test_exp"
 
@@ -40,6 +42,7 @@ class TestVOPlugin(ExecutionHooksBasePlugin):
 class TestSecondVOPlugin(ExecutionHooksBasePlugin):
     """Test plugin for second vo."""
 
+    __test__ = False
     description: ClassVar[str] = "Test plugin for second VO"
     vo: ClassVar[Optional[str]] = "exp2"
 
@@ -273,8 +276,8 @@ class TestPluginSystem:
         class DirectPlugin(ExecutionHooksBasePlugin):
             test_param: str = "default"
 
-            def get_input_query(self, input_name: str, **kwargs: Any) -> Optional[Path]:
-                return Path(f"/direct/{input_name}/{self.test_param}")
+            def get_input_query(self, **kwargs: Any) -> Optional[Path]:
+                return Path(f"/direct/{self.test_param}")
 
         # Register plugin directly
         registry = get_registry()
@@ -285,8 +288,8 @@ class TestPluginSystem:
         instance = registry.instantiate_plugin(descriptor)
 
         # Should work with new interface
-        result = instance.get_input_query("test_input")
-        assert result == Path("/direct/test_input/custom")
+        result = instance.get_input_query()
+        assert result == Path("/direct/custom")
 
     def test_plugin_parameter_handling(self):
         """Test that parameters are passed correctly to plugins."""

@@ -20,7 +20,6 @@ from dirac_cwl.execution_hooks.core import (
     ExecutionHooksHint,
     SchedulingHint,
 )
-from dirac_cwl.job.job_wrapper import JobWrapper
 
 
 class TestSystemIntegration:
@@ -72,7 +71,7 @@ class TestRealWorldScenarios:
     """Test real-world usage scenarios."""
 
     @pytest.mark.asyncio
-    async def test_user_workflow_scenario(self, sample_job):
+    async def test_user_workflow_scenario(self, sample_job, job_wrapper):
         """Test a typical user workflow scenario."""
         # Use any available plugin for a generic runtime smoke test
         registry = get_registry()
@@ -87,7 +86,6 @@ class TestRealWorldScenarios:
         # Simulate job execution
 
         # Pre-process should return a command list (may be modified by plugin)
-        job_wrapper = JobWrapper(job_id=0)
         job_wrapper._execution_hooks_plugin = user_runtime
         processed_command = await job_wrapper.pre_process(sample_job.task, None)
         assert isinstance(processed_command, list)
@@ -97,7 +95,7 @@ class TestRealWorldScenarios:
         assert isinstance(result, bool)
 
     @pytest.mark.asyncio
-    async def test_admin_workflow_scenario(self, sample_job):
+    async def test_admin_workflow_scenario(self, sample_job, job_wrapper):
         """Test an administrative workflow scenario."""
         # Generic admin-style smoke test: ensure a plugin accepts configuration
         registry = get_registry()
@@ -118,7 +116,6 @@ class TestRealWorldScenarios:
             pytest.skip(f"Plugin {plugin_name} cannot be instantiated with configuration")
 
         # Simulate job execution
-        job_wrapper = JobWrapper(job_id=0)
         job_wrapper._execution_hooks_plugin = admin_runtime
         processed_command = await job_wrapper.pre_process(sample_job.task, None)
         assert isinstance(processed_command, list)
@@ -142,7 +139,7 @@ class TestRealWorldScenarios:
         analysis_runtime = analysis_descriptor.to_runtime()
 
         # Test input data discovery
-        input_path = analysis_runtime.get_input_query("input_data")
+        input_path = analysis_runtime.get_input_query()
         assert str(input_path).startswith("/grid/data")
         assert "Run3_2024" in str(input_path)
         assert "CERN" in str(input_path)
