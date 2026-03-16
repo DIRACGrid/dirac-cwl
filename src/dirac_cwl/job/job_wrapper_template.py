@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 """Job wrapper template for executing CWL jobs."""
 
+import asyncio
 import json
 import logging
 import os
@@ -19,14 +20,16 @@ from dirac_cwl.job.job_wrapper import JobWrapper
 from dirac_cwl.submission_models import JobModel
 
 
-def main():
+async def main():
     """Execute the job wrapper for a given job model."""
-    if len(sys.argv) != 2:
-        logging.error("1 argument is required")
+    if len(sys.argv) != 3:
+        logging.error("2 arguments required, <json-file> <jobID>")
         sys.exit(1)
 
+    job_id = int(sys.argv[2])
+
     job_json_file = sys.argv[1]
-    job_wrapper = JobWrapper()
+    job_wrapper = JobWrapper(job_id)
     with open(job_json_file, "r") as file:
         job_model_dict = json.load(file)
 
@@ -44,13 +47,41 @@ def main():
 
     job = JobModel.model_validate(job_model_dict)
 
-    res = job_wrapper.run_job(job)
+    res = await job_wrapper.run_job(job)
     if res:
         logging.info("Job done.")
+        return 0
     else:
         logging.info("Job failed.")
-        sys.exit(1)
+        return 1
+
+
+def setup_diracx() -> None:
+    """Get a DiracX client instance with the current user's credentials."""
+    from pathlib import Path
+
+    from DIRAC import gConfig
+    from DIRAC.Core.Security.Locations import getDefaultProxyLocation  # type: ignore[import-untyped]
+
+    diracxUrl = gConfig.getValue("/DiracX/URL")
+    if not diracxUrl:
+        raise ValueError("Missing mandatory /DiracX/URL configuration")
+
+    os.environ["DIRACX_URL"] = diracxUrl
+
+    proxyLocation = getDefaultProxyLocation()
+    diracxToken = DIRAC.Core.Security.DiracX.diracxTokenFromPEM(proxyLocation)
+    if not diracxToken:
+        raise ValueError(f"No diracx token in the proxy file {proxyLocation}")
+
+    token_file = Path.home() / ".cache" / "diracx" / "credentials.json"
+    token_file.parent.mkdir(parents=True, exist_ok=True)
+    with open(token_file, "w", encoding="utf-8", opener=lambda p, f: os.open(p, f | os.O_TRUNC, 0o600)) as f:
+        json.dump(diracxToken, f)
 
 
 if __name__ == "__main__":
-    main()
+    logging.basicConfig(level=logging.INFO)
+    if os.getenv("DIRAC_PROTO_LOCAL") != "1":
+        setup_diracx()
+    sys.exit(asyncio.run(main()))

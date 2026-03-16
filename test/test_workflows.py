@@ -13,7 +13,7 @@ import pytest
 from typer.testing import CliRunner
 
 from dirac_cwl import app
-from dirac_cwl.data_management_mocks.sandbox import SANDBOX_STORE_DIR, download_sandbox
+from dirac_cwl.mocks.sandbox import SANDBOX_STORE_DIR, download_sandbox
 
 
 def strip_ansi_codes(text: str) -> str:
@@ -35,6 +35,7 @@ def cleanup():
         shutil.rmtree("filecatalog", ignore_errors=True)
         shutil.rmtree("sandboxstore", ignore_errors=True)
         shutil.rmtree("workernode", ignore_errors=True)
+        shutil.rmtree("status", ignore_errors=True)
 
     _cleanup()
     yield
@@ -247,7 +248,8 @@ def test_run_job_validation_failure(cli_runner, cleanup, cwl_file, inputs, expec
 @pytest.mark.skipif(
     platform.system() != "Linux" or not shutil.which("taskset"), reason="taskset command only available on Linux"
 )
-def test_run_job_parallely(tmp_path, cleanup):
+@pytest.mark.asyncio
+async def test_run_job_parallely(tmp_path, cleanup):
     """Test parallel job execution performance."""
     # Ensure the workflow exists
     workflow = Path("test/workflows/parallel/description.cwl").resolve()
@@ -272,7 +274,7 @@ def test_run_job_parallely(tmp_path, cleanup):
         (a0, a1), (b0, b1) = a, b
         return a0 < b1 and b0 < a1
 
-    def run(cpu_spec: str):
+    async def run(cpu_spec: str):
         subprocess.run(
             ["taskset", "-c", cpu_spec, "dirac-cwl", "job", "submit", str(workflow)],
             stdout=subprocess.PIPE,
@@ -285,7 +287,7 @@ def test_run_job_parallely(tmp_path, cleanup):
         sandbox_files = list(Path(SANDBOX_STORE_DIR).glob("*.tar.*"))
         assert len(sandbox_files) == 1, f"Expected exactly one sandbox file, found {len(sandbox_files)}"
         sandbox_file = sandbox_files[0].name
-        download_sandbox(str(sandbox_file), tmp_path)
+        await download_sandbox(str(sandbox_file), tmp_path)
 
         # Get the output sandbox paths
         a = read_interval(tmp_path / "a.txt")
@@ -296,11 +298,11 @@ def test_run_job_parallely(tmp_path, cleanup):
         return a, b
 
     # 1 CPU => expect no overlap
-    a1, b1 = run(str(cpu0))
+    a1, b1 = await run(str(cpu0))
     assert not overlaps(a1, b1), f"Expected sequential execution on 1 CPU, got overlap: a={a1}, b={b1}"
 
     # 2 CPUs => expect overlap
-    a2, b2 = run(f"{cpu0},{cpu1}")
+    a2, b2 = await run(f"{cpu0},{cpu1}")
     assert overlaps(a2, b2), f"Expected parallel execution on 2 CPUs, got no overlap: a={a2}, b={b2}"
 
 

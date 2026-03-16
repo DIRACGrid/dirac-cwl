@@ -54,14 +54,14 @@ class PrototypeSubmissionClient(SubmissionClient):
         :param parameter_path: Path to the parameter file (not used in local mode)
         :return: Sandbox PFN or None
         """
-        from dirac_cwl.data_management_mocks.sandbox import (
+        from dirac_cwl.mocks.sandbox import (
             create_sandbox,
         )
 
         if not isb_file_paths:
             return None
 
-        return create_sandbox(paths=isb_file_paths)
+        return await create_sandbox(paths=isb_file_paths)
 
     async def submit_job(self, job_submission: JobSubmissionModel) -> bool:
         """
