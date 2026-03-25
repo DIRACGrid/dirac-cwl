@@ -168,9 +168,6 @@
       "additionalProperties": false,
       "description": "Schema for ProductionSubmissionModel with CWL type references",
       "properties": {
-        "input_data": {
-          "description": "Field of type list[str | cwl_utils.parser.cwl_v1_0.File | cwl_utils.parser.cwl_v1_1.File | cwl_utils.parser.cwl_v1_2.File] | None"
-        },
         "task": {
           "$ref": "https://json.schemastore.org/cwl-workflow.json",
           "description": "CWL Workflow definition"
@@ -330,6 +327,39 @@
           "title": "Hook Plugin",
           "type": "string"
         },
+        "input_data": {
+          "anyOf": [
+            {
+              "additionalProperties": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Input data for transformation jobs",
+          "title": "Input Data"
+        },
+        "input_query": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Input query for transformation jobs",
+          "title": "Input Query"
+        },
         "output_paths": {
           "additionalProperties": true,
           "description": "LFNs for outputs on the Data Catalog",
@@ -359,21 +389,6 @@
     "TransformationSubmissionModel": {
       "description": "Transformation definition sent to the router.",
       "properties": {
-        "input_data": {
-          "anyOf": [
-            {
-              "items": {
-                "type": "string"
-              },
-              "type": "array"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Input Data"
-        },
         "task": {
           "anyOf": [],
           "title": "Task"
