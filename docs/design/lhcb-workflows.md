@@ -4,7 +4,9 @@
 
 Currently, the Workflow Modules execute in a predefined order.
 
-For the new approach with CWL, the modules are called "commands" and can be executed in any order, because they don't depend on any other's outputs. However, an order has to be defined while defining the `JobType`, which can be the same as the current order.
+For the new approach with CWL, the modules are called "commands". The order of execution of the commands has to be defined while creating the `JobType`, which can be the same as the current order.
+
+To select the proper order of the commands, the developer needs to take into account what each one generates and consumes. For LHCb commands, most of them do not need to be on any specific order, except a few such as `UploadOutputData` and `BookkeepingReport`, where the former depends on the latter and `FailoverRequest` and `UserJobFinalization`, which need to execute last, as they commits the operation requests.
 
 ### USER Job (setExecutable)
 
@@ -36,7 +38,7 @@ flowchart LR
             FileUsage1[FileUsage]
             UserJobFinalization1[UserJobFinalization]
 
-            FileUsage1 ~~~ UserJobFinalization1
+            FileUsage1 --> UserJobFinalization1
         end
         PreProcessing1 --> Processing1
         Processing1 --> PostProcessing1
@@ -127,11 +129,11 @@ flowchart LR
             UploadOutputData0[UploadOutputData]
             UploadLogFile0[UploadLogFile]
             UploadMC0[UploadMC]
-            FailoverTransfer0[FailoverTransfer]
+            FailoverRequest0[FailoverRequest]
 
             UploadOutputData0 --> UploadLogFile0
             UploadLogFile0 --> UploadMC0
-            UploadMC0 --> FailoverTransfer0
+            UploadMC0 --> FailoverRequest0
         end
 
         Processing0 --> PostProcessing0
@@ -149,15 +151,15 @@ flowchart LR
             AnalyseXmlSummary1[AnalyseXmlSummary]
             UploadLogFile1[UploadLogFile]
             UploadOutputData1[UploadOutputData]
-            FailoverTransfer1[FailoverTransfer]
+            FailoverRequest1[FailoverRequest]
             BookkeepingReport1[BookkeepingReport]
             WorkflowAccounting1[WorkflowAccounting]
 
             AnalyseXmlSummary1 ~~~ UploadLogFile1
-            UploadLogFile1 ~~~ UploadOutputData1
-            UploadOutputData1 ~~~ FailoverTransfer1
-            FailoverTransfer1 ~~~ BookkeepingReport1
-            BookkeepingReport1 ~~~ WorkflowAccounting1
+            UploadLogFile1 ~~~ WorkflowAccounting1
+            WorkflowAccounting1 ~~~ BookkeepingReport1
+            BookkeepingReport1 --> UploadOutputData1
+            UploadOutputData1 --> FailoverRequest1
         end
 
         Processing1 --> PostProcessing1
@@ -197,12 +199,12 @@ flowchart LR
             RemoveInputData0[RemoveInputData]
             UploadLogFile0[UploadLogFile]
             UploadMC0[UploadMC]
-            FailoverTransfer0[FailoverTransfer]
+            FailoverRequest0[FailoverRequest]
 
             UploadOutputData0 --> RemoveInputData0
             RemoveInputData0 --> UploadLogFile0
             UploadLogFile0 --> UploadMC0
-            UploadMC0 --> FailoverTransfer0
+            UploadMC0 --> FailoverRequest0
         end
 
         Processing0 --> PostProcessing0
@@ -221,17 +223,19 @@ flowchart LR
             AnalyseXmlSummary1[AnalyseXmlSummary]
             UploadLogFile1[UploadLogFile]
             UploadOutputData1[UploadOutputData]
-            FailoverTransfer1[FailoverTransfer]
+            FailoverRequest1[FailoverRequest]
             BookkeepingReport1[BookkeepingReport]
             WorkflowAccounting1[WorkflowAccounting]
             RemoveInputData1[RemoveInputData]
 
+
             AnalyseXmlSummary1 ~~~ UploadLogFile1
-            UploadLogFile1 ~~~ UploadOutputData1
-            UploadOutputData1 ~~~ RemoveInputData1
-            RemoveInputData1 ~~~ FailoverTransfer1
-            FailoverTransfer1 ~~~ BookkeepingReport1
-            BookkeepingReport1 ~~~ WorkflowAccounting1
+            UploadLogFile1 ~~~ RemoveInputData1
+            RemoveInputData1 ~~~ WorkflowAccounting1
+            WorkflowAccounting1 ~~~ BookkeepingReport1
+            BookkeepingReport1 --> UploadOutputData1
+            UploadOutputData1 --> FailoverRequest1
+
         end
         Processing1 --> PostProcessing1
     end
@@ -258,12 +262,17 @@ flowchart LR
     getDestinationSEList getDestinationSEList_l@===> DataManager
     getFileDescendants{{"**getFileDescendants (lhcb)**"}}
     getFileDescendants getFileDescendants_l@===> DataManager
+    removeFile{{**removeFile**}}
+    removeFile removeFile_l@===> DataManager
+    getSiteSEMapping{{**getSiteSEMapping**}}
+    getSiteSEMapping getSiteSEMapping_l@===> DataManager
+
     DataManager[**DataManager**]
 
     classDef DataManagerLink stroke:#A31E00
     classDef DataManagerNode fill:#FF542E,stroke:#A31E00,stroke-width:4px ;
-    class DataManager,getDestinationSEList,getFileDescendants DataManagerNode
-    class getDestinationSEList_l,getFileDescendants_l DataManagerLink
+    class DataManager,getDestinationSEList,getFileDescendants,removeFile,getSiteSEMapping DataManagerNode
+    class getDestinationSEList_l,getFileDescendants_l,removeFile_l,getSiteSEMapping_l DataManagerLink
 
     %% ======================
     %% OpsHelper
@@ -399,6 +408,19 @@ flowchart LR
     class addFile_l FileCatalogLink
 
     %% ======================
+    %% DataUsage
+    %% ======================
+
+    sendDataUsageReport{{**sendDataUsageReport**}}
+    sendDataUsageReport sendDataUsageReport_l@===> DataUsageClient
+    DataUsageClient[**DataUsageClient**]
+
+    classDef DataUsageClientLink stroke:#A98B76 ;
+    classDef DataUsageClientNode fill:#BFA28C,stroke:#A98B76,stroke-width:4px ;
+    class sendDataUsageReport,DataUsageClient DataUsageClientNode
+    class sendDataUsageReport_l DataUsageClientLink
+
+    %% ======================
     %% Commands
     %% ======================
 
@@ -429,17 +451,20 @@ flowchart LR
     UploadOutputData UploadOutputData_l3@===> setApplicationStatus
     UploadOutputData UploadOutputData_l4@===> sendXMLBookkeepingReport
     UploadOutputData UploadOutputData_l5@===> addFile
+    UploadOutputData UploadOutputData_l6@===> getFileDescendants
+    UploadOutputData UploadOutputData_l7@===> getSiteSEMapping
 
     class UploadOutputData_l1 FailoverTransferLink
     class UploadOutputData_l2,UploadOutputData_l3 JobReportLink
     class UploadOutputData_l4 BookkeepingClientLink
     class UploadOutputData_l5 FileCatalogLink
+    class UploadOutputData_l6,UploadOutputData_l7 DataManagerLink
 
     %% ======================
 
     RemoveInputData("RemoveInputData")
 
-    RemoveInputData RemoveInputData_l1@===> getFileDescendants
+    RemoveInputData RemoveInputData_l1@===> removeFile
     RemoveInputData RemoveInputData_l2@===> setApplicationStatus
 
     class RemoveInputData_l1 DataManagerLink
@@ -447,14 +472,14 @@ flowchart LR
 
     %% ======================
 
-    FailoverTransferC("FailoverTransfer")
+    FailoverRequest("FailoverRequest")
 
-    FailoverTransferC FailoverTransferC_l1@===> getFiles
-    FailoverTransferC FailoverTransferC_l2@===> setFileStatus
-    FailoverTransferC FailoverTransferC_l3@===> generateForwardDISET
-    FailoverTransferC FailoverTransferC_l4@===> commit
+    FailoverRequest FailoverRequest_l1@===> getFiles
+    FailoverRequest FailoverRequest_l2@===> setFileStatus
+    FailoverRequest FailoverRequest_l3@===> generateForwardDISET
+    FailoverRequest FailoverRequest_l4@===> commit
 
-    class FailoverTransferC_l1,FailoverTransferC_l2,FailoverTransferC_l3,FailoverTransferC_l4 FileReportLink
+    class FailoverRequest_l1,FailoverRequest_l2,FailoverRequest_l3,FailoverRequest_l4 FileReportLink
 
     %% ======================
 
@@ -464,7 +489,8 @@ flowchart LR
     BookkeepingReport BookkeepingReport_l2@===> getFileMetadata
     BookkeepingReport BookkeepingReport_l3@===> getValueGconf
 
-    class BookkeepingReport_l1,BookkeepingReport_l2 JobReportLink
+    class BookkeepingReport_l1 JobReportLink
+    class BookkeepingReport_l2 BookkeepingClientLink
     class BookkeepingReport_l3 ConfigurationSystemLink
 
     %% ======================
@@ -479,7 +505,12 @@ flowchart LR
 
     %% ======================
 
-    AnaliseFileAccess("AnaliseFileAccess")
+    AnalyseFileAccess("AnalyseFileAccess")
+
+    AnalyseFileAccess AnalyseFileAccess_l1@===> addRegister
+    class AnalyseFileAccess_l1 DataStoreClientLink
+
+    %% ======================
 
     UserJobFinalization("UserJobFinalization")
 
@@ -496,7 +527,22 @@ flowchart LR
     FileUsage("FileUsage")
 
     FileUsage FileUsage_l1@===> getValueGconf
+    FileUsage FileUsage_l2@===> sendDataUsageReport
     class FileUsage_l1 ConfigurationSystemLink
+    class FileUsage_l2 DataUsageClientLink
+
+    %% ======================
+
+    AnalyseXMLSummary("AnalyseXMLSummary")
+
+    AnalyseXMLSummary AnalyseXMLSummary_l1@===> getFileTypes
+    AnalyseXMLSummary AnalyseXMLSummary_l2@===> setApplicationStatus
+    AnalyseXMLSummary AnalyseXMLSummary_l3@===> setFileStatus
+
+    class AnalyseXMLSummary_l1 BookkeepingClientLink
+    class AnalyseXMLSummary_l2 JobReportLink
+    class AnalyseXMLSummary_l3 FileReportLink
+
 ```
 
 ## Command's inputs & outputs
@@ -507,13 +553,14 @@ Some commands have been removed, such as `UploadMC` or `ErrorLogging`, so they w
 | --- | --- | --- | --- |
 | CreateDataFile | Inputs | data.py | poolXMLCatName |
 | UploadLogFile | Outputs | N/A | JobID ProductionID Namespace ConfigVersion |
-| UploadOutputData | Outputs Inputs XMLSummary.xml | N/A | OutputDataStep OutputList OutputMode ProductionOutputData SiteName |
+| UploadOutputData | Outputs Inputs XMLSummary.xml bookkeeping.xml | N/A | OutputDataStep OutputList OutputMode ProductionOutputData SiteName |
 | RemoveInputData | Inputs | N/A | N/A |
-| FailoverTransfer | Inputs | request.json | N/A |
+| FailoverRequest | Inputs | request.json | N/A |
 | BookkeepingReport | Outputs | bookkeeping.xml | StepID ApplicationName ApplicationVersion StartTime ProductionId StepNumber SiteName JobType |
 | WorkflowAccounting | N/A | N/A | RunNumber ProdID EventType SiteName ProcessingStep CpuTime NormCpuTime InputsStats OutputStats InputEvents OutputEvents EventTime NProcs JobGroup FinalState |
 | AnalyseFileAccess | XMLSummary.xml pool_xml_catalog.xml | N/A | N/A |
-| UserJobFinalization | UserOutputData | bookkeeping.xml | JobId UserOutputSE SiteName UserOutputPath ReplicateUserOutData UserOutputLFNPrep |
+| UserJobFinalization | UserOutputData | request.json | JobId UserOutputSE SiteName UserOutputPath ReplicateUserOutData UserOutputLFNPrep |
+| AnalyzeXmlSummary | XMLSummary.xml | N/A | ProdId ApplicationName |
 
 **Legend:**
 
@@ -545,7 +592,7 @@ Report file usage to a DataFileUsage service.
 
 Registers every output generated to the corresponding SE and to the Master Catalog or to the FailoverSE in case of failure.
 
-### FailoverTransfer
+### FailoverRequest
 
 Commits the status of the files in the file report. The status will be "Processed" if everything ended properly or "Unused" if it did not.
 
