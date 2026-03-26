@@ -258,19 +258,27 @@ flowchart LR
     %% DataManager
     %% ======================
 
-    getDestinationSEList{{**getDestinationSEList**}}
+    DataManager[DataManager]
+
+    %% Functions
+
+    getDestinationSEList{{getDestinationSEList}}
     getDestinationSEList getDestinationSEList_l@===> DataManager
-    getFileDescendants{{"**getFileDescendants (lhcb)**"}}
+
+    getFileDescendants{{"getFileDescendants (lhcb)"}}
     getFileDescendants getFileDescendants_l@===> DataManager
-    removeFile{{**removeFile**}}
+
+    removeFile{{removeFile}}
     removeFile removeFile_l@===> DataManager
-    getSiteSEMapping{{**getSiteSEMapping**}}
+
+    getSiteSEMapping{{getSiteSEMapping}}
     getSiteSEMapping getSiteSEMapping_l@===> DataManager
 
-    DataManager[**DataManager**]
+    %% Styling
 
-    classDef DataManagerLink stroke:#A31E00
-    classDef DataManagerNode fill:#FF542E,stroke:#A31E00,stroke-width:4px ;
+    classDef DataManagerLink stroke:#C00707
+    classDef DataManagerNode fill:#FF4400,stroke:#C00707,stroke-width:4px,color:black,font-weight:bold ;
+
     class DataManager,getDestinationSEList,getFileDescendants,removeFile,getSiteSEMapping DataManagerNode
     class getDestinationSEList_l,getFileDescendants_l,removeFile_l,getSiteSEMapping_l DataManagerLink
 
@@ -278,12 +286,18 @@ flowchart LR
     %% OpsHelper
     %% ======================
 
-    getValue{{**getValue**}}
+    OpsHelper[OpsHelper]
+
+    %% Functions
+
+    getValue{{getValue}}
     getValue getValue_opsHelper_l@===> OpsHelper
-    OpsHelper[**OpsHelper**]
+
+    %% Styling
 
     classDef OpsHelperLink stroke:#A35F00
-    classDef OpsHelperNode fill:#FFA82E,stroke:#A35F00,stroke-width:4px ;
+    classDef OpsHelperNode fill:#FFA82E,stroke:#A35F00,stroke-width:4px,color:black,font-weight:bold ;
+
     class getValue,OpsHelper OpsHelperNode
     class getValue_opsHelper_l OpsHelperLink
 
@@ -291,14 +305,21 @@ flowchart LR
     %% StorageElement
     %% ======================
 
-    getUrl{{**getUrl**}}
-    getUrl getUrl_l@===> StorageElement
-    putFile{{**putFile**}}
-    putFile putFile_l@===> StorageElement
-    StorageElement[**StorageElement**]
+    StorageElement[StorageElement]
 
-    classDef StorageElementLink stroke:#E6C300 ;
-    classDef StorageElementNode fill:#FFFC2E,stroke:#E6C300,stroke-width:4px ;
+    %% Functions
+
+    getUrl{{getUrl}}
+    getUrl getUrl_l@===> StorageElement
+
+    putFile{{putFile}}
+    putFile putFile_l@===> StorageElement
+
+    %% Styling
+
+    classDef StorageElementLink stroke:#FFA240 ;
+    classDef StorageElementNode fill:#FFD41D,stroke:#FFA240,stroke-width:4px,color:black,font-weight:bold ;
+
     class getUrl,putFile,StorageElement StorageElementNode
     class getUrl_l,putFile_l StorageElementLink
 
@@ -306,12 +327,18 @@ flowchart LR
     %% DataStoreClient
     %% ======================
 
-    addRegister{{**addRegister**}}
-    addRegister addRegister_l@===> DataStoreClient
-    DataStoreClient[**DataStoreClient**]
+    DataStoreClient[DataStoreClient]
 
-    classDef DataStoreClientLink stroke:#75A300 ;
-    classDef DataStoreClientNode fill:#C4FF2E,stroke:#75A300,stroke-width:4px ;
+    %% Functions
+
+    addRegister{{addRegister}}
+    addRegister addRegister_l@===> DataStoreClient
+
+    %% Styling
+
+    classDef DataStoreClientLink stroke:#BBC863 ;
+    classDef DataStoreClientNode fill:#F0E491,stroke:#BBC863,stroke-width:4px,color:black,font-weight:bold ;
+
     class addRegister,DataStoreClient DataStoreClientNode
     class addRegister_l DataStoreClientLink
 
@@ -319,14 +346,21 @@ flowchart LR
     %% FailoverTransfer
     %% ======================
 
-    transferAndRegisterFile{{**transferAndRegisterFile**}}
-    transferAndRegisterFile transferAndRegisterFile_l@===> FailoverTransfer
-    setFileReplicationRequest{{**_setFileReplicationRequest**}}
-    setFileReplicationRequest setFileReplicationRequest_l@===> FailoverTransfer
-    FailoverTransfer[**FailoverTransfer**]
+    FailoverTransfer[FailoverTransfer]
 
-    classDef FailoverTransferLink stroke:#3CA300 ;
-    classDef FailoverTransferNode fill:#7BFF2E,stroke:#3CA300,stroke-width:4px ;
+    %% Functions
+
+    transferAndRegisterFile{{transferAndRegisterFile}}
+    transferAndRegisterFile transferAndRegisterFile_l@===> FailoverTransfer
+
+    setFileReplicationRequest{{_setFileReplicationRequest}}
+    setFileReplicationRequest setFileReplicationRequest_l@===> FailoverTransfer
+
+    %% Styling
+
+    classDef FailoverTransferLink stroke:#237227 ;
+    classDef FailoverTransferNode fill:#519A66,stroke:#237227,stroke-width:4px,color:black,font-weight:bold ;
+
     class transferAndRegisterFile,setFileReplicationRequest,FailoverTransfer FailoverTransferNode
     class transferAndRegisterFile_l,setFileReplicationRequest_l FailoverTransferLink
 
@@ -334,14 +368,21 @@ flowchart LR
     %% JobReport
     %% ======================
 
-    setJobParameter{{**setJobParameter**}}
-    setJobParameter setJobParameter_l@===> JobReport
-    setApplicationStatus{{**setApplicationStatus**}}
-    setApplicationStatus setApplicationStatus_l@===> JobReport
-    JobReport[**JobReport**]
+    JobReport[JobReport]
 
-    classDef JobReportLink stroke:#00A354 ;
-    classDef JobReportNode fill:#2EFF9A,stroke:#00A354,stroke-width:4px ;
+    %% Functions
+
+    setJobParameter{{setJobParameter}}
+    setJobParameter setJobParameter_l@===> JobReport
+
+    setApplicationStatus{{setApplicationStatus}}
+    setApplicationStatus setApplicationStatus_l@===> JobReport
+
+    %% Styling
+
+    classDef JobReportLink stroke:#9AB17A ;
+    classDef JobReportNode fill:#C3CC9B,stroke:#9AB17A,stroke-width:4px,color:black,font-weight:bold ;
+
     class setJobParameter,setApplicationStatus,JobReport JobReportNode
     class setJobParameter_l,setApplicationStatus_l JobReportLink
 
@@ -349,16 +390,24 @@ flowchart LR
     %% BookkeepingClient
     %% ======================
 
-    getFileMetadata{{**getFileMetadata**}}
-    getFileMetadata getFileMetadata_l@===> BookkeepingClient
-    sendXMLBookkeepingReport{{**sendXMLBookkeepingReport**}}
-    sendXMLBookkeepingReport sendXMLBookkeepingReport_l@===> BookkeepingClient
-    getFileTypes{{"**getFileTypes (lhcb)**"}}
-    getFileTypes getFileTypes_l@===> BookkeepingClient
-    BookkeepingClient[**BookkeepingClient**]
+    BookkeepingClient[BookkeepingClient]
 
-    classDef BookkeepingClientLink stroke:#00A383 ;
-    classDef BookkeepingClientNode fill:#2EFFD5,stroke:#00A383,stroke-width:4px ;
+    %% Functions
+
+    getFileMetadata{{getFileMetadata}}
+    getFileMetadata getFileMetadata_l@===> BookkeepingClient
+
+    sendXMLBookkeepingReport{{sendXMLBookkeepingReport}}
+    sendXMLBookkeepingReport sendXMLBookkeepingReport_l@===> BookkeepingClient
+
+    getFileTypes{{"getFileTypes (lhcb)"}}
+    getFileTypes getFileTypes_l@===> BookkeepingClient
+
+    %% Styling
+
+    classDef BookkeepingClientLink stroke:#81A6C6 ;
+    classDef BookkeepingClientNode fill:#AACDDC,stroke:#81A6C6,stroke-width:4px,color:black,font-weight:bold ;
+
     class getFileMetadata,sendXMLBookkeepingReport,getFileTypes,BookkeepingClient BookkeepingClientNode
     class getFileMetadata_l,sendXMLBookkeepingReport_l,getFileTypes_l BookkeepingClientLink
 
@@ -366,18 +415,27 @@ flowchart LR
     %% FileReport
     %% ======================
 
-    getFiles{{**getFiles**}}
-    getFiles getFiles_l@===> FileReport
-    setFileStatus{{**setFileStatus**}}
-    setFileStatus setFileStatus_l@===> FileReport
-    commit{{**commit**}}
-    commit commit_l@===> FileReport
-    generateForwardDISET{{**generateForwardDISET**}}
-    generateForwardDISET generateForwardDISET_l@===> FileReport
-    FileReport[**FileReport**]
+    FileReport[FileReport]
 
-    classDef FileReportLink stroke:#006AA3 ;
-    classDef FileReportNode fill:#2EB6FF,stroke:#006AA3,stroke-width:4px ;
+    %% Functions
+
+    getFiles{{getFiles}}
+    getFiles getFiles_l@===> FileReport
+
+    setFileStatus{{setFileStatus}}
+    setFileStatus setFileStatus_l@===> FileReport
+
+    commit{{commit}}
+    commit commit_l@===> FileReport
+
+    generateForwardDISET{{generateForwardDISET}}
+    generateForwardDISET generateForwardDISET_l@===> FileReport
+
+    %% Styling
+
+    classDef FileReportLink stroke:#FE81D4 ;
+    classDef FileReportNode fill:#FAACBF,stroke:#FE81D4,stroke-width:4px,color:black,font-weight:bold ;
+
     class getFiles,setFileStatus,commit,generateForwardDISET,FileReport FileReportNode
     class getFiles_l,setFileStatus_l,commit_l,generateForwardDISET_l FileReportLink
 
@@ -385,12 +443,18 @@ flowchart LR
     %% ConfigurationSystem
     %% ======================
 
-    getValueGconf{{**getValue**}}
-    getValueGconf getValue_Gconf_l@===> ConfigurationSystem
-    ConfigurationSystem[**ConfigurationSystem**]
+    ConfigurationSystem[ConfigurationSystem]
 
-    classDef ConfigurationSystemLink stroke:#0034A3 ;
-    classDef ConfigurationSystemNode fill:#5C8FFF,stroke:#0034A3,stroke-width:4px ;
+    %% Functions
+
+    getValueGconf{{getValue}}
+    getValueGconf getValue_Gconf_l@===> ConfigurationSystem
+
+    %% Styling
+
+    classDef ConfigurationSystemLink stroke:#0B2D72 ;
+    classDef ConfigurationSystemNode fill:#0992C2,stroke:#0B2D72,stroke-width:4px,color:black,font-weight:bold ;
+
     class getValueGconf,ConfigurationSystem ConfigurationSystemNode
     class getValue_Gconf_l ConfigurationSystemLink
 
@@ -398,12 +462,18 @@ flowchart LR
     %% FileCatalog
     %% ======================
 
-    addFile{{**addFile**}}
+    FileCatalog[FileCatalog]
+
+    %% Functions
+
+    addFile{{addFile}}
     addFile addFile_l@===> FileCatalog
-    FileCatalog[**FileCatalog**]
+
+    %% Styling
 
     classDef FileCatalogLink stroke:#4400A3 ;
-    classDef FileCatalogNode fill:#A05CFF,stroke:#4400A3,stroke-width:4px ;
+    classDef FileCatalogNode fill:#A05CFF,stroke:#4400A3,stroke-width:4px,color:black,font-weight:bold ;
+
     class addFile,FileCatalog FileCatalogNode
     class addFile_l FileCatalogLink
 
@@ -411,12 +481,18 @@ flowchart LR
     %% DataUsage
     %% ======================
 
-    sendDataUsageReport{{**sendDataUsageReport**}}
+    DataUsageClient[DataUsageClient]
+
+    %% Functions
+
+    sendDataUsageReport{{sendDataUsageReport}}
     sendDataUsageReport sendDataUsageReport_l@===> DataUsageClient
-    DataUsageClient[**DataUsageClient**]
+
+    %% Styling
 
     classDef DataUsageClientLink stroke:#A98B76 ;
-    classDef DataUsageClientNode fill:#BFA28C,stroke:#A98B76,stroke-width:4px ;
+    classDef DataUsageClientNode fill:#BFA28C,stroke:#A98B76,stroke-width:4px,color:black,font-weight:bold ;
+
     class sendDataUsageReport,DataUsageClient DataUsageClientNode
     class sendDataUsageReport_l DataUsageClientLink
 
@@ -500,6 +576,7 @@ flowchart LR
 
     WorkflowAccounting WorkflowAccounting_l1@===> addRegister
     WorkflowAccounting WorkflowAccounting_l2@===> getValueGconf
+
     class WorkflowAccounting_l1 DataStoreClientLink
     class WorkflowAccounting_l2 ConfigurationSystemLink
 
@@ -508,6 +585,7 @@ flowchart LR
     AnalyseFileAccess("AnalyseFileAccess")
 
     AnalyseFileAccess AnalyseFileAccess_l1@===> addRegister
+
     class AnalyseFileAccess_l1 DataStoreClientLink
 
     %% ======================
@@ -528,6 +606,7 @@ flowchart LR
 
     FileUsage FileUsage_l1@===> getValueGconf
     FileUsage FileUsage_l2@===> sendDataUsageReport
+
     class FileUsage_l1 ConfigurationSystemLink
     class FileUsage_l2 DataUsageClientLink
 
@@ -562,11 +641,11 @@ Some commands have been removed, such as `UploadMC` or `ErrorLogging`, so they w
 | UserJobFinalization | UserOutputData | request.json | JobId UserOutputSE SiteName UserOutputPath ReplicateUserOutData UserOutputLFNPrep |
 | AnalyzeXmlSummary | XMLSummary.xml | N/A | ProdId ApplicationName |
 
-**Legend:**
+Legend:
 
-- **Consumes**: Files that will be processed
-- **Creates**: Files that generates
-- **Requires**: Extra information required from the parameters or DIRAC
+- Consumes: Files that will be processed
+- Creates: Files that generates
+- Requires: Extra information required from the parameters or DIRAC
 
 ### CreateDataFile
 
