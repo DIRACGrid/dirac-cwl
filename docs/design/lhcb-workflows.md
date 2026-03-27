@@ -2,245 +2,296 @@
 
 ## Types of workflows
 
-Currently, the Workflow Modules execute in a predefined order.
+For the new LHCb Workflows approach with CWL, the modules are called "commands" and the order of execution of the commands has to be defined while creating the `JobType`, which can be the same as the current order.
 
-For the new approach with CWL, the modules are called "commands". The order of execution of the commands has to be defined while creating the `JobType`, which can be the same as the current order.
+Every `JobType` has to define certain pre-processing and post-processing steps containing a list of command. That list can be empty and will always execute in the same order.
 
-To select the proper order of the commands, the developer needs to take into account what each one generates and consumes. For LHCb commands, most of them do not need to be on any specific order, except a few such as `UploadOutputData` and `BookkeepingReport`, where the former depends on the latter and `FailoverRequest` and `UserJobFinalization`, which need to execute last, as they commits the operation requests.
+Also a few modules have been removed, as they are no longer needed.
 
 ### USER Job (setExecutable)
 
 ```mermaid
-flowchart LR
-    subgraph Current
-        direction TB
+---
+config:
+    layout: elk
+---
+stateDiagram
+    direction TB
 
-        CreateDataFile0[CreateDataFile]
-        LHCbScript0[LHCbScript]
-        FileUsage0[FileUsage]
-        UserJobFinalization0[UserJobFinalization]
+    state Current {
 
-        CreateDataFile0 --> LHCbScript0
-        LHCbScript0 --> FileUsage0
-        FileUsage0 --> UserJobFinalization0
-    end
+        CreateDataFile_Old: CreateDataFile
+        LHCbScript_Old: LHCbScript
+        FileUsage_Old: FileUsage
+        UserJobFinalization_Old: UserJobFinalization
 
-    subgraph New
-        direction TB
-        subgraph PreProcessing1[PreProcessing]
-            CreateDataFile1[CreateDataFile]
-        end
-        subgraph Processing1[Processing]
-            CommandLineTool1[CommandLineTool]
-        end
-        subgraph PostProcessing1[PostProcessing]
-            direction TB
-            FileUsage1[FileUsage]
-            UserJobFinalization1[UserJobFinalization]
+        [*] --> CreateDataFile_Old
+        CreateDataFile_Old --> LHCbScript_Old
+        LHCbScript_Old --> FileUsage_Old
+        FileUsage_Old --> UserJobFinalization_Old
+        UserJobFinalization_Old --> [*]
+    }
 
-            FileUsage1 --> UserJobFinalization1
-        end
-        PreProcessing1 --> Processing1
-        Processing1 --> PostProcessing1
-    end
+    state New {
+        PreProcessing_New: PreProcessing
+        Processing_New: Processing
+        PostProcessing_New: PostProcessing
 
-    Current ~~~ New
+        state PreProcessing_New {
+            CreateDataFile_New: CreateDataFile
+
+            [*] --> CreateDataFile_New
+        }
+
+        state Processing_New {
+            CommandLineTool_New: CommandLineTool
+
+            [*] --> CommandLineTool_New
+        }
+
+        state PostProcessing_New {
+            FileUsage_New: FileUsage
+            UserJobFinalization_New: UserJobFinalization
+
+            [*] --> FileUsage_New
+            FileUsage_New --> UserJobFinalization_New
+        }
+
+        [*] --> PreProcessing_New
+        PreProcessing_New --> Processing_New
+        Processing_New --> PostProcessing_New
+        PostProcessing_New --> [*]
+    }
 ```
 
 ### USER Job (setApplication)
 
 ```mermaid
-flowchart LR
-    subgraph Current
-        direction TB
+---
+config:
+    layout: elk
+---
+stateDiagram
+    direction TB
 
-        CreateDataFile0[CreateDataFile]
-        GaudiApplication0[GaudiApplication]
-        FileUsage0[FileUsage]
-        AnalyseFileAccess0[AnalyseFileAccess]
-        UserJobFinalization0[UserJobFinalization]
+    state Current {
+        CreateDataFile_Old: CreateDataFile
+        GaudiApplication_Old: GaudiApplication
+        FileUsage_Old: FileUsage
+        AnalyseFileAccess_Old: AnalyseFileAccess
+        UserJobFinalization_Old: UserJobFinalization
 
-        CreateDataFile0 --> GaudiApplication0
-        GaudiApplication0 --> FileUsage0
-        FileUsage0 --> AnalyseFileAccess0
-        AnalyseFileAccess0 --> UserJobFinalization0
-    end
+        [*] --> CreateDataFile_Old
+        CreateDataFile_Old --> GaudiApplication_Old
+        GaudiApplication_Old --> FileUsage_Old
+        FileUsage_Old --> AnalyseFileAccess_Old
+        AnalyseFileAccess_Old --> UserJobFinalization_Old
+        UserJobFinalization_Old --> [*]
+    }
 
-    subgraph New
-        direction TB
-        subgraph PreProcessing1[PreProcessing]
-            CreateDataFile1[CreateDataFile]
-        end
-        subgraph Processing1[Processing]
-        direction TB
-            LbRunApp1[LbRunApp]
-        end
-        subgraph PostProcessing1[PostProcessing]
-            direction TB
-            AnalyseXmlSummary1[AnalyseXmlSummary]
-            FileUsage1[FileUsage]
-            AnalyseFileAccess1[AnalyseFileAccess]
-            UserJobFinalization1[UserJobFinalization]
+    state New {
+        state  PreProcessing {
+            [*] --> CreateDataFile_New
+            CreateDataFile_New: CreateDataFile
+        }
 
-            AnalyseXmlSummary1 ~~~ FileUsage1
-            FileUsage1 ~~~ AnalyseFileAccess1
-            AnalyseFileAccess1 ~~~ UserJobFinalization1
-        end
-        PreProcessing1 --> Processing1
-        Processing1 --> PostProcessing1
-    end
+        state  Processing {
+            [*] --> LbRunApp_New
+            LbRunApp_New: LbRunApp
+        }
 
-    Current ~~~ New
+        state  PostProcessing {
+            FileUsage_New: FileUsage
+            AnalyseFileAccess_New: AnalyseFileAccess
+            UserJobFinalization_New: UserJobFinalization
+
+            [*] --> FileUsage_New
+            FileUsage_New --> AnalyseFileAccess_New
+            AnalyseFileAccess_New --> UserJobFinalization_New
+        }
+
+        [*] --> PreProcessing
+        PreProcessing --> Processing
+        Processing --> PostProcessing
+        PostProcessing --> [*]
+    }
 ```
 
 ### Simulation Job
 
-For this type of job and for the following one (Reconstruction), currently we have some kind of processing and a post-processing step. The main difference with the new approach is that the processing step also contained modules and as this step could be executed multiple times, so did those modules.
+For this type of job and for the following one (Reconstruction), currently we have some kind of processing and a post-processing (Finalization) step. The main difference with the new approach is that the old processing step also contained modules. As this step could be executed multiple times, so did those modules.
 
-Now, as we moved those commands out of the processing step, the commands that used to execute multiple times, now they need to deal with multiple outputs at a time, as they only execute once.
+Now, the corresponding commands got moved out of the processing step, which forces them to deal with multiple outputs at a time, as they only execute once.
 
 ```mermaid
-flowchart LR
+---
+config:
+    layout: elk
+    nodeSpacing: 10
+---
+stateDiagram
     direction TB
 
-    subgraph Current
-        direction TB
+    state Current {
+        Processing_Old: Processing
+        PostProcessing_Old: Finalization
 
+        state Processing_Old {
+            GaudiApplication_Old: GaudiApplication
+            AnalyseXmlSummary_Old: AnalyseXmlSummary
+            ErrorLogging_Old: ErrorLogging
+            BookkeepingReport_Old: BookkeepingReport
+            StepAccounting_Old: StepAccounting
 
-        subgraph Processing0[''Processing'']
-            direction TB
+            [*] --> GaudiApplication_Old
+            GaudiApplication_Old --> AnalyseXmlSummary_Old
+            AnalyseXmlSummary_Old --> ErrorLogging_Old
+            ErrorLogging_Old --> BookkeepingReport_Old
+            BookkeepingReport_Old --> StepAccounting_Old
+        }
 
-            GaudiApplication0[GaudiApplication]
-            AnalyseXmlSummary0[AnalyseXmlSummary]
-            ErrorLogging0[ErrorLogging]
-            BookkeepingReport0[BookkeepingReport]
-            StepAccounting0[StepAccounting]
+        state PostProcessing_Old {
+            UploadOutputData_Old: UploadOutputData
+            UploadLogFile_Old: UploadLogFile
+            UploadMC_Old: UploadMC
+            FailoverRequest_Old: FailoverRequest
 
+            [*] --> UploadOutputData_Old
+            UploadOutputData_Old --> UploadLogFile_Old
+            UploadLogFile_Old --> UploadMC_Old
+            UploadMC_Old --> FailoverRequest_Old
+        }
 
-            GaudiApplication0 --> AnalyseXmlSummary0
-            AnalyseXmlSummary0 --> ErrorLogging0
-            ErrorLogging0 --> BookkeepingReport0
-            BookkeepingReport0 --> StepAccounting0
-        end
+        [*] --> Processing_Old
+        Processing_Old --> Processing_Old
+        Processing_Old --> PostProcessing_Old
+        PostProcessing_Old --> [*]
+    }
 
-        subgraph PostProcessing0[''PostProcessing'']
-            direction TB
+    state New {
+        PreProcessing_New: PreProcessing
+        Processing_New: Processing
+        PostProcessing_New: PostProcessing
 
-            UploadOutputData0[UploadOutputData]
-            UploadLogFile0[UploadLogFile]
-            UploadMC0[UploadMC]
-            FailoverRequest0[FailoverRequest]
+        state PreProcessing_New {
+            [*]
+        }
 
-            UploadOutputData0 --> UploadLogFile0
-            UploadLogFile0 --> UploadMC0
-            UploadMC0 --> FailoverRequest0
-        end
+        state Processing_New {
+            LbRunApp_New: LbRunApp
 
-        Processing0 --> PostProcessing0
+            [*] --> LbRunApp_New
+        }
 
-    end
+        state PostProcessing_New {
+            AnalyseXmlSummary_New: AnalyseXmlSummary
+            UploadLogFile_New: UploadLogFile
+            UploadOutputData_New: UploadOutputData
+            FailoverRequest_New: FailoverRequest
+            BookkeepingReport_New: BookkeepingReport
+            WorkflowAccounting_New: WorkflowAccounting
 
-    subgraph New
-        direction TB
-        subgraph Processing1[Processing]
-            direction TB
-            LbRunApp1[LbRunApp]
-        end
-        subgraph PostProcessing1[PostProcessing]
-        direction TB
-            AnalyseXmlSummary1[AnalyseXmlSummary]
-            UploadLogFile1[UploadLogFile]
-            UploadOutputData1[UploadOutputData]
-            FailoverRequest1[FailoverRequest]
-            BookkeepingReport1[BookkeepingReport]
-            WorkflowAccounting1[WorkflowAccounting]
+            [*] --> AnalyseXmlSummary_New
+            AnalyseXmlSummary_New --> BookkeepingReport_New
+            BookkeepingReport_New --> WorkflowAccounting_New
+            WorkflowAccounting_New --> UploadOutputData_New
+            UploadOutputData_New --> UploadLogFile_New
+            UploadLogFile_New --> FailoverRequest_New
+        }
 
-            AnalyseXmlSummary1 ~~~ UploadLogFile1
-            UploadLogFile1 ~~~ WorkflowAccounting1
-            WorkflowAccounting1 ~~~ BookkeepingReport1
-            BookkeepingReport1 --> UploadOutputData1
-            UploadOutputData1 --> FailoverRequest1
-        end
-
-        Processing1 --> PostProcessing1
-    end
-
-    Current ~~~ New
+        [*] --> PreProcessing_New
+        PreProcessing_New --> Processing_New
+        Processing_New --> PostProcessing_New
+        PostProcessing_New --> [*]
+    }
 ```
 
 ### Reconstruction Job
 
 ```mermaid
-flowchart LR
-    subgraph Current
-        direction TB
+---
+config:
+    layout: elk
+---
+stateDiagram
+    direction TB
 
+    state Current {
+        Processing_Old: Processing
+        PostProcessing_Old: Finalization
 
-        subgraph Processing0[''Processing'']
-            direction TB
+        state Processing_Old {
+            GaudiApplication_Old: GaudiApplication
+            AnalyseXmlSummary_Old: AnalyseXmlSummary
+            ErrorLogging_Old: ErrorLogging
+            BookkeepingReport_Old: BookkeepingReport
+            StepAccounting_Old: StepAccounting
 
-            GaudiApplication0[GaudiApplication]
-            AnalyseXmlSummary0[AnalyseXmlSummary]
-            ErrorLogging0[ErrorLogging]
-            BookkeepingReport0[BookkeepingReport]
-            StepAccounting0[StepAccounting]
+            [*] --> GaudiApplication_Old
+            GaudiApplication_Old --> AnalyseXmlSummary_Old
+            AnalyseXmlSummary_Old --> ErrorLogging_Old
+            ErrorLogging_Old --> BookkeepingReport_Old
+            BookkeepingReport_Old --> StepAccounting_Old
+        }
 
+        state PostProcessing_Old {
+            UploadOutputData_Old: UploadOutputData
+            RemoveInputData_Old: RemoveInputData
+            UploadLogFile_Old: UploadLogFile
+            UploadMC_Old: UploadMC
+            FailoverRequest_Old: FailoverRequest
 
-            GaudiApplication0 --> AnalyseXmlSummary0
-            AnalyseXmlSummary0 --> ErrorLogging0
-            ErrorLogging0 --> BookkeepingReport0
-            BookkeepingReport0 --> StepAccounting0
-        end
+            [*] --> UploadOutputData_Old
+            UploadOutputData_Old --> RemoveInputData_Old
+            RemoveInputData_Old --> UploadLogFile_Old
+            UploadLogFile_Old --> UploadMC_Old
+            UploadMC_Old --> FailoverRequest_Old
+        }
 
-        subgraph PostProcessing0[''PostProcessing'']
-            direction TB
+        [*] --> Processing_Old
+        Processing_Old --> PostProcessing_Old
+        Processing_Old --> Processing_Old
+        PostProcessing_Old --> [*]
+    }
 
-            UploadOutputData0[UploadOutputData]
-            RemoveInputData0[RemoveInputData]
-            UploadLogFile0[UploadLogFile]
-            UploadMC0[UploadMC]
-            FailoverRequest0[FailoverRequest]
+    state New {
+        PreProcessing_New: PreProcessing
+        Processing_New: Processing
+        PostProcessing_New: PostProcessing
 
-            UploadOutputData0 --> RemoveInputData0
-            RemoveInputData0 --> UploadLogFile0
-            UploadLogFile0 --> UploadMC0
-            UploadMC0 --> FailoverRequest0
-        end
+        state PreProcessing_New {
+            [*]
+        }
 
-        Processing0 --> PostProcessing0
+        state Processing_New {
+            LbRunApp_New: LbRunApp
 
-    end
+            [*] --> LbRunApp_New
+        }
 
-    subgraph New
-        direction TB
-        subgraph Processing1[Processing]
-            direction TB
-            LbRunApp1[LbRunApp]
+        state PostProcessing_New {
+            AnalyseXmlSummary_New: AnalyseXmlSummary
+            UploadLogFile_New: UploadLogFile
+            UploadOutputData_New: UploadOutputData
+            FailoverRequest_New: FailoverRequest
+            BookkeepingReport_New: BookkeepingReport
+            WorkflowAccounting_New: WorkflowAccounting
+            RemoveInputData_New: RemoveInputData
 
-        end
-        subgraph PostProcessing1[PostProcessing]
-            direction TB
-            AnalyseXmlSummary1[AnalyseXmlSummary]
-            UploadLogFile1[UploadLogFile]
-            UploadOutputData1[UploadOutputData]
-            FailoverRequest1[FailoverRequest]
-            BookkeepingReport1[BookkeepingReport]
-            WorkflowAccounting1[WorkflowAccounting]
-            RemoveInputData1[RemoveInputData]
+            [*] --> AnalyseXmlSummary_New
+            AnalyseXmlSummary_New --> BookkeepingReport_New
+            BookkeepingReport_New --> WorkflowAccounting_New
+            WorkflowAccounting_New --> UploadOutputData_New
+            UploadOutputData_New --> RemoveInputData_New
+            RemoveInputData_New --> UploadLogFile_New
+            UploadLogFile_New --> FailoverRequest_New
+        }
 
-
-            AnalyseXmlSummary1 ~~~ UploadLogFile1
-            UploadLogFile1 ~~~ RemoveInputData1
-            RemoveInputData1 ~~~ WorkflowAccounting1
-            WorkflowAccounting1 ~~~ BookkeepingReport1
-            BookkeepingReport1 --> UploadOutputData1
-            UploadOutputData1 --> FailoverRequest1
-
-        end
-        Processing1 --> PostProcessing1
-    end
-
-    Current ~~~ New
+        [*] --> PreProcessing_New
+        PreProcessing_New --> Processing_New
+        Processing_New --> PostProcessing_New
+        PostProcessing_New --> [*]
+    }
 ```
 
 ## Relations between commands and DIRAC Components
