@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from typing import Any, Optional
 
-from cwl_utils.parser import WorkflowStep, save
+from cwl_utils.parser import save
 from cwl_utils.parser.cwl_v1_2 import (
     CommandLineTool,
     ExpressionTool,
@@ -186,65 +186,38 @@ class ProductionSubmissionModel(BaseModel):
 # Temporary code, waiting on cwltool PR: https://github.com/common-workflow-language/cwltool/pull/2179.
 
 
-def validate_resource_requirements(task):
+def validate_resource_requirements(task: CommandLineTool | Workflow | ExpressionTool):
+    """Validate ResourceRequirements of a task recursively.
+
+    :param task: The task to validate.
+    :raises ValueError: If any ResourceRequirement has min > max.
     """
-    Validate ResourceRequirements of a task (CommandLineTool, Workflow, WorkflowStep, WorkflowStep.run).
+    # Validate task-level requirements
+    for req in getattr(task, "requirements", None) or []:
+        if isinstance(req, ResourceRequirement):
+            _validate_min_max(req)
 
-    :param task: The task to validate
-    """
-    cwl_req = _get_resource_requirement(task)
-
-    # Validate Workflow/CLT requirements.
-    if cwl_req:
-        _validate_resource_requirement(cwl_req)
-
-    # Validate WorkflowStep requirements.
-    if not isinstance(task, CommandLineTool) and task.steps:
-        for step in task.steps:
-            step_req = _get_resource_requirement(step)
-            if step_req:
-                _validate_resource_requirement(step_req)
-
-            # Validate run requirements for each step if they exist.
+    # Recurse into workflow steps
+    if isinstance(task, Workflow):
+        for step in task.steps or []:
+            for req in getattr(step, "requirements", None) or []:
+                if isinstance(req, ResourceRequirement):
+                    _validate_min_max(req)
             if step.run:
-                if isinstance(step.run, Workflow):
-                    # Validate nested Workflow requirements, if any.
-                    validate_resource_requirements(task=step.run)
-
-                step_run_req = _get_resource_requirement(step.run)
-                if step_run_req:
-                    _validate_resource_requirement(step_run_req)
+                validate_resource_requirements(step.run)
 
 
-def _validate_resource_requirement(requirement):
-    """Validate a ResourceRequirement.
+def _validate_min_max(req: ResourceRequirement):
+    """Check that min does not exceed max for any resource.
 
-    Verify that resourceMin is not higher than resourceMax (CommandLineTool, Workflow, WorkflowStep, WorkflowStep.run)
-
-    :param requirement: The current ResourceRequirement to validate.
-    :raises ValueError: If the requirement is invalid.
+    :param req: The ResourceRequirement to validate.
+    :raises ValueError: If min > max for any resource.
     """
-    for resource, min_value, max_value in [
-        ("ram", requirement.ramMin, requirement.ramMax),
-        ("cores", requirement.coresMin, requirement.coresMax),
-        ("tmpdir", requirement.tmpdirMin, requirement.tmpdirMax),
-        ("outdir", requirement.outdirMin, requirement.outdirMax),
+    for name, lo, hi in [
+        ("cores", req.coresMin, req.coresMax),
+        ("ram", req.ramMin, req.ramMax),
+        ("tmpdir", req.tmpdirMin, req.tmpdirMax),
+        ("outdir", req.outdirMin, req.outdirMax),
     ]:
-        if min_value and max_value and min_value > max_value:
-            raise ValueError(f"{resource}Min is higher than {resource}Max")
-
-
-def _get_resource_requirement(
-    cwl_object: Workflow | CommandLineTool | WorkflowStep,
-) -> ResourceRequirement | None:
-    """
-    Extract the resource requirement from the current cwl_object.
-
-    :param cwl_object: The cwl_object to extract the requirement from.
-    :return: The resource requirement object, or None if not found.
-    """
-    requirements = getattr(cwl_object, "requirements", []) or []
-    for requirement in requirements:
-        if isinstance(requirement, ResourceRequirement):
-            return requirement
-    return None
+        if lo and hi and lo > hi:
+            raise ValueError(f"{name}Min ({lo}) exceeds {name}Max ({hi})")
