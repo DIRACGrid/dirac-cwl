@@ -3,7 +3,7 @@
 from typing import List, Optional
 
 import pytest
-from cwl_utils.parser.cwl_v1_2 import CommandLineTool, ResourceRequirement, Workflow, WorkflowStep
+from cwl_utils.parser.cwl_v1_2 import CommandLineTool, ExpressionTool, ResourceRequirement, Workflow, WorkflowStep
 
 from dirac_cwl.submission_models import JobSubmissionModel, ProductionSubmissionModel, TransformationSubmissionModel
 
@@ -55,6 +55,20 @@ def create_step(
     )
 
 
+def create_expressiontool(
+    requirements: Optional[list] = None,
+    inputs: Optional[list] = None,
+    outputs: Optional[list] = None,
+) -> CommandLineTool:
+    """Create an ExpressionTool with the given requirements, inputs, and outputs."""
+    return ExpressionTool(
+        expression="",
+        requirements=requirements or [],
+        inputs=inputs or [],
+        outputs=outputs or [],
+    )
+
+
 def assert_submission_fails(task):
     """Assert that submission fails with ValueError for Job and Transformation models with bad resource requirements.
 
@@ -86,14 +100,27 @@ def test_bad_min_max_resource_reqs(bad_min_max_reqs):
     clt = create_commandlinetool(requirements=[bad_min_max_reqs])
     assert_submission_fails(clt)
 
+    # ExpressionTool with bad minmax reqs
+    expression_tool = create_expressiontool(requirements=[bad_min_max_reqs])
+    assert_submission_fails(expression_tool)
+
     # WorkflowStep.run with bad minmax reqs
     step_bad_run = create_step(run=clt)
+    workflow = create_workflow(steps=[step_bad_run])
+    assert_submission_fails(workflow)
+
+    step_bad_run = create_step(run=expression_tool)
     workflow = create_workflow(steps=[step_bad_run])
     assert_submission_fails(workflow)
 
     # WorkflowStep with bad minmax reqs
     clt = create_commandlinetool()
     step = create_step(run=clt, requirements=[bad_min_max_reqs])
+    workflow = create_workflow(steps=[step])
+    assert_submission_fails(workflow)
+
+    expression_tool = create_commandlinetool()
+    step = create_step(run=expression_tool, requirements=[bad_min_max_reqs])
     workflow = create_workflow(steps=[step])
     assert_submission_fails(workflow)
 

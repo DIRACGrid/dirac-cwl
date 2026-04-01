@@ -186,20 +186,20 @@ class ProductionSubmissionModel(BaseModel):
 # Temporary code, waiting on cwltool PR: https://github.com/common-workflow-language/cwltool/pull/2179.
 
 
-def validate_resource_requirements(task):
+def validate_resource_requirements(task: CommandLineTool | Workflow | ExpressionTool):
     """
-    Validate ResourceRequirements of a task (CommandLineTool, Workflow, WorkflowStep, WorkflowStep.run).
+    Validate ResourceRequirements of a task (CommandLineTool, ExpressionTool, Workflow, WorkflowStep).
 
     :param task: The task to validate
     """
-    cwl_req = _get_resource_requirement(task)
+    req = _get_resource_requirement(task)
 
-    # Validate Workflow/CLT requirements.
-    if cwl_req:
-        _validate_resource_requirement(cwl_req)
+    # Validate Workflow/CommandLineTool/ExpressionTool requirements.
+    if req:
+        _validate_resource_requirement(req)
 
     # Validate WorkflowStep requirements.
-    if not isinstance(task, CommandLineTool) and task.steps:
+    if isinstance(task, Workflow) and task.steps:
         for step in task.steps:
             step_req = _get_resource_requirement(step)
             if step_req:
@@ -207,19 +207,13 @@ def validate_resource_requirements(task):
 
             # Validate run requirements for each step if they exist.
             if step.run:
-                if isinstance(step.run, Workflow):
-                    # Validate nested Workflow requirements, if any.
-                    validate_resource_requirements(task=step.run)
-
-                step_run_req = _get_resource_requirement(step.run)
-                if step_run_req:
-                    _validate_resource_requirement(step_run_req)
+                validate_resource_requirements(task=step.run)
 
 
 def _validate_resource_requirement(requirement):
     """Validate a ResourceRequirement.
 
-    Verify that resourceMin is not higher than resourceMax (CommandLineTool, Workflow, WorkflowStep, WorkflowStep.run)
+    Verify that resourceMin is not higher than resourceMax (CommandLineTool, ExpressionTool, Workflow, WorkflowStep)
 
     :param requirement: The current ResourceRequirement to validate.
     :raises ValueError: If the requirement is invalid.
@@ -235,7 +229,7 @@ def _validate_resource_requirement(requirement):
 
 
 def _get_resource_requirement(
-    cwl_object: Workflow | CommandLineTool | WorkflowStep,
+    cwl_object: Workflow | CommandLineTool | ExpressionTool | WorkflowStep,
 ) -> ResourceRequirement | None:
     """
     Extract the resource requirement from the current cwl_object.
