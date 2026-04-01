@@ -9,10 +9,11 @@ from __future__ import annotations
 
 from typing import Any, Optional
 
-from cwl_utils.parser import save
+from cwl_utils.parser import WorkflowStep, save
 from cwl_utils.parser.cwl_v1_2 import (
     CommandLineTool,
     ExpressionTool,
+    ResourceRequirement,
     Workflow,
 )
 from pydantic import BaseModel, ConfigDict, field_serializer, model_validator
@@ -55,6 +56,23 @@ class BaseJobModel(BaseModel):
 
     task: CommandLineTool | Workflow | ExpressionTool
 
+    @model_validator(mode="before")
+    def validate_job(cls, values):
+        """Validate job workflow.
+
+        :param values: Model values dictionary.
+        :return: Validated values dictionary.
+        """
+        task = values.get("task")
+
+        # ResourceRequirement validation
+        validate_resource_requirements(task)
+
+        # Hints validation
+        ExecutionHooksHint.from_cwl(task), SchedulingHint.from_cwl(task)
+
+        return values
+
     @field_serializer("task")
     def serialize_task(self, value):
         """Serialize CWL task object to dictionary.
@@ -67,17 +85,6 @@ class BaseJobModel(BaseModel):
             return save(value)
         else:
             raise TypeError(f"Cannot serialize type {type(value)}")
-
-    @model_validator(mode="before")
-    def validate_hints(cls, values):
-        """Validate execution hooks and scheduling hints in the task.
-
-        :param values: Model values dictionary.
-        :return: Validated values dictionary.
-        """
-        task = values.get("task")
-        ExecutionHooksHint.from_cwl(task), SchedulingHint.from_cwl(task)
-        return values
 
 
 class JobSubmissionModel(BaseJobModel):
@@ -119,14 +126,20 @@ class TransformationSubmissionModel(BaseModel):
             raise TypeError(f"Cannot serialize type {type(value)}")
 
     @model_validator(mode="before")
-    def validate_hints(cls, values):
-        """Validate transformation execution hooks and scheduling hints in the task.
+    def validate_transformation(cls, values):
+        """Validate transformation workflow.
 
         :param values: Model values dictionary.
         :return: Validated values dictionary.
         """
         task = values.get("task")
+
+        # ResourceRequirement validation
+        validate_resource_requirements(task)
+
+        # Hints validation
         TransformationExecutionHooksHint.from_cwl(task), SchedulingHint.from_cwl(task)
+
         return values
 
 
@@ -155,3 +168,77 @@ class ProductionSubmissionModel(BaseModel):
             return save(value)
         else:
             raise TypeError(f"Cannot serialize type {type(value)}")
+
+    @model_validator(mode="before")
+    def validate_production(cls, values):
+        """Validate production workflow."""
+        task = values.get("task")
+
+        # ResourceRequirement validation
+        validate_resource_requirements(task)
+
+        return values
+
+
+# -----------------------------------------------------------------------------
+# ResourceRequirement validations
+# -----------------------------------------------------------------------------
+# Temporary code, waiting on cwltool PR: https://github.com/common-workflow-language/cwltool/pull/2179.
+
+
+def validate_resource_requirements(task: CommandLineTool | Workflow | ExpressionTool):
+    """
+    Validate ResourceRequirements of a task (CommandLineTool, ExpressionTool, Workflow, WorkflowStep).
+
+    :param task: The task to validate
+    """
+    req = _get_resource_requirement(task)
+
+    # Validate Workflow/CommandLineTool/ExpressionTool requirements.
+    if req:
+        _validate_resource_requirement(req)
+
+    # Validate WorkflowStep requirements.
+    if isinstance(task, Workflow) and task.steps:
+        for step in task.steps:
+            step_req = _get_resource_requirement(step)
+            if step_req:
+                _validate_resource_requirement(step_req)
+
+            # Validate run requirements for each step if they exist.
+            if step.run:
+                validate_resource_requirements(task=step.run)
+
+
+def _validate_resource_requirement(requirement):
+    """Validate a ResourceRequirement.
+
+    Verify that resourceMin is not higher than resourceMax (CommandLineTool, ExpressionTool, Workflow, WorkflowStep)
+
+    :param requirement: The current ResourceRequirement to validate.
+    :raises ValueError: If the requirement is invalid.
+    """
+    for resource, min_value, max_value in [
+        ("ram", requirement.ramMin, requirement.ramMax),
+        ("cores", requirement.coresMin, requirement.coresMax),
+        ("tmpdir", requirement.tmpdirMin, requirement.tmpdirMax),
+        ("outdir", requirement.outdirMin, requirement.outdirMax),
+    ]:
+        if min_value and max_value and min_value > max_value:
+            raise ValueError(f"{resource}Min is higher than {resource}Max")
+
+
+def _get_resource_requirement(
+    cwl_object: Workflow | CommandLineTool | ExpressionTool | WorkflowStep,
+) -> ResourceRequirement | None:
+    """
+    Extract the resource requirement from the current cwl_object.
+
+    :param cwl_object: The cwl_object to extract the requirement from.
+    :return: The resource requirement object, or None if not found.
+    """
+    requirements = getattr(cwl_object, "requirements", []) or []
+    for requirement in requirements:
+        if isinstance(requirement, ResourceRequirement):
+            return requirement
+    return None
