@@ -5,6 +5,8 @@ This module tests the functionalities of the job wrapper.
 """
 
 import os
+from random import randint
+from shutil import rmtree
 
 import pytest
 
@@ -12,32 +14,36 @@ os.environ["DIRAC_PROTO_LOCAL"] = "1"
 
 from dirac_cwl.core.exceptions import WorkflowProcessingException
 from dirac_cwl.execution_hooks.core import ExecutionHooksBasePlugin
+from dirac_cwl.job.job_report import JobMinorStatus, JobStatus
 from dirac_cwl.job.job_wrapper import JobWrapper
+from dirac_cwl.mocks.status import STATUS_DIR
 
 
 class TestJobWrapper:
     """Test the JobWrapper class."""
 
-    def test_instantiation(self, sample_job):
+    @pytest.mark.asyncio
+    async def test_instantiation(self, sample_job):
         """Test that ExecutionHooksBasePlugin can be instantiated directly with default behavior."""
         hook = ExecutionHooksBasePlugin()
-        job_wrapper = JobWrapper()
-        job_wrapper.execution_hooks_plugin = hook
+        job_wrapper = JobWrapper(job_id=0)
+        job_wrapper._execution_hooks_plugin = hook
 
         # Test default pre_process behavior
         command = ["cwltool", "--parallel", "task.cwl"]
-        result = job_wrapper.pre_process(sample_job.task, None)
+        result = await job_wrapper.pre_process(sample_job.task, None)
         assert result == command  # Should return command unchanged
 
         # Test default post_process behavior
-        result = job_wrapper.post_process(0, "{}", "{}")  # Should not raise any exception
+        result = await job_wrapper.post_process(0, "{}", "{}")  # Should not raise any exception
         assert result
 
         # Test default run_job behavior
-        result = job_wrapper.run_job(sample_job)
+        result = await job_wrapper.run_job(sample_job)
         assert result
 
-    def test_execute(self, job_type_testing, sample_job, mocker, monkeypatch):
+    @pytest.mark.asyncio
+    async def test_execute(self, job_type_testing, sample_job, mocker, monkeypatch):
         """Test the execution of the preprocess and postprocess commands.
 
         The fixture "job_type_testing" is the class "JobTypeTestingPlugin".
@@ -59,8 +65,8 @@ class TestJobWrapper:
                 return
 
         plugin = job_type_testing()
-        job_wrapper = JobWrapper()
-        job_wrapper.execution_hooks_plugin = plugin
+        job_wrapper = JobWrapper(job_id=0)
+        job_wrapper._execution_hooks_plugin = plugin
 
         # Mock the "execute" commands to be able to spy them
         execute_preprocess_mock = mocker.MagicMock()
@@ -76,13 +82,13 @@ class TestJobWrapper:
         plugin.preprocess_commands = [PreProcessCmd, DualProcessCmd]
         plugin.postprocess_commands = [PostProcessCmd, DualProcessCmd]
 
-        job_wrapper.pre_process(sample_job.task, None)
+        await job_wrapper.pre_process(sample_job.task, None)
         execute_preprocess_mock.assert_called_once()
         execute_dualprocess_mock.assert_called_once()
 
         execute_dualprocess_mock.reset_mock()  # Reset the mock to be able to call "assert_called_once"
 
-        job_wrapper.post_process(0, "{}", "{}")
+        await job_wrapper.post_process(0, "{}", "{}")
         execute_postprocess_mock.assert_called_once()
         execute_dualprocess_mock.assert_called_once()
 
@@ -92,12 +98,13 @@ class TestJobWrapper:
         plugin.postprocess_commands = [PreProcessCmd, DualProcessCmd]
 
         with pytest.raises(TypeError):
-            job_wrapper.pre_process(sample_job.task, None)
+            await job_wrapper.pre_process(sample_job.task, None)
 
         with pytest.raises(TypeError):
-            job_wrapper.post_process(0, "{}", "{}")
+            await job_wrapper.post_process(0, "{}", "{}")
 
-    def test_command_exception(self, job_type_testing, sample_job, mocker, monkeypatch):
+    @pytest.mark.asyncio
+    async def test_command_exception(self, job_type_testing, sample_job, mocker, monkeypatch):
         """Test exception report when a command fails.
 
         The fixture "job_type_testing" is the class "JobTypeTestingPlugin".
@@ -111,15 +118,53 @@ class TestJobWrapper:
                 raise NotImplementedError()
 
         plugin = job_type_testing()
-        job_wrapper = JobWrapper()
-        job_wrapper.execution_hooks_plugin = plugin
+        job_wrapper = JobWrapper(job_id=0)
+        job_wrapper._execution_hooks_plugin = plugin
 
         plugin.preprocess_commands = [Command]
         plugin.postprocess_commands = [Command]
 
         # The processing steps should raise a "WorkflowProcessingException"
         with pytest.raises(WorkflowProcessingException):
-            job_wrapper.pre_process(sample_job.task, None)
+            await job_wrapper.pre_process(sample_job.task, None)
 
         with pytest.raises(WorkflowProcessingException):
-            job_wrapper.post_process(0, "{}", "{}")
+            await job_wrapper.post_process(0, "{}", "{}")
+
+    @pytest.mark.asyncio
+    async def test_job_status(self):
+        """Test the job status methods of the job report work as intended."""
+        job_id = randint(0, 9999)
+        job_wrapper = JobWrapper(job_id)
+        file_path = STATUS_DIR / f"status_{job_id}"
+        assert len(job_wrapper._job_report.job_status_info) == 1  # One status expected for initialization
+        assert not file_path.exists()
+
+        job_wrapper._job_report.set_job_status(status=JobStatus.RUNNING, minor_status=JobMinorStatus.APPLICATION)
+        assert len(job_wrapper._job_report.job_status_info) == 2
+        assert not file_path.exists()
+
+        job_wrapper._job_report.set_job_status(application_status="Test")
+        assert len(job_wrapper._job_report.job_status_info) == 3
+        assert not file_path.exists()
+
+        await job_wrapper._job_report.commit()
+        assert file_path.exists()
+        with open(file_path) as f:
+            content = f.read()
+            assert JobStatus.RUNNING in content
+            assert JobMinorStatus.APPLICATION in content
+            assert "Test" in content
+        rmtree(STATUS_DIR)
+
+    @pytest.mark.asyncio
+    async def test_run_job_reports(self, sample_job):
+        """Test job statuses are reported in the job wrapper."""
+        job_id = randint(0, 9999)
+        job_wrapper = JobWrapper(job_id)
+        success = await job_wrapper.run_job(sample_job)
+        assert success
+        # Status info only stays accumulated for local testing, status info is emptied when committing to diracx
+        assert len(job_wrapper._job_report.job_status_info) > 0
+        assert (STATUS_DIR / f"status_{job_id}").exists()
+        rmtree(STATUS_DIR)
