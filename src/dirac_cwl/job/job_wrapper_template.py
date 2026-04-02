@@ -33,27 +33,22 @@ async def main():
 
     job_id = int(sys.argv[2])
 
-    # Read the job config (contains WorkflowID)
-    job_json_file = sys.argv[1]
-    with open(job_json_file, "r") as file:
-        job_config = json.load(file)
-
-    workflow_id = job_config.get("WorkflowID")
-    if not workflow_id:
-        logging.error("Missing WorkflowID in job config")
-        sys.exit(1)
-
-    # Fetch CWL workflow and job params from diracX API
+    # Fetch workflow_id, CWL, and params from diracX API using the job_id
     from diracx.client.aio import AsyncDiracClient
 
     async with AsyncDiracClient() as client:
+        # Get workflow_id and params from job attributes
+        job_attrs = await client.jobs.get_single_job(job_id)
+        workflow_id = getattr(job_attrs, "workflow_id", None)
+        workflow_params = getattr(job_attrs, "workflow_params", None)
+
+        if not workflow_id:
+            logging.error("Job %d has no workflow_id", job_id)
+            sys.exit(1)
+
         # Fetch CWL definition
         workflow_response = await client.jobs.get_workflow(workflow_id)
         cwl_yaml = workflow_response["cwl"]
-
-        # Fetch workflow_params from job attributes
-        job_attrs = await client.jobs.get_single_job(job_id)
-        workflow_params = getattr(job_attrs, "workflow_params", None)
 
     # Parse CWL
     yaml_doc = YAML()
