@@ -7,10 +7,12 @@ doc: >
   a unit circle inscribed in the square.
 
 $namespaces:
-  dirac: "../../schemas/dirac-metadata.json#/$defs/"
+  dirac: "https://diracgrid.org/cwl#"
 
-$schemas:
-  - "../../schemas/dirac-metadata.json"
+hints:
+  - class: dirac:Job
+    schema_version: "1.0"
+    type: User
 
 # Define the inputs of the workflow
 inputs:

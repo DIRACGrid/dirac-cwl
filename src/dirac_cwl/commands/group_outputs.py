@@ -9,7 +9,7 @@ from dirac_cwl.commands import PostProcessCommand
 class GroupOutputs(PostProcessCommand):
     """Example command that merges all of the outputs in a singular file."""
 
-    def execute(self, job_path, **kwargs):
+    async def execute(self, job_path, **kwargs):
         """Execute the output file grouping.
 
         :param job_path: Path to the job working directory.

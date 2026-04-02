@@ -13,7 +13,7 @@ class CommandBase(ABC):
     """
 
     @abstractmethod
-    def execute(self, job_path: Path, **kwargs) -> None:
+    async def execute(self, job_path: Path, **kwargs) -> None:
         """Execute the command in the given job path.
 
         :param job_path: Path to the job working directory.

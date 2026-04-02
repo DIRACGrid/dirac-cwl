@@ -59,3 +59,11 @@ steps:
       input_string: input_string
     out: [output]
     run: ./rot13.cwl
+
+hints:
+  - class: dirac:Job
+    schema_version: "1.0"
+    type: User
+
+$namespaces:
+  dirac: "https://diracgrid.org/cwl#"

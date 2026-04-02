@@ -21,3 +21,11 @@ steps:
       input: input
     out: [output]
     run: ./reference_circular2.cwl
+
+hints:
+  - class: dirac:Job
+    schema_version: "1.0"
+    type: User
+
+$namespaces:
+  dirac: "https://diracgrid.org/cwl#"

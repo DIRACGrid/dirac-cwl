@@ -15,12 +15,9 @@ baseCommand: ["touch", "file1"]
 
 
 $namespaces:
-  dirac: "../../schemas/dirac-metadata.json#/$defs/" # Generated schema from Pydantic models
-
-$schemas:
-  - "../../schemas/dirac-metadata.json"
+  dirac: "https://diracgrid.org/cwl#"
 
 hints:
-  - class: dirac:ExecutionHooks
-    hook_plugin: "QueryBasedPlugin"
-    output_sandbox: ["output1"]
+  - class: dirac:Job
+    schema_version: "1.0"
+    type: User

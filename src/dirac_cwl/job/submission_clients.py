@@ -13,7 +13,6 @@ from diracx.client.aio import AsyncDiracClient
 from rich.console import Console
 
 from dirac_cwl.core.utility import get_lfns
-from dirac_cwl.execution_hooks import SchedulingHint
 from dirac_cwl.submission_models import JobModel, JobSubmissionModel
 
 console = Console()
@@ -127,40 +126,14 @@ class DIRACSubmissionClient(SubmissionClient):
         return True
 
     def convert_to_jdl(self, job: JobModel, sandbox_pfn: str) -> str:
+        """Convert job model to jdl.
+
+        .. deprecated::
+            JDL conversion is now handled by ``cwl_to_jdl()`` in diracx-logic.
+            This method will be removed once the DIRACSubmissionClient is
+            updated to use the new ``POST /api/jobs/`` CWL endpoint.
         """
-        Convert job model to jdl.
-
-        :param job: The task to execute
-        :param sandbox_pfn: The sandbox PFN
-        :return: JDL string
-        """
-        jdl_lines = []
-        jdl_lines.append("Executable = dirac-cwl-exec;")
-        jdl_lines.append("Arguments = job.json;")
-
-        if job.task.requirements and job.task.requirements[0].coresMin:
-            jdl_lines.append(f"NumberOfProcessors = {job.task.requirements[0].coresMin};")
-
-        jdl_lines.append("JobName = test;")
-        jdl_lines.append("OutputSandbox = {std.out, std.err};")
-
-        job_scheduling = SchedulingHint.from_cwl(job.task)
-        if job_scheduling.priority:
-            jdl_lines.append(f"Priority = {job_scheduling.priority};")
-
-        if job_scheduling.sites:
-            jdl_lines.append(f"Site = {job_scheduling.sites};")
-
-        jdl_lines.append(f"InputSandbox = {sandbox_pfn};")
-        if job.input:
-            formatted_lfns = []
-            lfns_list = get_lfns(job.input.cwl).values()
-            for lfns in lfns_list:
-                for lfn in lfns:
-                    formatted_lfns.append(str(lfn).replace("lfn:", "LFN:", 1))
-
-            lfns_str = ", ".join(formatted_lfns)
-            if lfns_str:
-                jdl_lines.append(f"InputData = {lfns_str};")
-
-        return "\n".join(jdl_lines)
+        raise NotImplementedError(
+            "JDL conversion has moved to diracx-logic (cwl_to_jdl). "
+            "Use the POST /api/jobs/ endpoint instead."
+        )

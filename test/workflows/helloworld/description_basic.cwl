@@ -1,10 +1,15 @@
 cwlVersion: v1.2
-# What type of CWL process we have in this document: ComandLineTool or Workflow.
 class: CommandLineTool
 
-# The inputs for this process: none.
+hints:
+  - class: dirac:Job
+    schema_version: "1.0"
+    type: User
+
 inputs: []
-# The outputs for this process: none.
 outputs: []
 
 baseCommand: ["echo", "Hello World"]
+
+$namespaces:
+  dirac: "https://diracgrid.org/cwl#"
