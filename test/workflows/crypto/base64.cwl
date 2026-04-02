@@ -20,3 +20,11 @@ outputs:
     type: File
     outputBinding:
       glob: "base64_result.txt"
+
+hints:
+  - class: dirac:Job
+    schema_version: "1.0"
+    type: User
+
+$namespaces:
+  dirac: "https://diracgrid.org/cwl#"

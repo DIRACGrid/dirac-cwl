@@ -18,10 +18,9 @@ from cwl_utils.parser.cwl_v1_2 import (
 from pydantic import BaseModel, ConfigDict, field_serializer, model_validator
 
 from dirac_cwl.execution_hooks import (
-    ExecutionHooksHint,
-    SchedulingHint,
     TransformationExecutionHooksHint,
 )
+from diracx.core.models.cwl import JobHint
 
 # -----------------------------------------------------------------------------
 # Job models
@@ -70,13 +69,13 @@ class BaseJobModel(BaseModel):
 
     @model_validator(mode="before")
     def validate_hints(cls, values):
-        """Validate execution hooks and scheduling hints in the task.
+        """Validate dirac:Job hint in the task.
 
         :param values: Model values dictionary.
         :return: Validated values dictionary.
         """
         task = values.get("task")
-        ExecutionHooksHint.from_cwl(task), SchedulingHint.from_cwl(task)
+        JobHint.from_cwl(task)
         return values
 
 

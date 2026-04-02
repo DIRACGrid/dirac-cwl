@@ -41,7 +41,13 @@ def job_type_testing():
 def sample_command_line_tool():
     """Create a sample CommandLineTool."""
     return CommandLineTool(
-        id=".", inputs=[], outputs=[], requirements=[], cwlVersion="v1.2", baseCommand=["echo", "Hello World"]
+        id=".",
+        inputs=[],
+        outputs=[],
+        requirements=[],
+        hints=[{"class": "dirac:Job", "schema_version": "1.0", "type": "User"}],
+        cwlVersion="v1.2",
+        baseCommand=["echo", "Hello World"],
     )
 
 

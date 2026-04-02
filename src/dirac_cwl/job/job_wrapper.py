@@ -28,16 +28,15 @@ from diracx.client.aio import AsyncDiracClient
 from rich.text import Text
 from ruamel.yaml import YAML
 
-from dirac_cwl.commands import PostProcessCommand, PreProcessCommand
+from dirac_cwl.commands import PostProcessCommand, PreProcessCommand, StoreOutputCommand
 from dirac_cwl.core.exceptions import WorkflowProcessingException
 from dirac_cwl.core.utility import get_lfns
-from dirac_cwl.execution_hooks import ExecutionHooksHint
-from dirac_cwl.execution_hooks.core import ExecutionHooksBasePlugin
 from dirac_cwl.job.job_report import JobMinorStatus, JobReport, JobStatus
 from dirac_cwl.submission_models import (
     JobInputModel,
     JobModel,
 )
+from diracx.core.models.cwl import JobHint
 
 if os.getenv("DIRAC_PROTO_LOCAL") == "1":
     from dirac_cwl.mocks.sandbox import create_sandbox, download_sandbox  # type: ignore[no-redef]
@@ -58,7 +57,9 @@ class JobWrapper:
 
     def __init__(self, job_id: int) -> None:
         """Initialize the job wrapper."""
-        self._execution_hooks_plugin: ExecutionHooksBasePlugin | None = None
+        self._preprocess_commands: list[PreProcessCommand] = []
+        self._postprocess_commands: list[PostProcessCommand] = []
+        self._output_sandbox: list[str] = []
         self._job_path: Path = Path()
         self._job_id = job_id
         src = "JobWrapper"
@@ -78,9 +79,6 @@ class JobWrapper:
         """
         assert arguments.sandbox is not None
         self._job_report.set_job_status(minor_status=JobMinorStatus.DOWNLOADING_INPUT_SANDBOX)
-        if not self._execution_hooks_plugin:
-            self._job_report.set_job_status(minor_status=JobMinorStatus.FAILED_DOWNLOADING_INPUT_SANDBOX)
-            raise RuntimeError("Could not download sandboxes")
         for sandbox in arguments.sandbox:
             await download_sandbox(sandbox, job_path)
 
@@ -88,16 +86,10 @@ class JobWrapper:
         self,
         outputs: dict[str, str | Path | Sequence[str | Path]],
     ):
-        if not self._execution_hooks_plugin:
-            raise RuntimeError("Could not upload sandbox : Execution hook is not defined.")
-
         outputs_to_sandbox = []
         for output_name, src_path in outputs.items():
-            if (
-                self._execution_hooks_plugin.output_sandbox
-                and output_name in self._execution_hooks_plugin.output_sandbox
-            ):
-                if isinstance(src_path, Path) or isinstance(src_path, str):
+            if self._output_sandbox and output_name in self._output_sandbox:
+                if isinstance(src_path, (Path, str)):
                     src_path = [Path(src_path)]
                 for path in src_path:
                     outputs_to_sandbox.append(Path(path))
@@ -105,7 +97,7 @@ class JobWrapper:
             self._job_report.set_job_status(JobStatus.COMPLETING, minor_status=JobMinorStatus.UPLOADING_OUTPUT_SANDBOX)
             sb_path = Path(await create_sandbox(outputs_to_sandbox))
             logger.info(
-                "Successfully stored output %s in Sandbox %s", self._execution_hooks_plugin.output_sandbox, sb_path
+                "Successfully stored output %s in Sandbox %s", self._output_sandbox, sb_path
             )
             await self._diracx_client.jobs.assign_sandbox_to_job(self._job_id, f'"{sb_path}"')
             self._job_report.set_job_status(JobStatus.COMPLETING, minor_status=JobMinorStatus.OUTPUT_SANDBOX_UPLOADED)
@@ -122,17 +114,22 @@ class JobWrapper:
             A dictionary mapping each input name to the corresponding downloaded
             file path(s) located in the working directory.
         """
+        from DIRAC.DataManagementSystem.Client.DataManager import DataManager  # type: ignore[import-untyped]
+        from dirac_cwl.mocks.data_manager import MockDataManager
+
         new_paths: dict[str, Path | list[Path]] = {}
         self._job_report.set_job_status(minor_status=JobMinorStatus.INPUT_DATA_RESOLUTION)
 
-        if not self._execution_hooks_plugin:
-            raise RuntimeWarning("Could not download input data: Execution hook is not defined.")
+        if os.getenv("DIRAC_PROTO_LOCAL") == "1":
+            datamanager: DataManager = MockDataManager()
+        else:
+            datamanager = DataManager()
 
         lfns_inputs = get_lfns(inputs.cwl)
 
         if lfns_inputs:
             for input_name, lfns in lfns_inputs.items():
-                res = returnValueOrRaise(self._execution_hooks_plugin._datamanager.getFile(lfns, str(job_path)))
+                res = returnValueOrRaise(datamanager.getFile(lfns, str(job_path)))
                 if res["Failed"]:
                     raise RuntimeError(f"Could not get files : {res['Failed']}")
                 paths = res["Successful"]
@@ -235,8 +232,8 @@ class JobWrapper:
                 YAML().dump(parameter_dict, parameter_file)
             command.append(str(parameter_path.name))
 
-        if self._execution_hooks_plugin:
-            return self.__pre_process_hooks(executable, arguments, self._job_path, command)
+        if self._preprocess_commands:
+            await self.__run_preprocess_commands(self._job_path)
 
         await self._job_report.commit()
         return command
@@ -263,98 +260,61 @@ class JobWrapper:
 
         success = True
 
-        if self._execution_hooks_plugin:
-            success = await self.__post_process_hooks(self._job_path, outputs=outputs)
+        if self._postprocess_commands:
+            success = await self.__run_postprocess_commands(self._job_path, outputs=outputs)
 
         await self.__upload_output_sandbox(outputs=outputs)
         await self._job_report.commit()
         return success
 
-    def __pre_process_hooks(
-        self,
-        executable: CommandLineTool | Workflow | ExpressionTool,
-        arguments: Any | None,
-        job_path: Path,
-        command: List[str],
-        **kwargs: Any,
-    ) -> List[str]:
-        """Pre-process job inputs and command before execution.
-
-        :param CommandLineTool | Workflow | ExpressionTool executable:
-            The CWL tool, workflow, or expression to be executed.
-        :param JobInputModel arguments:
-            The job inputs, including CWL and LFN data.
-        :param Path job_path:
-            Path to the job working directory.
-        :param list[str] command:
-            The command to be executed, which will be modified.
-        :param Any **kwargs:
-            Additional parameters, allowing extensions to pass extra context
-            or configuration options.
-
-        :return list[str]:
-            The modified command, typically including the serialized CWL
-            input file path.
-        """
-        if not self._execution_hooks_plugin:
-            raise RuntimeWarning("Could not run pre_process_hooks: Execution hook is not defined.")
-
-        for preprocess_command in self._execution_hooks_plugin.preprocess_commands:
-            if not issubclass(preprocess_command, PreProcessCommand):
-                msg = f"The command {preprocess_command} is not a {PreProcessCommand.__name__}"
-                logger.error(msg)
-                raise TypeError(msg)
-
+    async def __run_preprocess_commands(self, job_path: Path, **kwargs: Any) -> None:
+        """Run all pre-process commands."""
+        for cmd in self._preprocess_commands:
             try:
-                preprocess_command().execute(job_path, **kwargs)
+                await cmd.execute(job_path, **kwargs)
             except Exception as e:
-                msg = f"Command '{preprocess_command.__name__}' failed during the pre-process stage: {e}"
+                msg = f"Command '{type(cmd).__name__}' failed during the pre-process stage: {e}"
                 logger.exception(msg)
                 raise WorkflowProcessingException(msg) from e
 
-        return command
-
-    async def __post_process_hooks(
+    async def __run_postprocess_commands(
         self,
         job_path: Path,
         outputs: dict[str, str | Path | Sequence[str | Path]] = {},
         **kwargs: Any,
     ) -> bool:
-        """Post-process job outputs.
-
-        :param Path job_path:
-            Path to the job working directory.
-        :param str|None stdout:
-            cwltool standard output.
-        :param Any **kwargs:
-            Additional keyword arguments for extensibility.
-        """
-        if not self._execution_hooks_plugin:
-            raise RuntimeWarning("Could not run post_process_hooks: Execution hook is not defined.")
-
-        for postprocess_command in self._execution_hooks_plugin.postprocess_commands:
-            if not issubclass(postprocess_command, PostProcessCommand):
-                msg = f"The command {postprocess_command} is not a {PostProcessCommand.__name__}"
-                logger.error(msg)
-                raise TypeError(msg)
-
+        """Run all post-process commands."""
+        for cmd in self._postprocess_commands:
             try:
-                postprocess_command().execute(job_path, **kwargs)
+                await cmd.execute(job_path, outputs=outputs, **kwargs)
             except Exception as e:
-                msg = f"Command '{postprocess_command.__name__}' failed during the post-process stage: {e}"
+                msg = f"Command '{type(cmd).__name__}' failed during the post-process stage: {e}"
                 logger.exception(msg)
                 raise WorkflowProcessingException(msg) from e
-
-        self._job_report.set_job_status(minor_status=JobMinorStatus.UPLOADING_OUTPUT_DATA)
-        try:
-            await self._execution_hooks_plugin.store_output(outputs)
-            self._job_report.set_job_status(
-                status=JobStatus.COMPLETING, minor_status=JobMinorStatus.OUTPUT_DATA_UPLOADED
-            )
-        except RuntimeError as err:
-            self._job_report.set_job_status(status=JobStatus.FAILED, minor_status=JobMinorStatus.UPLOADING_OUTPUT_DATA)
-            raise err
         return True
+
+    def _build_commands_from_hint(self, job_hint: JobHint) -> None:
+        """Build pre/post-process commands from the dirac:Job hint.
+
+        The ``type`` field determines which commands are attached.
+        I/O config from the hint is used to configure commands.
+        """
+        # Extract I/O config from the hint
+        output_paths = {
+            entry.source: entry.output_path for entry in job_hint.output_data
+        }
+        output_se = []
+        for entry in job_hint.output_data:
+            output_se.extend(entry.output_se)
+        output_se = list(set(output_se))
+
+        self._output_sandbox = [ref.source for ref in job_hint.output_sandbox]
+
+        # Build post-process commands — output storage
+        if output_paths:
+            self._postprocess_commands.append(
+                StoreOutputCommand(output_paths=output_paths, output_se=output_se)
+            )
 
     async def run_job(self, job: JobModel) -> bool:
         """Execute a given CWL workflow using cwltool.
@@ -365,10 +325,10 @@ class JobWrapper:
         :return: True if the job is executed successfully, False otherwise.
         """
         logger = logging.getLogger("JobWrapper")
-        # Instantiate runtime metadata from the serializable descriptor and
-        # the job context so implementations can access task inputs/overrides.
-        job_execution_hooks = ExecutionHooksHint.from_cwl(job.task)
-        self._execution_hooks_plugin = job_execution_hooks.to_runtime(job) if job_execution_hooks else None
+
+        # Extract dirac:Job hint and build commands from type + I/O config
+        job_hint = JobHint.from_cwl(job.task)
+        self._build_commands_from_hint(job_hint)
 
         # Isolate the job in a specific directory
         self._job_path = Path(".") / "workernode" / f"{random.randint(1000, 9999)}"

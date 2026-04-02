@@ -7,7 +7,12 @@ requirements:
     ramMin: 1024
 
 hints:
-  $import: "type_dependencies/transformation/metadata-pi_simulate.yaml"
+  - class: dirac:Job
+    schema_version: "1.0"
+    type: User
+
+$namespaces:
+  dirac: "https://diracgrid.org/cwl#"
 
 inputs:
   num-points:

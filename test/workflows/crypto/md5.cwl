@@ -20,3 +20,11 @@ outputs:
     type: File
     outputBinding:
       glob: "md5_result.txt"
+
+hints:
+  - class: dirac:Job
+    schema_version: "1.0"
+    type: User
+
+$namespaces:
+  dirac: "https://diracgrid.org/cwl#"

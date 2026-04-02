@@ -7,6 +7,7 @@ import logging
 import os
 import sys
 import tempfile
+from typing import Any
 
 import DIRAC  # type: ignore[import-untyped]
 from cwl_utils.parser import load_document_by_uri
@@ -21,31 +22,53 @@ from dirac_cwl.submission_models import JobModel
 
 
 async def main():
-    """Execute the job wrapper for a given job model."""
+    """Execute the job wrapper for a given job model.
+
+    Fetches the CWL workflow definition and input parameters from the
+    diracX API using the WorkflowID stored in the job config JSON.
+    """
     if len(sys.argv) != 3:
         logging.error("2 arguments required, <json-file> <jobID>")
         sys.exit(1)
 
     job_id = int(sys.argv[2])
 
-    job_json_file = sys.argv[1]
-    job_wrapper = JobWrapper(job_id)
-    with open(job_json_file, "r") as file:
-        job_model_dict = json.load(file)
+    # Fetch workflow_id, CWL, and params from diracX API using the job_id
+    from diracx.client.aio import AsyncDiracClient
 
-    task_dict = job_model_dict["task"]
+    async with AsyncDiracClient() as client:
+        # Get workflow_id and params from job attributes
+        job_attrs = await client.jobs.get_single_job(job_id)
+        workflow_id = getattr(job_attrs, "workflow_id", None)
+        workflow_params = getattr(job_attrs, "workflow_params", None)
+
+        if not workflow_id:
+            logging.error("Job %d has no workflow_id", job_id)
+            sys.exit(1)
+
+        # Fetch CWL definition
+        workflow_response = await client.jobs.get_workflow(workflow_id)
+        cwl_yaml = workflow_response["cwl"]
+
+    # Parse CWL
+    yaml_doc = YAML()
+    task_dict = yaml_doc.load(cwl_yaml)
 
     with tempfile.NamedTemporaryFile("w+", suffix=".cwl", delete=False) as f:
         YAML().dump(task_dict, f)
         f.flush()
         task_obj = load_document_by_uri(f.name)
 
-    if job_model_dict["input"]:
-        cwl_inputs_obj = load_inputfile(job_model_dict["input"]["cwl"])
-        job_model_dict["input"]["cwl"] = cwl_inputs_obj
-    job_model_dict["task"] = task_obj
+    # Build job model
+    job_model_dict: dict[str, Any] = {"task": task_obj, "input": None}
+
+    # If workflow_params were stored, use them as CWL inputs
+    if workflow_params:
+        cwl_inputs_obj = load_inputfile(workflow_params)
+        job_model_dict["input"] = {"sandbox": None, "cwl": cwl_inputs_obj}
 
     job = JobModel.model_validate(job_model_dict)
+    job_wrapper = JobWrapper(job_id)
 
     res = await job_wrapper.run_job(job)
     if res:

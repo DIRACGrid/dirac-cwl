@@ -120,17 +120,20 @@ class TestExecutionHooksHint:
         assert hasattr(runtime, "query_root") or runtime.query_root == "/data"
         assert hasattr(runtime, "data_type") or runtime.data_type == "AOD"
 
-    def test_from_cwl(self, mocker):
+    def test_from_cwl(self):
         """Test from_cwl class method."""
-        mock_cwl = mocker.Mock()
-        mock_descriptor = ExecutionHooksHint(hook_plugin="QueryBasedPlugin")
-        mock_from_cwl = mocker.patch("dirac_cwl.submission_models.ExecutionHooksHint.from_cwl")
-        mock_from_cwl.return_value = mock_descriptor
+        from cwl_utils.parser.cwl_v1_2 import CommandLineTool
 
-        result = ExecutionHooksHint.from_cwl(mock_cwl)
-
+        task = CommandLineTool(
+            id=".",
+            inputs=[],
+            outputs=[],
+            hints=[{"class": "dirac:ExecutionHooks", "hook_plugin": "QueryBasedPlugin"}],
+            cwlVersion="v1.2",
+        )
+        result = ExecutionHooksHint.from_cwl(task)
         assert isinstance(result, ExecutionHooksHint)
-        mock_from_cwl.assert_called_once_with(mock_cwl)
+        assert result.hook_plugin == "QueryBasedPlugin"
 
 
 class TestSubmissionModelsIntegration:

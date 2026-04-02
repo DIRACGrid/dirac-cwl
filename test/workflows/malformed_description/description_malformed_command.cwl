@@ -6,3 +6,11 @@ outputs: []
 
 # baseComand instead of baseCommand
 baseComand: malformedcommand
+
+hints:
+  - class: dirac:Job
+    schema_version: "1.0"
+    type: User
+
+$namespaces:
+  dirac: "https://diracgrid.org/cwl#"

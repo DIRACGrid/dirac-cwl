@@ -8,7 +8,7 @@ from dirac_cwl.commands import PreProcessCommand
 class DownloadConfig(PreProcessCommand):
     """Example command that creates a file with named 'content.cfg'."""
 
-    def execute(self, job_path, **kwargs):
+    async def execute(self, job_path, **kwargs):
         """Execute the configuration download.
 
         :param job_path: Path to the job working directory.

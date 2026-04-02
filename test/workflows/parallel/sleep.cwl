@@ -14,3 +14,11 @@ arguments:
     date +%s%N > "$(inputs.label).txt"
     sleep "$(inputs.seconds)"
     date +%s%N >> "$(inputs.label).txt"
+
+hints:
+  - class: dirac:Job
+    schema_version: "1.0"
+    type: User
+
+$namespaces:
+  dirac: "https://diracgrid.org/cwl#"
