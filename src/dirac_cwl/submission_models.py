@@ -13,6 +13,7 @@ from cwl_utils.parser import save
 from cwl_utils.parser.cwl_v1_2 import (
     CommandLineTool,
     ExpressionTool,
+    ResourceRequirement,
     Workflow,
 )
 from pydantic import BaseModel, ConfigDict, field_serializer, model_validator
@@ -55,6 +56,23 @@ class BaseJobModel(BaseModel):
 
     task: CommandLineTool | Workflow | ExpressionTool
 
+    @model_validator(mode="before")
+    def validate_job(cls, values):
+        """Validate job workflow.
+
+        :param values: Model values dictionary.
+        :return: Validated values dictionary.
+        """
+        task = values.get("task")
+
+        # ResourceRequirement validation
+        validate_resource_requirements(task)
+
+        # Hints validation
+        ExecutionHooksHint.from_cwl(task), SchedulingHint.from_cwl(task)
+
+        return values
+
     @field_serializer("task")
     def serialize_task(self, value):
         """Serialize CWL task object to dictionary.
@@ -67,17 +85,6 @@ class BaseJobModel(BaseModel):
             return save(value)
         else:
             raise TypeError(f"Cannot serialize type {type(value)}")
-
-    @model_validator(mode="before")
-    def validate_hints(cls, values):
-        """Validate execution hooks and scheduling hints in the task.
-
-        :param values: Model values dictionary.
-        :return: Validated values dictionary.
-        """
-        task = values.get("task")
-        ExecutionHooksHint.from_cwl(task), SchedulingHint.from_cwl(task)
-        return values
 
 
 class JobSubmissionModel(BaseJobModel):
@@ -119,14 +126,20 @@ class TransformationSubmissionModel(BaseModel):
             raise TypeError(f"Cannot serialize type {type(value)}")
 
     @model_validator(mode="before")
-    def validate_hints(cls, values):
-        """Validate transformation execution hooks and scheduling hints in the task.
+    def validate_transformation(cls, values):
+        """Validate transformation workflow.
 
         :param values: Model values dictionary.
         :return: Validated values dictionary.
         """
         task = values.get("task")
+
+        # ResourceRequirement validation
+        validate_resource_requirements(task)
+
+        # Hints validation
         TransformationExecutionHooksHint.from_cwl(task), SchedulingHint.from_cwl(task)
+
         return values
 
 
@@ -155,3 +168,56 @@ class ProductionSubmissionModel(BaseModel):
             return save(value)
         else:
             raise TypeError(f"Cannot serialize type {type(value)}")
+
+    @model_validator(mode="before")
+    def validate_production(cls, values):
+        """Validate production workflow."""
+        task = values.get("task")
+
+        # ResourceRequirement validation
+        validate_resource_requirements(task)
+
+        return values
+
+
+# -----------------------------------------------------------------------------
+# ResourceRequirement validations
+# -----------------------------------------------------------------------------
+# Temporary code, waiting on cwltool PR: https://github.com/common-workflow-language/cwltool/pull/2179.
+
+
+def validate_resource_requirements(task: CommandLineTool | Workflow | ExpressionTool):
+    """Validate ResourceRequirements of a task recursively.
+
+    :param task: The task to validate.
+    :raises ValueError: If any ResourceRequirement has min > max.
+    """
+    # Validate task-level requirements
+    for req in getattr(task, "requirements", None) or []:
+        if isinstance(req, ResourceRequirement):
+            _validate_min_max(req)
+
+    # Recurse into workflow steps
+    if isinstance(task, Workflow):
+        for step in task.steps or []:
+            for req in getattr(step, "requirements", None) or []:
+                if isinstance(req, ResourceRequirement):
+                    _validate_min_max(req)
+            if step.run:
+                validate_resource_requirements(step.run)
+
+
+def _validate_min_max(req: ResourceRequirement):
+    """Check that min does not exceed max for any resource.
+
+    :param req: The ResourceRequirement to validate.
+    :raises ValueError: If min > max for any resource.
+    """
+    for name, lo, hi in [
+        ("cores", req.coresMin, req.coresMax),
+        ("ram", req.ramMin, req.ramMax),
+        ("tmpdir", req.tmpdirMin, req.tmpdirMax),
+        ("outdir", req.outdirMin, req.outdirMax),
+    ]:
+        if lo and hi and lo > hi:
+            raise ValueError(f"{name}Min ({lo}) exceeds {name}Max ({hi})")
