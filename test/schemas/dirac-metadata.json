@@ -318,7 +318,7 @@
             }
           ],
           "default": null,
-          "description": "Input grouping configuration for transformation jobs",
+          "description": "Number of input files per job",
           "title": "Group Size"
         },
         "hook_plugin": {
@@ -343,7 +343,7 @@
             }
           ],
           "default": null,
-          "description": "Input data for transformation jobs",
+          "description": "Static input file lists, keyed by CWL input parameter name",
           "title": "Input Data"
         },
         "input_query": {
@@ -357,7 +357,7 @@
             }
           ],
           "default": null,
-          "description": "Input query for transformation jobs",
+          "description": "Dynamic input query for transformation jobs",
           "title": "Input Query"
         },
         "output_paths": {

@@ -350,9 +350,11 @@ class ExecutionHooksHint(BaseModel, Hint):
 class TransformationExecutionHooksHint(ExecutionHooksHint):
     """Extended data manager for transformations."""
 
-    group_size: Optional[int] = Field(default=None, description="Input grouping configuration for transformation jobs")
-    input_data: Optional[Dict[str, List[str]]] = Field(default=None, description="Input data for transformation jobs")
-    input_query: Optional[Dict] = Field(default=None, description="Input query for transformation jobs")
+    group_size: Optional[int] = Field(default=None, description="Number of input files per job")
+    input_data: Optional[Dict[str, List[str]]] = Field(
+        default=None, description="Static input file lists, keyed by CWL input parameter name"
+    )
+    input_query: Optional[Dict] = Field(default=None, description="Dynamic input query for transformation jobs")
 
     @field_validator("input_data", mode="before")
     @classmethod

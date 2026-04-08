@@ -23,9 +23,10 @@ class TestJobWrapper:
     """Test the JobWrapper class."""
 
     @pytest.mark.asyncio
-    async def test_instantiation(self, sample_job, job_wrapper):
+    async def test_instantiation(self, sample_job):
         """Test that ExecutionHooksBasePlugin can be instantiated directly with default behavior."""
         hook = ExecutionHooksBasePlugin()
+        job_wrapper = JobWrapper(job_id=0)
         job_wrapper._execution_hooks_plugin = hook
 
         # Test default pre_process behavior
@@ -42,7 +43,7 @@ class TestJobWrapper:
         assert result
 
     @pytest.mark.asyncio
-    async def test_execute(self, job_type_testing, sample_job, mocker, monkeypatch, job_wrapper):
+    async def test_execute(self, job_type_testing, sample_job, mocker, monkeypatch):
         """Test the execution of the preprocess and postprocess commands.
 
         The fixture "job_type_testing" is the class "JobTypeTestingPlugin".
@@ -64,6 +65,7 @@ class TestJobWrapper:
                 return
 
         plugin = job_type_testing()
+        job_wrapper = JobWrapper(job_id=0)
         job_wrapper._execution_hooks_plugin = plugin
 
         # Mock the "execute" commands to be able to spy them
@@ -102,7 +104,7 @@ class TestJobWrapper:
             await job_wrapper.post_process(0, "{}", "{}")
 
     @pytest.mark.asyncio
-    async def test_command_exception(self, job_type_testing, sample_job, mocker, monkeypatch, job_wrapper):
+    async def test_command_exception(self, job_type_testing, sample_job, mocker, monkeypatch):
         """Test exception report when a command fails.
 
         The fixture "job_type_testing" is the class "JobTypeTestingPlugin".
@@ -116,6 +118,7 @@ class TestJobWrapper:
                 raise NotImplementedError()
 
         plugin = job_type_testing()
+        job_wrapper = JobWrapper(job_id=0)
         job_wrapper._execution_hooks_plugin = plugin
 
         plugin.preprocess_commands = [Command]

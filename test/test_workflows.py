@@ -507,27 +507,32 @@ def test_run_transformation_validation_failure(cli_runner, cwl_file, cleanup, ex
 
 
 @pytest.mark.parametrize(
-    "cwl_file, inputs_file, destination_source_input_data",
+    "cwl_file, inputs_file, chunk, destination_source_input_data",
     [
         # --- Job Grouping ---
-        # Count and list files in inputs_file
+        # 5 files with chunk size 2 → 3 jobs (2/2/1)
         (
             "test/workflows/job_grouping/job_grouping.cwl",
             "test/workflows/pi/type_dependencies/job/inputs-pi_gather_catalog.yaml",
+            "input-data=2",
             {"filecatalog/pi/100": [f"test/workflows/pi/type_dependencies/job/result_{i}.sim" for i in range(1, 6)]},
-        )
+        ),
+        # 5 files with chunk size 3 → 2 jobs (3/2)
+        (
+            "test/workflows/job_grouping/job_grouping.cwl",
+            "test/workflows/pi/type_dependencies/job/inputs-pi_gather_catalog.yaml",
+            "input-data=3",
+            {"filecatalog/pi/100": [f"test/workflows/pi/type_dependencies/job/result_{i}.sim" for i in range(1, 6)]},
+        ),
     ],
 )
-def test_run_transformation_with_inputs_file(
-    cli_runner, cleanup, pi_test_files, cwl_file, inputs_file, destination_source_input_data
+def test_run_transformation_with_chunk(
+    cli_runner, cleanup, pi_test_files, cwl_file, inputs_file, chunk, destination_source_input_data
 ):
-    """Test successful transformation submission and execution with inputs file."""
+    """Test successful transformation submission with --chunk flag."""
     create_test_input_datafiles(destination_source_input_data)
 
-    command = ["transformation", "submit", cwl_file]
-
-    if inputs_file:
-        command.extend(["--inputs-file", inputs_file])
+    command = ["transformation", "submit", cwl_file, "--inputs-file", inputs_file, "--chunk", chunk]
 
     result = cli_runner.invoke(app, command)
     clean_output = strip_ansi_codes(result.stdout)

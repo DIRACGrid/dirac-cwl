@@ -9,7 +9,7 @@ from typing import Dict, List, Optional
 
 import typer
 from cwl_utils.pack import pack
-from cwl_utils.parser import load_document, save
+from cwl_utils.parser import load_document
 from cwl_utils.parser.cwl_v1_2 import File
 from cwl_utils.parser.utils import load_inputfile
 from rich import print_json
@@ -35,10 +35,32 @@ console = Console()
 # -----------------------------------------------------------------------------
 
 
+def _parse_chunk(chunk_str: str) -> tuple[str, int]:
+    """Parse a --chunk value of the form PARAM=SIZE.
+
+    :param chunk_str: The chunk string to parse.
+    :return: Tuple of (parameter name, chunk size).
+    :raises typer.BadParameter: If the format is invalid or size is not a positive integer.
+    """
+    if "=" not in chunk_str:
+        raise typer.BadParameter(f"Invalid --chunk format '{chunk_str}'. Expected PARAM=SIZE (e.g., input-data=3).")
+    param, size_str = chunk_str.split("=", 1)
+    if not param:
+        raise typer.BadParameter("Parameter name cannot be empty in --chunk.")
+    try:
+        size = int(size_str)
+    except ValueError as err:
+        raise typer.BadParameter(f"Chunk size must be an integer, got '{size_str}'.") from err
+    if size <= 0:
+        raise typer.BadParameter(f"Chunk size must be > 0, got {size}.")
+    return param, size
+
+
 @app.command("submit")
 def submit_transformation_client(
     task_path: str = typer.Argument(..., help="Path to the CWL file"),
     inputs_file: str | None = typer.Option(None, help="Path to the CWL inputs file"),
+    chunk: str | None = typer.Option(None, help="Split an array input into jobs: PARAM=SIZE (e.g., input-data=3)"),
     # Specific parameter for the purpose of the prototype
     local: Optional[bool] = typer.Option(True, help="Run the jobs locally instead of submitting them to the router"),
 ):
@@ -50,15 +72,55 @@ def submit_transformation_client(
     - Start the transformation
     """
     os.environ["DIRAC_PROTO_LOCAL"] = "0"
+
+    # --chunk and --inputs-file must be used together
+    if chunk and not inputs_file:
+        console.print("[red]:heavy_multiplication_x:[/red] [bold]CLI:[/bold] --chunk requires --inputs-file.")
+        return typer.Exit(code=1)
+    if inputs_file and not chunk:
+        console.print("[red]:heavy_multiplication_x:[/red] [bold]CLI:[/bold] --inputs-file requires --chunk.")
+        return typer.Exit(code=1)
+
     # Validate the workflow
     console.print("[blue]:information_source:[/blue] [bold]CLI:[/bold] Validating the transformation...")
     try:
         task = load_document(pack(task_path))
 
-        # Load Transformation inputs if existing
-        input_data = None
-        if inputs_file:
-            input_data = load_inputfile(task.cwlVersion, inputs_file).get("input-data")
+        # Warn if the hint already has input_data — CLI overrides it
+        existing_hint = TransformationExecutionHooksHint.from_cwl(task)
+        if inputs_file and existing_hint.input_data:
+            console.print(
+                "[yellow]:warning:[/yellow] [bold]CLI:[/bold] "
+                "The workflow hint already contains input_data. "
+                "Overriding with --inputs-file/--chunk values."
+            )
+
+        # Load and validate inputs, inject into hint
+        if inputs_file and chunk:
+            all_inputs = load_inputfile(task.cwlVersion, inputs_file)
+            chunk_param, chunk_size = _parse_chunk(chunk)
+
+            # Validate the chunk parameter exists and is a list
+            if chunk_param not in all_inputs:
+                console.print(
+                    f"[red]:heavy_multiplication_x:[/red] [bold]CLI:[/bold] "
+                    f"Parameter '{chunk_param}' not found in inputs file. "
+                    f"Available parameters: {list(all_inputs.keys())}"
+                )
+                return typer.Exit(code=1)
+            if not isinstance(all_inputs[chunk_param], list):
+                console.print(
+                    f"[red]:heavy_multiplication_x:[/red] [bold]CLI:[/bold] "
+                    f"Parameter '{chunk_param}' must be an array type for --chunk, "
+                    f"got {type(all_inputs[chunk_param]).__name__}."
+                )
+                return typer.Exit(code=1)
+
+            input_data = {chunk_param: all_inputs[chunk_param]}
+
+            # Inject input_data and group_size into the task's ExecutionHooks hint
+            hint_update = TransformationExecutionHooksHint(group_size=chunk_size, input_data=input_data)
+            TransformationExecutionHooksHint.update_cwl(task, hint_update)
 
     except FileNotFoundError as ex:
         console.print(f"[red]:heavy_multiplication_x:[/red] [bold]CLI:[/bold] Failed to load the task:\n{ex}")
@@ -68,7 +130,7 @@ def submit_transformation_client(
         return typer.Exit(code=1)
     console.print(f"\t[green]:heavy_check_mark:[/green] Task {task_path}")
 
-    transformation = TransformationSubmissionModel(task=task, input_data=input_data)
+    transformation = TransformationSubmissionModel(task=task)
     console.print("[green]:heavy_check_mark:[/green] [bold]CLI:[/bold] Transformation validated.")
 
     # Submit the transformation
@@ -111,26 +173,40 @@ def submit_transformation_router(transformation: TransformationSubmissionModel) 
     except Exception as exc:
         raise ValueError(f"Invalid DIRAC hints:\n{exc}") from exc
 
-    # Inputs from Transformation inputs_file
-    if transformation.input_data:
-        nb_files = len(transformation.input_data)
-        group_size = transformation_execution_hooks.group_size or 1
-        nb_groups = (nb_files + group_size - 1) // group_size
-        logger.info("Creating %s jobs for the transformation with group size of %s...", nb_groups, group_size)
-
-        input_data = transformation.input_data
-        for i, start in enumerate(range(0, len(input_data), group_size)):
-            files_chunk = input_data[start : start + group_size]
-
-            logger.info(
-                "Group %i files: %s",
-                i + 1,
-                [save(file).get("path") if isinstance(file, File) else file for file in files_chunk],
+    # Inputs from static input_data (populated by --chunk on the client)
+    if transformation_execution_hooks.input_data:
+        if transformation_execution_hooks.configuration:
+            raise ValueError(
+                "Cannot specify both static input_data and dynamic input query (configuration). "
+                "Use --chunk/--inputs-file for standalone transformations with known files. "
+                "Use configuration for transformations that discover inputs from upstream outputs."
             )
-            job_model_params.append(JobInputModel(sandbox=None, cwl={"input-data": files_chunk}))
 
-    # Inputs from DataCatalog/Bookkeeping service
-    if transformation_execution_hooks.configuration and transformation_execution_hooks.group_size:
+        group_size = transformation_execution_hooks.group_size or 1
+        for param_name, file_list in transformation_execution_hooks.input_data.items():
+            nb_files = len(file_list)
+            nb_groups = (nb_files + group_size - 1) // group_size
+            logger.info(
+                "Chunking '%s': %s files into %s jobs (group_size=%s)",
+                param_name,
+                nb_files,
+                nb_groups,
+                group_size,
+            )
+
+            for i, start in enumerate(range(0, nb_files, group_size)):
+                files_chunk = file_list[start : start + group_size]
+                logger.info("Group %i files: %s", i + 1, files_chunk)
+                job_model_params.append(JobInputModel(sandbox=None, cwl={param_name: files_chunk}))
+
+    # Inputs from DataCatalog/Bookkeeping service (dynamic query)
+    # NOTE: group_size is required here to distinguish "configuration as plugin overrides"
+    # (e.g. num_points: 2000) from "configuration as query params" (e.g. query_root, campaign).
+    # Without group_size, there's no grouping to do and no reason to query for input files.
+    # This will be cleaned up when input_query becomes the explicit trigger (#69).
+    elif transformation_execution_hooks.configuration and transformation_execution_hooks.group_size:
+        group_size = transformation_execution_hooks.group_size
+
         # Get the metadata class
         transformation_metadata = transformation_execution_hooks.to_runtime(transformation)
 
@@ -143,9 +219,9 @@ def submit_transformation_router(transformation: TransformationSubmissionModel) 
         # Wait for the input to be available
         logger.info("\t- Waiting for input data...")
         logger.debug("\t\t- Query: %s", input_query)
-        logger.debug("\t\t- Group Size: %s", transformation_execution_hooks.group_size)
+        logger.debug("\t\t- Group Size: %s", group_size)
 
-        while not (inputs := _get_inputs(input_query, transformation_execution_hooks.group_size)):
+        while not (inputs := _get_inputs(input_query, group_size)):
             logger.debug("\t\t- Result: %s", inputs)
             time.sleep(5)
 
