@@ -34,12 +34,12 @@ class QueryBasedPlugin(ExecutionHooksBasePlugin):
     campaign: Optional[str] = Field(default=None, description="Campaign name for LFN path")
     data_type: Optional[str] = Field(default=None, description="Data type classification")
 
-    def get_input_query(self, input_name: str, **kwargs: Any) -> Union[Path, List[Path], None]:
+    def get_input_query(self, **kwargs: Any) -> Union[Path, List[Path], None]:
         """Generate LFN-based input query path.
 
         Accepts and ignores extra kwargs for interface compatibility.
         """
-        # Build LFN: /query_root/vo/campaign/site/data_type/input_name
+        # Build LFN: /query_root/vo/campaign/site/data_type
         path_parts = []
 
         if self.vo:
@@ -53,6 +53,6 @@ class QueryBasedPlugin(ExecutionHooksBasePlugin):
             path_parts.append(self.data_type)
 
         if len(path_parts) > 0:  # More than just VO
-            return Path(self.query_root) / Path(*path_parts) / Path(input_name)
+            return Path(self.query_root) / Path(*path_parts)
 
-        return Path(self.query_root) / Path(input_name)
+        return Path(self.query_root)

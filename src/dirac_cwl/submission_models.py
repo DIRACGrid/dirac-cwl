@@ -102,8 +102,6 @@ class JobModel(BaseJobModel):
 # -----------------------------------------------------------------------------
 # Transformation models
 # -----------------------------------------------------------------------------
-
-
 class TransformationSubmissionModel(BaseModel):
     """Transformation definition sent to the router."""
 

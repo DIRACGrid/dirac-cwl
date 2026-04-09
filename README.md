@@ -70,17 +70,17 @@ Inside the Pixi environment:
 pixi shell
 
 # Submit
-dirac-cwl job submit <workflow_path> [--parameter-path <input_path>] [--metadata-path <metadata_path>]
+dirac-cwl job submit <workflow_path> [--input-files <input_path>]
 
-dirac-cwl transformation submit <workflow_path> [--metadata-path <metadata_path>]
+dirac-cwl transformation submit <workflow_path> [--inputs-file <input_path>]
 
-dirac-cwl production submit <workflow_path> [--steps-metadata-path <steps_metadata_path>]
+dirac-cwl production submit <workflow_path> [--inputs-file <input_path>]
 ```
 
 Or prefix individual commands:
 
 ```bash
-pixi run dirac-cwl job submit <workflow_path> --parameter-path <input_path>
+pixi run dirac-cwl job submit <workflow_path> --input-files <input_path>
 ```
 
 Common tasks are defined in `pyproject.toml` and can be run with Pixi:

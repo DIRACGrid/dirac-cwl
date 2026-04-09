@@ -23,13 +23,14 @@ from typing import (
     Union,
 )
 
+from cwl_utils.parser import File, save
 from DIRAC.DataManagementSystem.Client.DataManager import (  # type: ignore[import-untyped]
     DataManager,
 )
 from DIRACCommon.Core.Utilities.ReturnValues import (  # type: ignore[import-untyped]
     returnSingleResult,
 )
-from pydantic import BaseModel, ConfigDict, Field, PrivateAttr
+from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, field_validator
 
 from dirac_cwl.commands import PostProcessCommand, PreProcessCommand
 from dirac_cwl.mocks.data_manager import MockDataManager
@@ -139,12 +140,12 @@ class ExecutionHooksBasePlugin(BaseModel):
                     if res and not res["OK"]:
                         raise RuntimeError(f"Could not save file {src} with LFN {str(lfn)} : {res['Message']}")
 
-    def get_input_query(self, input_name: str, **kwargs: Any) -> Union[Path, List[Path], None]:
+    def get_input_query(self, **kwargs: Any) -> Union[Path, List[Path], None]:
         """Generate LFN-based input query path.
 
         Accepts and ignores extra kwargs for interface compatibility.
         """
-        # Build LFN: /query_root/vo/campaign/site/data_type/input_name
+        # Build LFN: /query_root/vo/campaign/site/data_type
         pass
 
     @classmethod
@@ -332,10 +333,40 @@ class ExecutionHooksHint(BaseModel, Hint):
                 descriptor = descriptor.model_copy(update=hint_data)
         return descriptor
 
+    @classmethod
+    def update_cwl(cls, cwl_object: Any, descriptor: Self) -> None:
+        """Update CWL object with metadata descriptor."""
+        hints = getattr(cwl_object, "hints", []) or []
+        for hint in hints:
+            if hint.get("class") == "dirac:ExecutionHooks":
+                hint.update(descriptor.model_dump())
+                return
+
+        # Create the ExecutionHooks hint if it doesn't exist
+        hints.append({"class": "dirac:ExecutionHooks", **descriptor.model_dump()})
+        cwl_object.hints = hints
+
 
 class TransformationExecutionHooksHint(ExecutionHooksHint):
     """Extended data manager for transformations."""
 
-    group_size: Optional[Dict[str, int]] = Field(
-        default=None, description="Input grouping configuration for transformation jobs"
+    group_size: Optional[int] = Field(default=None, description="Number of input files per job")
+    input_data: Optional[Dict[str, List[str]]] = Field(
+        default=None, description="Static input file lists, keyed by CWL input parameter name"
     )
+    input_query: Optional[Dict] = Field(default=None, description="Dynamic input query for transformation jobs")
+
+    @field_validator("input_data", mode="before")
+    @classmethod
+    def convert_input_data(cls, value):
+        """Convert an input data dict containing a list of Files to a list of strings.
+
+        :param value: Input data dict to convert.
+        :return: Converted input data dict.
+        """
+        if value:
+            return {
+                key: [save(item)["location"] if isinstance(item, File) else item for item in items]
+                for key, items in value.items()
+            }
+        return None

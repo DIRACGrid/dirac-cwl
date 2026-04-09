@@ -20,6 +20,7 @@ from cwl_utils.parser.cwl_v1_2 import (
     WorkflowInputParameter,
     WorkflowStep,
 )
+from cwl_utils.parser.utils import load_inputfile
 from rich import print_json
 from rich.console import Console
 from schema_salad.exceptions import ValidationException
@@ -74,6 +75,8 @@ console = Console()
 @app.command("submit")
 def submit_production_client(
     task_path: str = typer.Argument(..., help="Path to the CWL file"),
+    inputs_file: str | None = typer.Option(None, help="Path to the CWL inputs file"),
+    chunk: str | None = typer.Option(None, help="Split an array input into jobs: PARAM=SIZE (e.g., input-data=3)"),
     # Specific parameter for the purpose of the prototype
     local: Optional[bool] = typer.Option(True, help="Run the job locally instead of submitting it to the router"),
 ):
@@ -86,10 +89,49 @@ def submit_production_client(
     """
     os.environ["DIRAC_PROTO_LOCAL"] = "0"
 
+    # --chunk and --inputs-file must be used together
+    if chunk and not inputs_file:
+        console.print("[red]:heavy_multiplication_x:[/red] [bold]CLI:[/bold] --chunk requires --inputs-file.")
+        return typer.Exit(code=1)
+    if inputs_file and not chunk:
+        console.print("[red]:heavy_multiplication_x:[/red] [bold]CLI:[/bold] --inputs-file requires --chunk.")
+        return typer.Exit(code=1)
+
     # Validate the workflow
     console.print("[blue]:information_source:[/blue] [bold]CLI:[/bold] Validating the production...")
     try:
         task = load_document(pack(task_path))
+
+        # Load Production inputs and inject into the first step's hint
+        if inputs_file and chunk:
+            from dirac_cwl.transformation import _parse_chunk
+
+            all_inputs = load_inputfile(task.cwlVersion, inputs_file)
+            chunk_param, chunk_size = _parse_chunk(chunk)
+
+            if chunk_param not in all_inputs:
+                console.print(
+                    f"[red]:heavy_multiplication_x:[/red] [bold]CLI:[/bold] "
+                    f"Parameter '{chunk_param}' not found in inputs file. "
+                    f"Available parameters: {list(all_inputs.keys())}"
+                )
+                return typer.Exit(code=1)
+            if not isinstance(all_inputs[chunk_param], list):
+                console.print(
+                    f"[red]:heavy_multiplication_x:[/red] [bold]CLI:[/bold] "
+                    f"Parameter '{chunk_param}' must be an array type for --chunk."
+                )
+                return typer.Exit(code=1)
+
+            input_data = {chunk_param: all_inputs[chunk_param]}
+
+            # Inject into the first step's hint
+            if task.steps:
+                from dirac_cwl.execution_hooks import TransformationExecutionHooksHint
+
+                hint_update = TransformationExecutionHooksHint(group_size=chunk_size, input_data=input_data)
+                TransformationExecutionHooksHint.update_cwl(task.steps[0].run, hint_update)
+
     except FileNotFoundError as ex:
         console.print(f"[red]:heavy_multiplication_x:[/red] [bold]CLI:[/bold] Failed to load the task:\n{ex}")
         return typer.Exit(code=1)
@@ -99,11 +141,10 @@ def submit_production_client(
     console.print(f"\t[green]:heavy_check_mark:[/green] Task {task_path}")
     console.print("\t[green]:heavy_check_mark:[/green] Metadata")
 
-    # Create the production
     production = ProductionSubmissionModel(task=task)
     console.print("[green]:heavy_check_mark:[/green] [bold]CLI:[/bold] Production validated.")
 
-    # Submit the tranaformation
+    # Submit the transformation
     console.print("[blue]:information_source:[/blue] [bold]CLI:[/bold] Submitting the production...")
     print_json(production.model_dump_json(indent=4))
     if not submit_production_router(production):
@@ -161,12 +202,7 @@ def _get_transformations(
 
     for step in production.task.steps:
         step_task = _create_subworkflow(step, str(production.task.cwlVersion), production.task.inputs)
-
-        transformations.append(
-            TransformationSubmissionModel(
-                task=step_task,
-            )
-        )
+        transformations.append(TransformationSubmissionModel(task=step_task))
     return transformations
 
 

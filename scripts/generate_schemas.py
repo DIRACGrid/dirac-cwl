@@ -22,18 +22,19 @@ import argparse
 import json
 import logging
 from pathlib import Path
-from typing import Any, Dict, List, cast
+from typing import Any, Dict, List, Type, cast
 
 import yaml
+from pydantic import BaseModel
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 logger = logging.getLogger(__name__)
 
 
-def collect_pydantic_models() -> Dict[str, Any]:
+def collect_pydantic_models() -> Dict[str, Type[BaseModel]]:
     """Collect all Pydantic models from the metadata system."""
-    models = {}
+    models: Dict[str, Type[BaseModel]] = {}
 
     # Import core models
     try:
@@ -44,14 +45,10 @@ def collect_pydantic_models() -> Dict[str, Any]:
             TransformationExecutionHooksHint,
         )
 
-        models.update(
-            {
-                "ExecutionHooksBasePlugin": ExecutionHooksBasePlugin,
-                "ExecutionHooks": ExecutionHooksHint,
-                "Scheduling": SchedulingHint,
-                "TransformationExecutionHooks": TransformationExecutionHooksHint,
-            }
-        )
+        models["ExecutionHooksBasePlugin"] = ExecutionHooksBasePlugin
+        models["ExecutionHooks"] = ExecutionHooksHint
+        models["Scheduling"] = SchedulingHint
+        models["TransformationExecutionHooks"] = TransformationExecutionHooksHint
         logger.info("Collected core metadata models")
     except ImportError as e:
         logger.error("Failed to import core models: %s", e)
@@ -65,14 +62,10 @@ def collect_pydantic_models() -> Dict[str, Any]:
             TransformationSubmissionModel,
         )
 
-        models.update(
-            {
-                "JobInputModel": JobInputModel,
-                "JobSubmissionModel": JobSubmissionModel,
-                "TransformationSubmissionModel": TransformationSubmissionModel,
-                "ProductionSubmissionModel": ProductionSubmissionModel,
-            }
-        )
+        models["JobInputModel"] = JobInputModel
+        models["JobSubmissionModel"] = JobSubmissionModel
+        models["TransformationSubmissionModel"] = TransformationSubmissionModel
+        models["ProductionSubmissionModel"] = ProductionSubmissionModel
         logger.info("Collected submission models")
     except ImportError as e:
         logger.error("Failed to import submission models: %s", e)
