@@ -690,7 +690,7 @@ Some commands have been removed, such as `UploadMC` or `ErrorLogging`, so they w
 | WorkflowAccounting | N/A | N/A | RunNumber ProdID EventType SiteName ProcessingStep CpuTime NormCpuTime InputsStats OutputStats InputEvents OutputEvents EventTime NProcs JobGroup FinalState |
 | AnalyseFileAccess | XMLSummary.xml pool_xml_catalog.xml | N/A | N/A |
 | UserJobFinalization | UserOutputData | request.json | JobId UserOutputSE SiteName UserOutputPath ReplicateUserOutData UserOutputLFNPrep |
-| AnalyzeXmlSummary | XMLSummary.xml | N/A | ProdId ApplicationName |
+| AnalyseXmlSummary | XMLSummary.xml | N/A | ProdId ApplicationName |
 
 Legend:
 
