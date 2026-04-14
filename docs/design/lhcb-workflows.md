@@ -4,17 +4,13 @@
 
 For the new LHCb Workflows approach with CWL, the modules are called "commands" and the order of execution of the commands has to be defined while creating the `JobType`, which can be the same as the current order.
 
-Every `JobType` has to define certain pre-processing and post-processing steps containing a list of command. That list can be empty and will always execute in the same order.
+Every `JobType` has to define certain pre-processing and post-processing steps containing a list of command. That list can be empty and will always execute in the same order. However, certain commands could be executed simultaneously. This is shown with a fork in the state diagrams.
 
 Also a few modules have been removed, as they are no longer needed.
 
 ### USER Job (setExecutable)
 
 ```mermaid
----
-config:
-    layout: elk
----
 stateDiagram
     direction TB
 
@@ -44,9 +40,9 @@ stateDiagram
         }
 
         state Processing_New {
-            CommandLineTool_New: CommandLineTool
+            Workflow_New: dirac-cwl workflow.cwl
 
-            [*] --> CommandLineTool_New
+            [*] --> Workflow_New
         }
 
         state PostProcessing_New {
@@ -67,10 +63,6 @@ stateDiagram
 ### USER Job (setApplication)
 
 ```mermaid
----
-config:
-    layout: elk
----
 stateDiagram
     direction TB
 
@@ -90,30 +82,51 @@ stateDiagram
     }
 
     state New {
-        state  PreProcessing {
-            [*] --> CreateDataFile_New
+        PreProcessing_New: PreProcessing
+        Processing_New: Processing
+        PostProcessing_New: PostProcessing
+
+        state PreProcessing_New {
             CreateDataFile_New: CreateDataFile
+
+            [*] --> CreateDataFile_New
         }
 
-        state  Processing {
-            [*] --> LbRunApp_New
-            LbRunApp_New: LbRunApp
+        state Processing_New {
+            Execution_New: dirac-cwl workflow.cwl
+
+            state Execution_New {
+                CLT_New: CommandLineTool
+
+                state CLT_New {
+                    LbRunApp_New: LbRunApp
+                    [*] --> LbRunApp_New
+                }
+            }
+
+            [*] --> Execution_New
         }
 
-        state  PostProcessing {
+        state PostProcessing_New {
+            state fork_state <<fork>>
+            state join_state <<join>>
+
             FileUsage_New: FileUsage
             AnalyseFileAccess_New: AnalyseFileAccess
             UserJobFinalization_New: UserJobFinalization
 
-            [*] --> FileUsage_New
-            FileUsage_New --> AnalyseFileAccess_New
-            AnalyseFileAccess_New --> UserJobFinalization_New
+            [*] --> fork_state
+            fork_state --> FileUsage_New
+            fork_state --> AnalyseFileAccess_New
+            FileUsage_New --> join_state
+            AnalyseFileAccess_New --> join_state
+            join_state --> UserJobFinalization_New
         }
 
-        [*] --> PreProcessing
-        PreProcessing --> Processing
-        Processing --> PostProcessing
-        PostProcessing --> [*]
+        [*] --> PreProcessing_New
+        PreProcessing_New --> Processing_New
+        Processing_New --> PostProcessing_New
+        PostProcessing_New --> [*]
     }
 ```
 
@@ -124,11 +137,6 @@ For this type of job and for the following one (Reconstruction), currently we ha
 Now, the corresponding commands got moved out of the processing step, which forces them to deal with multiple outputs at a time, as they only execute once.
 
 ```mermaid
----
-config:
-    layout: elk
-    nodeSpacing: 10
----
 stateDiagram
     direction TB
 
@@ -178,12 +186,24 @@ stateDiagram
         }
 
         state Processing_New {
-            LbRunApp_New: LbRunApp
+            Execution_New: dirac-cwl workflow.cwl
 
-            [*] --> LbRunApp_New
+            state Execution_New {
+                CLT_New: CommandLineTool
+
+                state CLT_New {
+                    LbRunApp_New: LbRunApp
+                    [*] --> LbRunApp_New
+                }
+            }
+
+            [*] --> Execution_New
         }
 
         state PostProcessing_New {
+            state fork_state <<fork>>
+            state join_state <<join>>
+
             AnalyseXmlSummary_New: AnalyseXmlSummary
             UploadLogFile_New: UploadLogFile
             UploadOutputData_New: UploadOutputData
@@ -192,11 +212,15 @@ stateDiagram
             WorkflowAccounting_New: WorkflowAccounting
 
             [*] --> AnalyseXmlSummary_New
-            AnalyseXmlSummary_New --> BookkeepingReport_New
-            BookkeepingReport_New --> WorkflowAccounting_New
-            WorkflowAccounting_New --> UploadOutputData_New
-            UploadOutputData_New --> UploadLogFile_New
-            UploadLogFile_New --> FailoverRequest_New
+            AnalyseXmlSummary_New --> fork_state
+            fork_state --> BookkeepingReport_New
+            fork_state --> WorkflowAccounting_New
+            fork_state --> UploadLogFile_New
+            join_state --> UploadOutputData_New
+            BookkeepingReport_New --> join_state
+            WorkflowAccounting_New --> join_state
+            UploadLogFile_New --> join_state
+            UploadOutputData_New --> FailoverRequest_New
         }
 
         [*] --> PreProcessing_New
@@ -209,10 +233,6 @@ stateDiagram
 ### Reconstruction Job
 
 ```mermaid
----
-config:
-    layout: elk
----
 stateDiagram
     direction TB
 
@@ -264,12 +284,30 @@ stateDiagram
         }
 
         state Processing_New {
-            LbRunApp_New: LbRunApp
+            Execution_New: dirac-cwl workflow.cwl
 
-            [*] --> LbRunApp_New
+            state Execution_New {
+                Workflow_New: CWL Workflow
+
+                state Workflow_New {
+                    CLT_New: CommandLineTool
+
+                    state CLT_New {
+                        LbRunApp_New: LbRunApp
+                        [*] --> LbRunApp_New
+                    }
+
+                    CLT_New --> CLT_New: This can be executed multiple times
+                }
+            }
+
+            [*] --> Execution_New
         }
 
         state PostProcessing_New {
+            state fork_state <<fork>>
+            state join_state <<join>>
+
             AnalyseXmlSummary_New: AnalyseXmlSummary
             UploadLogFile_New: UploadLogFile
             UploadOutputData_New: UploadOutputData
@@ -279,12 +317,17 @@ stateDiagram
             RemoveInputData_New: RemoveInputData
 
             [*] --> AnalyseXmlSummary_New
-            AnalyseXmlSummary_New --> BookkeepingReport_New
-            BookkeepingReport_New --> WorkflowAccounting_New
-            WorkflowAccounting_New --> UploadOutputData_New
-            UploadOutputData_New --> RemoveInputData_New
-            RemoveInputData_New --> UploadLogFile_New
-            UploadLogFile_New --> FailoverRequest_New
+            AnalyseXmlSummary_New --> fork_state
+            fork_state --> BookkeepingReport_New
+            fork_state --> WorkflowAccounting_New
+            fork_state --> UploadLogFile_New
+            fork_state --> RemoveInputData_New
+            BookkeepingReport_New --> join_state
+            RemoveInputData_New --> join_state
+            WorkflowAccounting_New --> join_state
+            UploadLogFile_New --> join_state
+            join_state --> UploadOutputData_New
+            UploadOutputData_New --> FailoverRequest_New
         }
 
         [*] --> PreProcessing_New
