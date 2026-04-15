@@ -135,7 +135,7 @@ workflows/
             └── inputs2.yaml
 ```
 
-### Add a Pre/Post-processing commamd and a Job type
+### Add a Pre/Post-processing command and a Job type
 
 #### Add a Pre/Post-Command
 
@@ -147,7 +147,7 @@ To add a new pre/post-processing command to the project, follow these steps:
 
 - Create a class that inherits `PreProcessCommand` if it's going to be executed before the workflow or `PostProcessCommand` if it's going to be executed after the workflow. In the rare case that the command can be executed in both stages, it should inherit both classes. These classes are located at `src/dirac_cwl/commands/core.py`.
 
-- Implement the `execute` function with the actions it's expected to do. This function recieves the `job path` as a `string` and the dictionary of keyworded arguments `**kwargs`. This function can raise exceptions if it needs to.
+- Implement the `execute` function with the actions it's expected to do. This function receives the `job path` as a `string` and the dictionary of keyworded arguments `**kwargs`. This function can raise exceptions if it needs to.
 
 #### Add a Job Type
 

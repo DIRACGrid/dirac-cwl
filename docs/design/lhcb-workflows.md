@@ -4,7 +4,7 @@
 
 For the new LHCb Workflows approach with CWL, the modules are called "commands" and the order of execution of the commands has to be defined while creating the `JobType`, which can be the same as the current order.
 
-Every `JobType` has to define certain pre-processing and post-processing steps containing a list of command. That list can be empty and will always execute in the same order. However, certain commands could be executed simultaneously. This is shown with a fork in the state diagrams.
+Every `JobType` has to define certain pre-processing and post-processing steps containing a list of command. That list can be empty and will always execute in the same order. However, certain commands could be executed simultaneously. This is shown with a fork in the state diagrams, even though we don't have any plans to implement this feature at this time.
 
 Also a few modules have been removed, as they are no longer needed.
 
