@@ -1,12 +1,91 @@
 # LHCb Workflow Commands
 
+This document describes how LHCb workflows are migrated from the old DIRAC XML workflow system to dirac-cwl with CWL. It serves two purposes:
+
+1. **For the LHCb team**: a reference for performing the migration, explaining what each module becomes, how commands communicate, and the phased migration plan.
+2. **For other communities**: an example of how to design pre/post-processing commands for their own experiment's workflows using dirac-cwl.
+
+## Architecture Overview
+
+### Why we are migrating
+
+Currently, LHCb workflow modules (`LHCbDIRAC/Workflow/Modules`) are the workflow: they call LHCb applications **and** LHCbDIRAC-specific logic (bookkeeping, accounting, file uploads) in the same execution context. This means the workflow cannot run on resources with no external connectivity, which is a growing requirement.
+
+The new approach separates concerns:
+
+- **Pre-process commands** — LHCbDIRAC-specific setup that requires external connectivity (runs before the workflow)
+- **CWL workflow** — Pure LHCb application logic via `lb-prod-run` (no external connectivity required)
+- **Post-process commands** — LHCbDIRAC-specific reporting, upload, and cleanup (runs after the workflow)
+
+### Job wrapper lifecycle
+
+The dirac-cwl job wrapper manages the full job lifecycle. Some steps are **generic** (provided by dirac-cwl, always run, not configurable by experiments) and some are **experiment-specific** (configured per job type):
+
+```
+Job Wrapper (generic dirac-cwl)
+│
+├── [setup]  — always runs before everything (generic)
+│   ├── Download input sandbox
+│   ├── Download input data
+│   └── Resolve file catalog
+│
+├── Pre-process commands (experiment-specific, sequential)
+│
+├── CWL workflow execution (experiment-specific)
+│
+├── Post-process commands (experiment-specific, sequential)
+│
+└── [finally] — always runs, even on crash (generic)
+    ├── Upload logs (target SE configured by experiment)
+    ├── Commit input file statuses (Processed/Unused) if managed by a transformation
+    ├── Commit accounting records (from accounting/*.json)
+    ├── Merge failover operations + write request.json
+    └── Report final job status
+```
+
+The `setup` and `finally` blocks are **not configurable by experiments**. They always run. This guarantees that:
+- Logs are always uploaded (even on crash — critical for debugging). The log upload mechanism is generic, but the target SE and log path are configured by the experiment.
+- For production jobs managed by the Transformation System, input files are marked as "Processed" or "Unused" so they don't get stuck as "Assigned" (no-op for user jobs)
+- Failover operations are always serialized for the RequestDB
+- Accounting records are committed. The commit mechanism is generic DIRAC, but the *content* of the records (which fields, which accounting types) is experiment-specific — the `finally` block commits whatever accounting JSON files the experiment's commands have written.
+
+### How commands communicate
+
+In the old system, modules share data through **mutable in-memory objects** (`workflow_commons`, `step_commons`). This makes modules tightly coupled and hard to test in isolation.
+
+In the new system, commands communicate through **files on disk** under `job_path/`. Each command reads from well-known paths and writes to well-known paths:
+
+| Purpose | File path | Writer | Reader |
+|---|---|---|---|
+| File statuses | `reports/file_statuses.json` | AnalyseSummary | job wrapper (`finally`) |
+| Bookkeeping records | `bookkeeping/bookkeeping_*.xml` | BookkeepingReport | UploadOutputData |
+| Accounting records | `accounting/*.json` | WorkflowAccounting | job wrapper (`finally`) |
+| Failover operations | `failover/*.json` | Upload commands | job wrapper (`finally`) |
+| Output manifest | `outputs/manifest.json` | ConstructLFNs | Upload commands |
+
+This makes dependencies explicit, commands independently testable, and eliminates shared mutable state.
+
+### What's generic vs experiment-specific
+
+| Provided by dirac-cwl (generic) | Implemented by each experiment |
+|---|---|
+| Job wrapper lifecycle (setup/finally) | Pre-process commands (e.g. ComputeEvents) |
+| Log upload mechanism (target SE configured by experiment) | Post-process commands (e.g. BookkeepingReport) |
+| File status management | CWL workflow definitions |
+| Failover request handling | LFN construction scheme |
+| Accounting commit mechanism (record content is experiment-specific) | Metadata/catalog integration |
+| Upload to SE with failover | Application-specific validation |
+| Phased command execution | |
+
+Other communities (e.g. CTAO) would implement their own pre/post-process commands but reuse the entire job wrapper infrastructure, upload utilities, and execution model.
+
 ## Types of workflows
 
 For the new LHCb Workflows approach with CWL, the modules are called "commands" and the order of execution of the commands has to be defined while creating the `JobType`, which can be the same as the current order.
 
-Every `JobType` has to define certain pre-processing and post-processing steps containing a list of command. That list can be empty and will always execute in the same order. However, certain commands could be executed simultaneously. This is shown with a fork in the state diagrams, even though we don't have any plans to implement this feature at this time.
+Every `JobType` has to define certain pre-processing and post-processing steps containing a list of commands. That list can be empty and will always execute in the same order.
 
-Also a few modules have been removed, as they are no longer needed.
+A few modules have been removed, as they are no longer needed (see [Removed commands](#removed-commands)).
 
 ### USER Job (setExecutable)
 
@@ -108,19 +187,13 @@ stateDiagram
         }
 
         state PostProcessing_New {
-            state fork_state <<fork>>
-            state join_state <<join>>
-
             FileUsage_New: FileUsage
             AnalyseFileAccess_New: AnalyseFileAccess
             UserJobFinalization_New: UserJobFinalization
 
-            [*] --> fork_state
-            fork_state --> FileUsage_New
-            fork_state --> AnalyseFileAccess_New
-            FileUsage_New --> join_state
-            AnalyseFileAccess_New --> join_state
-            join_state --> UserJobFinalization_New
+            [*] --> FileUsage_New
+            FileUsage_New --> AnalyseFileAccess_New
+            AnalyseFileAccess_New --> UserJobFinalization_New
         }
 
         [*] --> PreProcessing_New
@@ -182,6 +255,12 @@ stateDiagram
         PostProcessing_New: PostProcessing
 
         state PreProcessing_New {
+            note left of PreProcessing_New
+                May need a pre-process command
+                to compute LHCbDIRAC-specific details
+                before passing them to the workflow
+                (e.g. number of events to process)
+            end note
             [*]
         }
 
@@ -201,25 +280,18 @@ stateDiagram
         }
 
         state PostProcessing_New {
-            state fork_state <<fork>>
-            state join_state <<join>>
-
-            AnalyseXmlSummary_New: AnalyseXmlSummary
+            AnalyseSummary_New: AnalyseSummary
+            BookkeepingReport_New: BookkeepingReport
+            WorkflowAccounting_New: WorkflowAccounting
             UploadLogFile_New: UploadLogFile
             UploadOutputData_New: UploadOutputData
             FailoverRequest_New: FailoverRequest
-            BookkeepingReport_New: BookkeepingReport
-            WorkflowAccounting_New: WorkflowAccounting
 
-            [*] --> AnalyseXmlSummary_New
-            AnalyseXmlSummary_New --> fork_state
-            fork_state --> BookkeepingReport_New
-            fork_state --> WorkflowAccounting_New
-            fork_state --> UploadLogFile_New
-            join_state --> UploadOutputData_New
-            BookkeepingReport_New --> join_state
-            WorkflowAccounting_New --> join_state
-            UploadLogFile_New --> join_state
+            [*] --> AnalyseSummary_New
+            AnalyseSummary_New --> BookkeepingReport_New
+            BookkeepingReport_New --> WorkflowAccounting_New
+            WorkflowAccounting_New --> UploadLogFile_New
+            UploadLogFile_New --> UploadOutputData_New
             UploadOutputData_New --> FailoverRequest_New
         }
 
@@ -229,6 +301,8 @@ stateDiagram
         PostProcessing_New --> [*]
     }
 ```
+
+> **Note:** Commands such as `AnalyseSummary`, `BookkeepingReport`, and `WorkflowAccounting` (formerly `StepAccounting`) currently run once per step inside the processing loop. In the new approach, they run **once** after the entire CWL workflow completes, processing all step outputs at once. This is a behavioral change that requires adapting these commands to handle multiple outputs.
 
 ### Reconstruction Job
 
@@ -305,29 +379,21 @@ stateDiagram
         }
 
         state PostProcessing_New {
-            state fork_state <<fork>>
-            state join_state <<join>>
-
-            AnalyseXmlSummary_New: AnalyseXmlSummary
-            UploadLogFile_New: UploadLogFile
-            UploadOutputData_New: UploadOutputData
-            FailoverRequest_New: FailoverRequest
+            AnalyseSummary_New: AnalyseSummary
             BookkeepingReport_New: BookkeepingReport
             WorkflowAccounting_New: WorkflowAccounting
+            UploadLogFile_New: UploadLogFile
+            UploadOutputData_New: UploadOutputData
             RemoveInputData_New: RemoveInputData
+            FailoverRequest_New: FailoverRequest
 
-            [*] --> AnalyseXmlSummary_New
-            AnalyseXmlSummary_New --> fork_state
-            fork_state --> BookkeepingReport_New
-            fork_state --> WorkflowAccounting_New
-            fork_state --> UploadLogFile_New
-            fork_state --> RemoveInputData_New
-            BookkeepingReport_New --> join_state
-            RemoveInputData_New --> join_state
-            WorkflowAccounting_New --> join_state
-            UploadLogFile_New --> join_state
-            join_state --> UploadOutputData_New
-            UploadOutputData_New --> FailoverRequest_New
+            [*] --> AnalyseSummary_New
+            AnalyseSummary_New --> BookkeepingReport_New
+            BookkeepingReport_New --> WorkflowAccounting_New
+            WorkflowAccounting_New --> UploadLogFile_New
+            UploadLogFile_New --> UploadOutputData_New
+            UploadOutputData_New --> RemoveInputData_New
+            RemoveInputData_New --> FailoverRequest_New
         }
 
         [*] --> PreProcessing_New
@@ -623,12 +689,13 @@ flowchart LR
     UploadOutputData UploadOutputData_l5@===> addFile
     UploadOutputData UploadOutputData_l6@===> getFileDescendants
     UploadOutputData UploadOutputData_l7@===> getSiteSEMapping
+    UploadOutputData UploadOutputData_l8@===> getDestinationSEList
 
     class UploadOutputData_l1 FailoverTransferLink
     class UploadOutputData_l2,UploadOutputData_l3 JobReportLink
     class UploadOutputData_l4 BookkeepingClientLink
     class UploadOutputData_l5 FileCatalogLink
-    class UploadOutputData_l6,UploadOutputData_l7 DataManagerLink
+    class UploadOutputData_l6,UploadOutputData_l7,UploadOutputData_l8 DataManagerLink
 
     %% ======================
 
@@ -706,15 +773,15 @@ flowchart LR
 
     %% ======================
 
-    AnalyseXMLSummary("AnalyseXMLSummary")
+    AnalyseSummary("AnalyseSummary")
 
-    AnalyseXMLSummary AnalyseXMLSummary_l1@===> getFileTypes
-    AnalyseXMLSummary AnalyseXMLSummary_l2@===> setApplicationStatus
-    AnalyseXMLSummary AnalyseXMLSummary_l3@===> setFileStatus
+    AnalyseSummary AnalyseSummary_l1@===> getFileTypes
+    AnalyseSummary AnalyseSummary_l2@===> setApplicationStatus
+    AnalyseSummary AnalyseSummary_l3@===> setFileStatus
 
-    class AnalyseXMLSummary_l1 BookkeepingClientLink
-    class AnalyseXMLSummary_l2 JobReportLink
-    class AnalyseXMLSummary_l3 FileReportLink
+    class AnalyseSummary_l1 BookkeepingClientLink
+    class AnalyseSummary_l2 JobReportLink
+    class AnalyseSummary_l3 FileReportLink
 
 ```
 
@@ -725,15 +792,16 @@ Some commands have been removed, such as `UploadMC` or `ErrorLogging`, so they w
 | Command | Consumes | Creates | Requires |
 | --- | --- | --- | --- |
 | CreateDataFile | Inputs | data.py | poolXMLCatName |
-| UploadLogFile | Outputs | N/A | JobID ProductionID Namespace ConfigVersion |
-| UploadOutputData | Outputs Inputs XMLSummary.xml bookkeeping.xml | N/A | OutputDataStep OutputList OutputMode ProductionOutputData SiteName |
+| AnalyseSummary | XMLSummary.xml | N/A | ProdId ApplicationName |
+| BookkeepingReport | Outputs | bookkeeping_*.xml | StepID ApplicationName ApplicationVersion StartTime ProductionId StepNumber SiteName JobType |
+| WorkflowAccounting | N/A | N/A | RunNumber ProdID EventType SiteName ProcessingStep CpuTime NormCpuTime InputsStats OutputStats InputEvents OutputEvents EventTime NProcs JobGroup FinalState |
+| FileUsage | Inputs (directory list) | N/A | SiteName |
+| AnalyseFileAccess | XMLSummary.xml pool_xml_catalog.xml | N/A | N/A |
+| UploadOutputData | Outputs Inputs XMLSummary.xml bookkeeping_*.xml | N/A | OutputDataStep OutputList OutputMode ProductionOutputData SiteName |
+| UploadLogFile | Log files | N/A | JobID ProductionID Namespace ConfigVersion |
+| UserJobFinalization | UserOutputData | N/A | JobId UserOutputSE SiteName UserOutputPath ReplicateUserOutData UserOutputLFNPrep |
 | RemoveInputData | Inputs | N/A | N/A |
 | FailoverRequest | Inputs | request.json | N/A |
-| BookkeepingReport | Outputs | bookkeeping.xml | StepID ApplicationName ApplicationVersion StartTime ProductionId StepNumber SiteName JobType |
-| WorkflowAccounting | N/A | N/A | RunNumber ProdID EventType SiteName ProcessingStep CpuTime NormCpuTime InputsStats OutputStats InputEvents OutputEvents EventTime NProcs JobGroup FinalState |
-| AnalyseFileAccess | XMLSummary.xml pool_xml_catalog.xml | N/A | N/A |
-| UserJobFinalization | UserOutputData | request.json | JobId UserOutputSE SiteName UserOutputPath ReplicateUserOutData UserOutputLFNPrep |
-| AnalyseXmlSummary | XMLSummary.xml | N/A | ProdId ApplicationName |
 
 Legend:
 
@@ -745,7 +813,7 @@ Legend:
 
 Creates a `data.py` data file from the inputs to be used by Ganga.
 
-### AnalyseXMLSummary
+### AnalyseSummary
 
 Performs a series of checks on the XMLSummary output to make sure the execution was done correctly.
 
@@ -771,7 +839,11 @@ Commits the status of the files in the file report. The status will be "Processe
 
 ### UploadLogFile
 
-Uploads a compressed list of outputs to a DIRAC LogSE.
+Compresses and uploads log files to a Storage Element configured for log storage (LHCb uses an SE called `LogSE`, configured via `Operations/LogStorage/LogSE`).
+
+### UserJobFinalization
+
+Uploads user-specified output files to configured Storage Elements with failover support and optional replication to a secondary site.
 
 ### RemoveInputData
 
@@ -780,3 +852,93 @@ Removes the inputs and their replicas (if any) from every SE and File Catalog.
 ### AnalyseFileAccess
 
 Uses the XMLCatalog and XMLSummary to check if the access of each input file was successful or not.
+
+### Removed commands
+
+- **ErrorLogging** — Deprecated no-op module (just logs and returns success). Not carried forward.
+- **UploadMC** — Uploaded MC statistics (errors, XML summaries, generator logs, prmon metrics) to ElasticSearch. To be handled outside the workflow by a dedicated monitoring service.
+- **LHCbScript** — Set `CMTCONFIG` environment variable and ran user scripts. In the new model, the CWL CommandLineTool definition handles environment setup, so this module is absorbed into CWL configuration.
+- **StepAccounting** — Renamed to **WorkflowAccounting** because it now processes all step outputs at once rather than running per-step.
+
+### Key design decisions
+
+**Why did `AnalyseSummary`, `BookkeepingReport`, and `WorkflowAccounting` move out of the processing loop?**
+
+In the old system, these ran once per Gaudi application step (inside the processing loop). In the new system, `lb-prod-run` already checks the XML Summary and fails fast via exit code, so the CWL workflow stops on step failure without needing experiment-specific logic. The detailed post-execution analysis (marking files as "Problematic", generating BK records, sending accounting) only needs to happen once after the entire workflow completes. This means these commands must be adapted to handle N step outputs at once instead of 1.
+
+**Why do we need pre-process commands?**
+
+Some logic currently embedded in `GaudiApplication` / `RunApplication` requires external connectivity (DIRAC config, CPU time queries) and must run before the CWL workflow, which may execute without external connectivity. For example, computing the number of events to produce in a Simulation job (`getEventsToProduce`) needs the worker node's CPU normalization factor.
+
+**Why move `FailoverRequest` and `UploadLogFile` to the job wrapper?**
+
+These must always execute regardless of whether commands succeed or fail. Today they run "by convention" as the last modules in the chain, but if an earlier module crashes, they may never execute — leaving input files stuck as "Assigned" and logs lost. Moving them to the job wrapper's `finally` block guarantees execution.
+
+## Migration Strategy
+
+The migration from LHCbDIRAC XML workflows to dirac-cwl with CWL happens in three phases. This allows incremental validation without disrupting production.
+
+### Phase 1: Refactor modules into commands
+
+The existing LHCbDIRAC workflow modules (`LHCbDIRAC/Workflow/Modules`) are refactored so that their core logic is extracted into reusable functions that can be called both from the old modules and from new dirac-cwl pre/post-processing commands.
+
+For each module:
+1. Extract the business logic into standalone functions (no dependency on `ModuleBase`, `workflow_commons`, or `step_commons`).
+2. The old module becomes a thin wrapper that reads from `workflow_commons`/`step_commons`, calls the extracted function, and writes back to the shared state.
+3. The new dirac-cwl command becomes a thin wrapper that reads from files on disk, calls the same extracted function, and writes results to files on disk.
+
+This means both the old XML workflow path and the new CWL path share the same underlying logic during the transition. Bugs fixed in one are fixed in both.
+
+```
+Before:                          After:
+
+Module (old path)                Module (old path)
+├── reads workflow_commons       ├── reads workflow_commons
+├── business logic          →    ├── calls shared_logic()
+└── writes workflow_commons      └── writes workflow_commons
+
+                                 Command (new path)
+                                 ├── reads files from disk
+                                 ├── calls shared_logic()
+                                 └── writes files to disk
+```
+
+### Phase 2: Submit CWL workflows alongside old workflows
+
+Once the commands are functional and tested, start submitting CWL workflows through dirac-cwl for selected job types (e.g., start with USER jobs, then Simulation).
+
+During this phase:
+- Old XML workflows and new CWL workflows coexist in production.
+- The same transformations can be configured to use either path.
+- Validation compares outputs from both paths to ensure correctness.
+- The old modules still call into the shared logic, so any production fix applies to both.
+
+### Phase 3: Drop old modules, adapt commands to DiracX
+
+Once old XML workflows are no longer in use:
+1. Remove the old LHCbDIRAC workflow modules entirely.
+2. Remove the `ModuleBase` infrastructure (`workflow_commons`, `step_commons`, shared mutable objects).
+3. Adapt the commands to call DiracX services directly instead of going through old LHCbDIRAC clients (e.g., BookkeepingClient, DataManager).
+4. The shared logic functions are updated to use DiracX APIs.
+
+At this point, LHCbDIRAC module code is fully retired, and the commands are self-contained within the dirac-cwl ecosystem using DiracX for all external service calls.
+
+### For other communities
+
+If you are migrating a different experiment's workflows to dirac-cwl, the LHCb migration above serves as a template. The key steps are the same:
+
+1. **Identify your modules.** What logic runs today as part of your workflow that requires external connectivity? That logic becomes pre/post-process commands.
+2. **Separate application logic from infrastructure logic.** Your CWL workflow should only contain the experiment's application (no DIRAC calls). Everything else goes into commands.
+3. **Design your file-based data flow.** Decide what files each command reads and writes. Use the table in [How commands communicate](#how-commands-communicate) as a starting point.
+4. **Implement commands.** Use dirac-cwl's `PreProcessCommand` and `PostProcessCommand` base classes. Each command receives the `job_path` and reads/writes files under it.
+
+What you get for free from dirac-cwl:
+- The job wrapper lifecycle (`setup` / `finally`)
+- Log upload, file status management, accounting commit, failover request handling
+- Upload to Storage Elements with failover (`FailoverTransfer`)
+- CWL workflow execution via `cwltool`
+
+What you must implement:
+- Pre/post-process commands specific to your experiment's metadata, catalogs, and reporting
+- Your LFN naming scheme (equivalent to LHCb's `constructProductionLFNs`)
+- Your CWL workflow definitions
