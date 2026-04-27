@@ -31,7 +31,7 @@ dependencies = [
     "diracx-client>=0.0.8",
     "diracx-cli>=0.0.8",
     "lbprodrun",
-    "LHCbDIRAC @ git+ssh://git@gitlab.cern.ch:7999/jlisalab/LHCbDIRAC.git@modules-to-cwl-migration", # Temporary fork dependency
+    "LHCbDIRAC @ git+https://git@gitlab.cern.ch/jlisalab/LHCbDIRAC.git@modules-to-cwl-migration", # Temporary fork dependency
     "pydantic",
     "pyyaml",
     "typer",

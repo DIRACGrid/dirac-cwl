@@ -187,7 +187,7 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/6d/10/b37ac718c5903758fa9058a5182026a4f3b65443196b82c7840389ea0dbd/lbplatformutils-4.6.1-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/02/64/c86924898062e8217ed914a29458cfde9e4a9b80e4d4cbcca141983ba339/lbprodrun-1.12.4-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/29/ce/ed422816fb30ffa3bc11597b30d5deca06b4a1388707a04215da73c65b53/levenshtein-0.27.3-cp314-cp314-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl
-      - pypi: git+ssh://git@gitlab.cern.ch:7999/jlisalab/LHCbDIRAC.git?rev=modules-to-cwl-migration#c441175f3289d6d85abf5d5612c3ff964edd9a5c
+      - pypi: git+https://gitlab.cern.ch/jlisalab/LHCbDIRAC.git?rev=modules-to-cwl-migration#c441175f3289d6d85abf5d5612c3ff964edd9a5c
       - pypi: https://files.pythonhosted.org/packages/7f/37/8ea3555769b6048b5e4ec162cc90fd32e761c0e381ffb3baf888cb0d8a71/lhcbdiracx_api-0.0.8-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/68/15/bfb0c717b8f23c16907f3e73e8f56010ccd72e9900a108209665b0d9ed4b/lhcbdiracx_cli-0.0.8-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/2d/88/67602dfa2d7ab5d0518af82db34ab4d70dc2c3029b3ca788299a3be4a96d/lhcbdiracx_client-0.0.8-py3-none-any.whl
@@ -429,7 +429,7 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/6d/10/b37ac718c5903758fa9058a5182026a4f3b65443196b82c7840389ea0dbd/lbplatformutils-4.6.1-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/02/64/c86924898062e8217ed914a29458cfde9e4a9b80e4d4cbcca141983ba339/lbprodrun-1.12.4-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/f3/e1/2f705da403f865a5fa3449b155738dc9c53021698fd6926253a9af03180b/levenshtein-0.27.3-cp314-cp314-macosx_10_15_x86_64.whl
-      - pypi: git+ssh://git@gitlab.cern.ch:7999/jlisalab/LHCbDIRAC.git?rev=modules-to-cwl-migration#c441175f3289d6d85abf5d5612c3ff964edd9a5c
+      - pypi: git+https://gitlab.cern.ch/jlisalab/LHCbDIRAC.git?rev=modules-to-cwl-migration#c441175f3289d6d85abf5d5612c3ff964edd9a5c
       - pypi: https://files.pythonhosted.org/packages/7f/37/8ea3555769b6048b5e4ec162cc90fd32e761c0e381ffb3baf888cb0d8a71/lhcbdiracx_api-0.0.8-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/68/15/bfb0c717b8f23c16907f3e73e8f56010ccd72e9900a108209665b0d9ed4b/lhcbdiracx_cli-0.0.8-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/2d/88/67602dfa2d7ab5d0518af82db34ab4d70dc2c3029b3ca788299a3be4a96d/lhcbdiracx_client-0.0.8-py3-none-any.whl
@@ -670,7 +670,7 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/6d/10/b37ac718c5903758fa9058a5182026a4f3b65443196b82c7840389ea0dbd/lbplatformutils-4.6.1-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/02/64/c86924898062e8217ed914a29458cfde9e4a9b80e4d4cbcca141983ba339/lbprodrun-1.12.4-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/76/2c/bb6ef359e007fe7b6b3195b68a94f4dd3ecd1885ee337ee8fbd4df55996f/levenshtein-0.27.3-cp314-cp314-macosx_11_0_arm64.whl
-      - pypi: git+ssh://git@gitlab.cern.ch:7999/jlisalab/LHCbDIRAC.git?rev=modules-to-cwl-migration#c441175f3289d6d85abf5d5612c3ff964edd9a5c
+      - pypi: git+https://gitlab.cern.ch/jlisalab/LHCbDIRAC.git?rev=modules-to-cwl-migration#c441175f3289d6d85abf5d5612c3ff964edd9a5c
       - pypi: https://files.pythonhosted.org/packages/7f/37/8ea3555769b6048b5e4ec162cc90fd32e761c0e381ffb3baf888cb0d8a71/lhcbdiracx_api-0.0.8-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/68/15/bfb0c717b8f23c16907f3e73e8f56010ccd72e9900a108209665b0d9ed4b/lhcbdiracx_cli-0.0.8-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/2d/88/67602dfa2d7ab5d0518af82db34ab4d70dc2c3029b3ca788299a3be4a96d/lhcbdiracx_client-0.0.8-py3-none-any.whl
@@ -1639,8 +1639,8 @@ packages:
   requires_python: '>=3.11'
 - pypi: ./
   name: dirac-cwl
-  version: 1.2.1.dev8+g8317c9f76.d20260427
-  sha256: 827f00c9f462c00995c99046a12618a97b94bd8085f0ea7fadb6faeaabb7c002
+  version: 1.2.1.dev10+g98ccc37b9.d20260427
+  sha256: e52448240772253ac6d1e1fda93951e71a3743146d125eac2c495619f14b3b5d
   requires_dist:
   - cwl-utils
   - cwlformat
@@ -1651,7 +1651,7 @@ packages:
   - diracx-client>=0.0.8
   - diracx-cli>=0.0.8
   - lbprodrun
-  - lhcbdirac @ git+ssh://git@gitlab.cern.ch:7999/jlisalab/LHCbDIRAC.git@modules-to-cwl-migration
+  - lhcbdirac @ git+https://****@gitlab.cern.ch/jlisalab/LHCbDIRAC.git@modules-to-cwl-migration
   - pydantic
   - pyyaml
   - typer
@@ -2668,7 +2668,7 @@ packages:
   requires_dist:
   - rapidfuzz>=3.9.0,<4.0.0
   requires_python: '>=3.10'
-- pypi: git+ssh://git@gitlab.cern.ch:7999/jlisalab/LHCbDIRAC.git?rev=modules-to-cwl-migration#c441175f3289d6d85abf5d5612c3ff964edd9a5c
+- pypi: git+https://gitlab.cern.ch/jlisalab/LHCbDIRAC.git?rev=modules-to-cwl-migration#c441175f3289d6d85abf5d5612c3ff964edd9a5c
   name: lhcbdirac
   version: 0.1.dev20447+gc441175f3
   requires_dist:
