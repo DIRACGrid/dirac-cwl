@@ -2,6 +2,7 @@
 
 import json
 import os
+import shutil
 
 from DIRAC import siteName
 from DIRAC.Core.Utilities.ReturnValues import S_OK
@@ -90,3 +91,30 @@ def prepare_lhcb_workflow_commons(workflow_commons_path, extra_mandatory_values=
     workflow_commons["site_name"] = siteName()
 
     return workflow_commons
+
+
+def save_workflow_commons(wf_commons, wf_file_path):
+    """Update the workflow_commons file to accomodate for the new values.
+
+    Ensures that no data is lost during the update by creating a backup.
+    """
+    if not (os.path.exists(wf_file_path) and os.path.isfile(wf_file_path)):
+        raise WorkflowProcessingException("")
+
+    wf_filename = os.path.basename(wf_file_path)
+    wf_backup = f"{wf_filename}.bak"
+
+    shutil.move(wf_file_path, wf_backup)
+
+    try:
+        with open(wf_file_path, "x", encoding="utf-8") as f:
+            json.dump(wf_commons, f)
+    except Exception:
+        os.unlink(wf_file_path)
+        shutil.copy2(wf_backup, wf_file_path)
+        return False
+
+    finally:
+        os.unlink(wf_backup)
+
+    return True

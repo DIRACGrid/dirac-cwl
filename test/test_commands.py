@@ -12,11 +12,42 @@ from urllib.parse import urljoin
 import LHCbDIRAC
 import pytest
 from DIRAC import siteName
+from DIRAC.TransformationSystem.Client.FileReport import FileReport
+from DIRAC.WorkloadManagementSystem.Client.JobReport import JobReport
 from DIRACCommon.Core.Utilities.ReturnValues import S_ERROR, S_OK
 from LHCbDIRAC.Core.Utilities.XMLSummaries import XMLSummary
 from pytest_mock import MockerFixture
 
-from dirac_cwl.commands import BookeepingReport, UploadLogFile
+from dirac_cwl.commands import BookeepingReport, FailoverRequest, UploadLogFile
+
+wf_commons = {
+    "job_id": 0,
+    "job_type": "merge",
+    "production_id": "123",
+    "prod_job_id": "00000456",
+    "event_type": "123456789",
+    "number_of_events": "100",
+    "config_name": "aConfigName",
+    "config_version": "aConfigVersion",
+    "application_name": "someApp",
+    "application_version": "v1r0",
+    "bk_step_id": "123",
+    "inputs": [],
+    "outputs": [],
+    "executable": "",
+    "command_id": "1",
+    "command_number": 1,
+}
+
+number_of_processors = 1
+job_path = "."
+xml_summary_file = os.path.join(
+    job_path,
+    f"summary{wf_commons['application_name']}_{wf_commons['production_id']}_{wf_commons['prod_job_id']}_{wf_commons['command_id']}.xml",
+)
+wf_commons_file = os.path.join(job_path, "workflow_commons.json")
+bookkeeping_file = os.path.join(job_path, f"bookkeeping_{wf_commons['command_id']}.xml")
+request_file = f"{wf_commons['production_id']}_{wf_commons['prod_job_id']}_request.json"
 
 
 def prepare_XMLSummary_file(xml_summary, content):
@@ -735,7 +766,7 @@ class TestBookkeepingReport:
         assert simulation_condition is None, "SimulationCondition element should not be present."
 
     def test_bkreport_previousError_success(self, mocker, bk_report, wf_commons):
-        """."""
+        """Test previous command failure."""
         wf_commons["application_name"] = "Gauss"
         wf_commons["application_version"] = self.config_version
         wf_commons["job_type"] = "MCSimulation"
@@ -747,3 +778,253 @@ class TestBookkeepingReport:
         bk_report.execute(self.job_path)
 
         assert not os.path.exists(self.bookkeeping_file)
+
+
+class TestFailoverRequest:
+    """Collection of tests for the FailoverRequest command."""
+
+    @pytest.fixture
+    def failover_request(self, mocker: MockerFixture):
+        """FailoverRequest mocked command.
+
+        Cleans created files after execution.
+        """
+        mocker.patch("dirac_cwl.commands.failover_request.RequestValidator")
+
+        yield FailoverRequest()
+
+        Path(request_file).unlink(missing_ok=True)
+        Path(wf_commons_file).unlink(missing_ok=True)
+
+    def test_failoverRequest_success(self, mocker: MockerFixture, failover_request):
+        """Test successful execution of FailoverRequest module."""
+        problematic_files = [
+            "/lhcb/data/2010/EW.DST/00008380/0000/00008380_00000287_1.ew.dst",
+        ]
+
+        mock_file_report = mocker.patch("dirac_cwl.commands.failover_request.FileReport")
+        mock_job_report = mocker.patch("dirac_cwl.commands.failover_request.JobReport")
+
+        fr = FileReport()
+        mocker.patch.object(fr, "getFiles", side_effect=[problematic_files, []])
+        mocker.patch.object(fr, "commit", return_value=S_OK("Anything"))
+        mocker.patch.object(fr, "setFileStatus")
+        mock_file_report.return_value = fr
+
+        jr = JobReport(wf_commons["job_id"])
+        mocker.patch.object(jr, "setApplicationStatus")
+        mock_job_report.return_value = jr
+
+        wf_commons["inputs"] = [
+            "/lhcb/data/2010/EW.DST/00008380/0000/00008380_00000281_1.ew.dst",
+            "/lhcb/data/2011/EW.DST/00008380/0000/00008380_00000281_1.ew.dst",
+        ] + problematic_files
+
+        with open(wf_commons_file, "w", encoding="utf-8") as f:
+            json.dump(wf_commons, f)
+
+        failover_request.execute(job_path)
+
+        with open(wf_commons_file, "r", encoding="utf-8") as f:
+            updated_wf_commons = json.load(f)
+
+        # Check the FileReport calls: the problematic file should not appear
+        # The input files should be set to "Processed"
+        assert fr.setFileStatus.call_count == 2
+        args = fr.setFileStatus.call_args_list
+        assert args[0][0][0] == int(updated_wf_commons["production_id"])
+        assert args[0][0][1] == updated_wf_commons["inputs"][0]
+        assert args[0][0][2] == "Processed"
+
+        assert args[1][0][0] == int(updated_wf_commons["production_id"])
+        assert args[1][0][1] == updated_wf_commons["inputs"][1]
+        assert args[1][0][2] == "Processed"
+
+        # Make sure the appliction is successfully finished
+        assert jr.setApplicationStatus.call_count == 1
+        assert jr.setApplicationStatus.call_args[0][0] == "Job Finished Successfully"
+
+        print(updated_wf_commons)
+        # Make sure the forward DISET is not generated
+        operations = updated_wf_commons["request_dict"]["Operations"]
+        assert len(operations) == 0
+
+        # Make sure the request json does not exists
+        assert not Path(request_file).exists()
+
+    def test_failoverRequest_commitFailure1(self, mocker: MockerFixture, failover_request):
+        """Test execution of FailoverRequest module when the fileReport.commit() fails.
+
+        In this context, the second call to commit() will work, so the request should not be generated.
+        """
+        problematic_files = [
+            "/lhcb/data/2010/EW.DST/00008380/0000/00008380_00000287_1.ew.dst",
+        ]
+        # Both calla to getFiles() will return the problematic files because the commit did not work
+        mock_file_report = mocker.patch("dirac_cwl.commands.failover_request.FileReport")
+        mock_job_report = mocker.patch("dirac_cwl.commands.failover_request.JobReport")
+
+        jr = JobReport(wf_commons["job_id"])
+        mocker.patch.object(jr, "setApplicationStatus")
+        mock_job_report.return_value = jr
+
+        fr = FileReport()
+        mocker.patch.object(fr, "getFiles", side_effect=[problematic_files, problematic_files])
+        mocker.patch.object(fr, "commit", side_effect=[S_ERROR("Error"), S_OK(None)])
+        mocker.patch.object(fr, "setFileStatus")
+        mock_file_report.return_value = fr
+
+        wf_commons["inputs"] = [
+            "/lhcb/data/2010/EW.DST/00008380/0000/00008380_00000281_1.ew.dst",
+            "/lhcb/data/2011/EW.DST/00008380/0000/00008380_00000281_1.ew.dst",
+        ] + problematic_files
+
+        # Execute the module
+        with open(wf_commons_file, "w", encoding="utf-8") as f:
+            json.dump(wf_commons, f)
+
+        failover_request.execute(job_path)
+
+        with open(wf_commons_file, "r", encoding="utf-8") as f:
+            updated_wf_commons = json.load(f)
+
+        # Check the FileReport calls: the problematic file should not appear
+        # The input files should be set to "Processed"
+        assert fr.setFileStatus.call_count == 2
+        args = fr.setFileStatus.call_args_list
+        assert args[0][0][0] == int(updated_wf_commons["production_id"])
+        assert args[0][0][1] == updated_wf_commons["inputs"][0]
+        assert args[0][0][2] == "Processed"
+
+        assert args[1][0][0] == int(updated_wf_commons["production_id"])
+        assert args[1][0][1] == updated_wf_commons["inputs"][1]
+        assert args[1][0][2] == "Processed"
+
+        # Make sure the appliction is successfully finished
+        assert jr.setApplicationStatus.call_count == 1
+        assert jr.setApplicationStatus.call_args[0][0] == "Job Finished Successfully"
+
+        # Make sure the forward DISET is generated
+        operations = updated_wf_commons["request_dict"]["Operations"]
+        assert len(operations) == 0
+
+        # Make sure the request json does not exists
+        assert not Path(request_file).exists()
+
+    def test_failoverRequest_commitFailure2(self, mocker: MockerFixture, failover_request):
+        """Test execution of FailoverRequest module when the fileReport.commit() fails.
+
+        In this context, the second call to commit() will fail, so the request should be generated.
+        """
+        problematic_files = [
+            "/lhcb/data/2010/EW.DST/00008380/0000/00008380_00000287_1.ew.dst",
+        ]
+        # Both calla to getFiles() will return the problematic files because the commit did not work
+        mock_file_report = mocker.patch("dirac_cwl.commands.failover_request.FileReport")
+        mock_job_report = mocker.patch("dirac_cwl.commands.failover_request.JobReport")
+
+        fr = FileReport()
+        mocker.patch.object(fr, "getFiles", side_effect=[problematic_files, problematic_files])
+        mocker.patch.object(fr, "commit", side_effect=[S_ERROR("Error"), S_ERROR("Error")])
+        mocker.patch.object(fr, "setFileStatus")
+        mock_file_report.return_value = fr
+
+        jr = JobReport(wf_commons["job_id"])
+        mocker.patch.object(jr, "setApplicationStatus")
+        mock_job_report.return_value = jr
+
+        wf_commons["inputs"] = [
+            "/lhcb/data/2010/EW.DST/00008380/0000/00008380_00000281_1.ew.dst",
+            "/lhcb/data/2011/EW.DST/00008380/0000/00008380_00000281_1.ew.dst",
+        ] + problematic_files
+
+        with open(wf_commons_file, "w", encoding="utf-8") as f:
+            json.dump(wf_commons, f)
+
+        # Execute the module
+        failover_request.execute(job_path)
+
+        with open(wf_commons_file, "r", encoding="utf-8") as f:
+            updated_wf_commons = json.load(f)
+
+        # Check the FileReport calls: the problematic file should not appear
+        # The input files should be set to "Processed"
+        assert fr.setFileStatus.call_count == 2
+        args = fr.setFileStatus.call_args_list
+        assert args[0][0][0] == int(updated_wf_commons["production_id"])
+        assert args[0][0][1] == updated_wf_commons["inputs"][0]
+        assert args[0][0][2] == "Processed"
+
+        assert args[1][0][0] == int(updated_wf_commons["production_id"])
+        assert args[1][0][1] == updated_wf_commons["inputs"][1]
+        assert args[1][0][2] == "Processed"
+
+        # Make sure the appliction is successfully finished
+        assert jr.setApplicationStatus.call_count == 1
+        assert jr.setApplicationStatus.call_args[0][0] == "Job Finished Successfully"
+
+        # Make sure the forward DISET is generated
+        operations = updated_wf_commons["request_dict"]["Operations"]
+
+        assert len(operations) == 1
+        assert operations[0]["Type"] == "SetFileStatus"
+
+        # Make sure the request json does not exists
+        assert Path(request_file).exists()
+
+    def test_failoverRequest_previousError_fail(self, mocker: MockerFixture, failover_request):
+        """Test FailoverRequest with an intentional failure."""
+        problematic_files = [
+            "/lhcb/data/2010/EW.DST/00008380/0000/00008380_00000287_1.ew.dst",
+        ]
+        mock_file_report = mocker.patch("dirac_cwl.commands.failover_request.FileReport")
+        mock_job_report = mocker.patch("dirac_cwl.commands.failover_request.JobReport")
+
+        fr = FileReport()
+        mocker.patch.object(fr, "getFiles", side_effect=[problematic_files, problematic_files])
+        mocker.patch.object(fr, "commit", side_effect=[S_ERROR("Error"), S_ERROR("Error")])
+        mocker.patch.object(fr, "setFileStatus")
+        mock_file_report.return_value = fr
+
+        jr = JobReport(wf_commons["job_id"])
+        mocker.patch.object(jr, "setApplicationStatus")
+        mock_job_report.return_value = jr
+
+        wf_commons["inputs"] = [
+            "/lhcb/data/2010/EW.DST/00008380/0000/00008380_00000281_1.ew.dst",
+            "/lhcb/data/2011/EW.DST/00008380/0000/00008380_00000281_1.ew.dst",
+        ] + problematic_files
+
+        # Intentional error
+        wf_commons["step_status"] = S_ERROR()
+
+        with open(wf_commons_file, "w", encoding="utf-8") as f:
+            json.dump(wf_commons, f)
+
+        # Execute the module
+        failover_request.execute(job_path)
+
+        with open(wf_commons_file, "r", encoding="utf-8") as f:
+            updated_wf_commons = json.load(f)
+
+        # Check the FileReport calls: the problematic file should not appear
+        # The input files should be set to "Unused"
+        assert fr.setFileStatus.call_count == 2
+        args = fr.setFileStatus.call_args_list
+        assert args[0][0][0] == int(updated_wf_commons["production_id"])
+        assert args[0][0][1] == updated_wf_commons["inputs"][0]
+        assert args[0][0][2] == "Unused"
+
+        assert args[1][0][0] == int(updated_wf_commons["production_id"])
+        assert args[1][0][1] == updated_wf_commons["inputs"][1]
+        assert args[1][0][2] == "Unused"
+
+        # Make sure the appliction is not reported as a success
+        assert jr.setApplicationStatus.call_count == 0
+
+        # Make sure the forward DISET is not generated
+        operations = updated_wf_commons["request_dict"]["Operations"]
+        assert len(operations) == 0
+
+        # Make sure the request json does not exists
+        assert not Path(request_file).exists()
