@@ -20,34 +20,58 @@ from pytest_mock import MockerFixture
 
 from dirac_cwl.commands import BookeepingReport, FailoverRequest, UploadLogFile
 
-wf_commons = {
-    "job_id": 0,
-    "job_type": "merge",
-    "production_id": "123",
-    "prod_job_id": "00000456",
-    "event_type": "123456789",
-    "number_of_events": "100",
-    "config_name": "aConfigName",
-    "config_version": "aConfigVersion",
-    "application_name": "someApp",
-    "application_version": "v1r0",
-    "bk_step_id": "123",
-    "inputs": [],
-    "outputs": [],
-    "executable": "",
-    "command_id": "1",
-    "command_number": 1,
-}
-
 number_of_processors = 1
 job_path = "."
-xml_summary_file = os.path.join(
-    job_path,
-    f"summary{wf_commons['application_name']}_{wf_commons['production_id']}_{wf_commons['prod_job_id']}_{wf_commons['command_id']}.xml",
-)
-wf_commons_file = os.path.join(job_path, "workflow_commons.json")
-bookkeeping_file = os.path.join(job_path, f"bookkeeping_{wf_commons['command_id']}.xml")
-request_file = f"{wf_commons['production_id']}_{wf_commons['prod_job_id']}_request.json"
+
+
+@pytest.fixture
+def wf_commons():
+    """Workflow commons dictionary fixture."""
+    yield {
+        "job_id": 0,
+        "job_type": "merge",
+        "production_id": "123",
+        "prod_job_id": "00000456",
+        "event_type": "123456789",
+        "number_of_events": "100",
+        "config_name": "aConfigName",
+        "config_version": "aConfigVersion",
+        "application_name": "someApp",
+        "application_version": "v1r0",
+        "bk_step_id": "123",
+        "inputs": [],
+        "outputs": [],
+        "executable": "",
+        "command_id": "1",
+        "command_number": 1,
+    }
+
+
+@pytest.fixture
+def xml_summary_file(wf_commons):
+    """XMLSummaryFile file path fixture."""
+    path = os.path.join(
+        job_path,
+        f"summary{wf_commons['application_name']}_{wf_commons['production_id']}_{wf_commons['prod_job_id']}_{wf_commons['command_id']}.xml",
+    )
+    yield path
+    Path(path).unlink(missing_ok=True)
+
+
+@pytest.fixture
+def request_file(wf_commons):
+    """RequstDict file path fixture."""
+    path = os.path.join(job_path, f"{wf_commons['production_id']}_{wf_commons['prod_job_id']}_request.json")
+    yield path
+    Path(path).unlink(missing_ok=True)
+
+
+@pytest.fixture
+def wf_commons_file():
+    """Workflow commons file path fixture."""
+    path = os.path.join(job_path, "workflow_commons.json")
+    yield path
+    Path(path).unlink(missing_ok=True)
 
 
 def prepare_XMLSummary_file(xml_summary, content):
@@ -83,6 +107,7 @@ def get_output_file_details(output_file):
     return details
 
 
+@pytest.mark.skip("Deprecated command implementation")
 class TestUploadLogFile:
     """Collection of tests for the UploadLogFile command."""
 
@@ -348,52 +373,14 @@ class TestUploadLogFile:
 
 
 class TestBookkeepingReport:
-    """Collection of tests for the TestBookkeepingReport command."""
-
-    wms_job_id = 0
-    job_type = "merge"
-    production_id = "123"
-    prod_job_id = "00000456"
-    event_type = "123456789"
-    number_of_events = "100"
-    config_name = "aConfigName"
-    config_version = "aConfigVersion"
-    application_name = "someApp"
-    application_version = "v1r0"
-    bk_step_id = "123"
-    command_id = "1"
-    number_of_processors = 1
-    job_path = "."
-
-    xml_summary_file = os.path.join(
-        job_path, f"summary{application_name}_{production_id}_{prod_job_id}_{command_id}.xml"
-    )
-    wf_commons_file = os.path.join(job_path, "workflow_commons.json")
-    bookkeeping_file = os.path.join(job_path, f"bookkeeping_{command_id}.xml")
+    """Collection of tests for the BookkeepingReport command."""
 
     @pytest.fixture
-    def wf_commons(self):
-        """Workflow Commons dictionary fixture."""
-        content = {
-            "job_id": self.wms_job_id,
-            "job_type": self.job_type,
-            "production_id": self.production_id,
-            "prod_job_id": self.prod_job_id,
-            "event_type": self.event_type,
-            "number_of_events": self.number_of_events,
-            "config_name": self.config_name,
-            "config_version": self.config_version,
-            "application_name": self.application_name,
-            "application_version": self.application_version,
-            "bk_step_id": self.bk_step_id,
-            "inputs": [],
-            "outputs": [],
-            "executable": "",
-            "command_id": self.command_id,
-            "command_number": 1,
-        }
-
-        yield content
+    def bookkeeping_file(self, wf_commons):
+        """Bookkeeping report file fixture."""
+        path = os.path.join(job_path, f"bookkeeping_{wf_commons['command_id']}.xml")
+        yield path
+        Path(path).unlink(missing_ok=True)
 
     @pytest.fixture
     def bk_report(self, mocker):
@@ -403,21 +390,18 @@ class TestBookkeepingReport:
         """
         mock_get_n_procs = mocker.patch("dirac_cwl.commands.bookkeeping_report.getNumberOfProcessorsToUse")
 
-        mock_get_n_procs.return_value = self.number_of_processors
+        mock_get_n_procs.return_value = number_of_processors
 
         yield BookeepingReport()
-
-        Path(self.wf_commons_file).unlink(missing_ok=True)
-        Path(self.bookkeeping_file).unlink(missing_ok=True)
-        Path(self.xml_summary_file).unlink(missing_ok=True)
 
         Path("00209455_00001537_1").unlink(missing_ok=True)
         Path("00209455_00001537_1.sim").unlink(missing_ok=True)
 
-    def test_bkreport_prod_mcsimulation_success(self, bk_report, wf_commons):
+    def test_bkreport_prod_mcsimulation_success(
+        self, bk_report, wf_commons, wf_commons_file, bookkeeping_file, xml_summary_file
+    ):
         """Test successful execution of BookkeepingReport module."""
         wf_commons["application_name"] = "Gauss"
-        wf_commons["application_version"] = self.application_version
         wf_commons["job_type"] = "MCSimulation"
 
         wf_commons["bookkeeping_LFNs"] = [
@@ -467,16 +451,16 @@ class TestBookkeepingReport:
             </summary>
             """)
 
-        wf_commons["xml_summary_path"] = self.xml_summary_file
-        xf_o = prepare_XMLSummary_file(self.xml_summary_file, xml_content)
+        wf_commons["xml_summary_path"] = xml_summary_file
+        xf_o = prepare_XMLSummary_file(xml_summary_file, xml_content)
 
-        with open(self.wf_commons_file, "w", encoding="utf-8") as f:
+        with open(wf_commons_file, "w", encoding="utf-8") as f:
             json.dump(wf_commons, f)
 
         # Execute the module
-        bk_report.execute(self.job_path)
+        bk_report.execute(job_path)
 
-        xml_path = self.bookkeeping_file
+        xml_path = bookkeeping_file
         assert Path(xml_path).exists(), "XML report file not created."
 
         # Validate the XML file
@@ -485,15 +469,15 @@ class TestBookkeepingReport:
 
         # Extract fields from the XML and perform further operations
         assert root.tag == "Job", "Root tag should be Job."
-        assert root.attrib["ConfigName"] == self.config_name
-        assert root.attrib["ConfigVersion"] == self.config_version
+        assert root.attrib["ConfigName"] == wf_commons["config_name"]
+        assert root.attrib["ConfigVersion"] == wf_commons["config_version"]
         assert root.attrib["Date"]
         assert root.attrib["Time"]
 
         assert get_typed_parameter_value("ProgramName", root) == wf_commons["application_name"]
         assert get_typed_parameter_value("ProgramVersion", root) == wf_commons["application_version"]
         assert get_typed_parameter_value("DiracVersion", root) == LHCbDIRAC.__version__
-        assert get_typed_parameter_value("Name", root) == self.command_id
+        assert get_typed_parameter_value("Name", root) == wf_commons["command_id"]
         assert float(get_typed_parameter_value("ExecTime", root)) > 1000
         assert get_typed_parameter_value("CPUTIME", root) == "0"
 
@@ -501,8 +485,8 @@ class TestBookkeepingReport:
         assert get_typed_parameter_value("StatisticsRequested", root) == str(wf_commons["number_of_events"])
         assert get_typed_parameter_value("NumberOfEvents", root) == str(xf_o.outputEventsTotal)
 
-        assert get_typed_parameter_value("Production", root) == self.production_id
-        assert get_typed_parameter_value("DiracJobId", root) == str(self.wms_job_id)
+        assert get_typed_parameter_value("Production", root) == wf_commons["production_id"]
+        assert get_typed_parameter_value("DiracJobId", root) == str(wf_commons["job_id"])
         assert get_typed_parameter_value("Location", root) == siteName()
         assert get_typed_parameter_value("JobStart", root)
         assert get_typed_parameter_value("JobEnd", root)
@@ -514,7 +498,7 @@ class TestBookkeepingReport:
         assert get_typed_parameter_value("WNMODEL", root)
         assert get_typed_parameter_value("WNCACHE", root)
         assert get_typed_parameter_value("WNCPUHS06", root)
-        assert get_typed_parameter_value("NumberOfProcessors", root) == str(self.number_of_processors)
+        assert get_typed_parameter_value("NumberOfProcessors", root) == str(number_of_processors)
 
         # Input should be empty
         input_file = root.find("InputFile")
@@ -534,7 +518,9 @@ class TestBookkeepingReport:
 
         assert len(output_files) == 1
 
-    def test_bkreport_prod_mcsimulation_noinputoutput_success(self, bk_report, wf_commons):
+    def test_bkreport_prod_mcsimulation_noinputoutput_success(
+        self, bk_report, wf_commons, wf_commons_file, bookkeeping_file, xml_summary_file
+    ):
         """Test successful execution of BookkeepingReport module.
 
         * No input files because wf_commons["stepInputData is empty
@@ -544,7 +530,6 @@ class TestBookkeepingReport:
         """
         # Mock the BookkeepingReport module
         wf_commons["application_name"] = "Gauss"
-        wf_commons["application_version"] = self.application_version
         wf_commons["job_type"] = "MCSimulation"
 
         # This was obtained from a previous module (likely GaudiApplication)
@@ -589,17 +574,17 @@ class TestBookkeepingReport:
             </summary>
             """)
 
-        wf_commons["xml_summary_path"] = self.xml_summary_file
-        xf_o = prepare_XMLSummary_file(self.xml_summary_file, xml_content)
+        wf_commons["xml_summary_path"] = xml_summary_file
+        xf_o = prepare_XMLSummary_file(xml_summary_file, xml_content)
 
-        with open(self.wf_commons_file, "w", encoding="utf-8") as f:
+        with open(wf_commons_file, "w", encoding="utf-8") as f:
             json.dump(wf_commons, f)
 
         # Execute the module
-        bk_report.execute(self.job_path)
+        bk_report.execute(job_path)
 
         # Check if the XML report file is created
-        xml_path = self.bookkeeping_file
+        xml_path = bookkeeping_file
         assert Path(xml_path).exists(), "XML report file not created."
 
         # Validate the XML file
@@ -608,15 +593,15 @@ class TestBookkeepingReport:
 
         # Extract fields from the XML and perform further operations
         assert root.tag == "Job", "Root tag should be Job."
-        assert root.attrib["ConfigName"] == self.config_name
-        assert root.attrib["ConfigVersion"] == self.config_version
+        assert root.attrib["ConfigName"] == wf_commons["config_name"]
+        assert root.attrib["ConfigVersion"] == wf_commons["config_version"]
         assert root.attrib["Date"]
         assert root.attrib["Time"]
 
         assert get_typed_parameter_value("ProgramName", root) == wf_commons["application_name"]
         assert get_typed_parameter_value("ProgramVersion", root) == wf_commons["application_version"]
         assert get_typed_parameter_value("DiracVersion", root) == LHCbDIRAC.__version__
-        assert get_typed_parameter_value("Name", root) == self.command_id
+        assert get_typed_parameter_value("Name", root) == wf_commons["command_id"]
         assert float(get_typed_parameter_value("ExecTime", root)) > 1000
         assert get_typed_parameter_value("CPUTIME", root) == "0"
 
@@ -624,8 +609,8 @@ class TestBookkeepingReport:
         assert get_typed_parameter_value("StatisticsRequested", root) == str(wf_commons["number_of_events"])
         assert get_typed_parameter_value("NumberOfEvents", root) == str(xf_o.outputEventsTotal)
 
-        assert get_typed_parameter_value("Production", root) == self.production_id
-        assert get_typed_parameter_value("DiracJobId", root) == str(self.wms_job_id)
+        assert get_typed_parameter_value("Production", root) == wf_commons["production_id"]
+        assert get_typed_parameter_value("DiracJobId", root) == str(wf_commons["job_id"])
         assert get_typed_parameter_value("Location", root) == siteName()
         assert get_typed_parameter_value("JobStart", root)
         assert get_typed_parameter_value("JobEnd", root)
@@ -637,7 +622,7 @@ class TestBookkeepingReport:
         assert get_typed_parameter_value("WNMODEL", root)
         assert get_typed_parameter_value("WNCACHE", root)
         assert get_typed_parameter_value("WNCPUHS06", root)
-        assert get_typed_parameter_value("NumberOfProcessors", root) == str(self.number_of_processors)
+        assert get_typed_parameter_value("NumberOfProcessors", root) == str(number_of_processors)
 
         # Input should be empty
         input_file = root.find("InputFile")
@@ -647,10 +632,11 @@ class TestBookkeepingReport:
         output_file = root.find("OutputFile")
         assert output_file is None, "OutputFile element should not be present."
 
-    def test_bk_report_prod_mcreconstruction_success(self, bk_report, wf_commons):
+    def test_bk_report_prod_mcreconstruction_success(
+        self, bk_report, wf_commons, wf_commons_file, bookkeeping_file, xml_summary_file
+    ):
         """Test successful execution of BookkeepingReport module."""
         wf_commons["application_name"] = "Boole"
-        wf_commons["application_version"] = self.application_version
         wf_commons["job_type"] = "MCReconstruction"
 
         wf_commons["bookkeeping_LFNs"] = [
@@ -692,18 +678,18 @@ class TestBookkeepingReport:
             </summary>
             """)
 
-        wf_commons["xml_summary_path"] = self.xml_summary_file
+        wf_commons["xml_summary_path"] = xml_summary_file
 
-        xf_o = prepare_XMLSummary_file(self.xml_summary_file, xml_content)
+        xf_o = prepare_XMLSummary_file(xml_summary_file, xml_content)
 
-        with open(self.wf_commons_file, "w", encoding="utf-8") as f:
+        with open(wf_commons_file, "w", encoding="utf-8") as f:
             json.dump(wf_commons, f)
 
         # Execute the module
-        bk_report.execute(self.job_path)
+        bk_report.execute(job_path)
 
         # Check if the XML report file is created
-        xml_path = self.bookkeeping_file
+        xml_path = bookkeeping_file
         assert Path(xml_path).exists(), "XML report file not created."
 
         # Validate the XML file
@@ -712,15 +698,15 @@ class TestBookkeepingReport:
 
         # Extract fields from the XML and perform further operations
         assert root.tag == "Job", "Root tag should be Job."
-        assert root.attrib["ConfigName"] == self.config_name
-        assert root.attrib["ConfigVersion"] == self.config_version
+        assert root.attrib["ConfigName"] == wf_commons["config_name"]
+        assert root.attrib["ConfigVersion"] == wf_commons["config_version"]
         assert root.attrib["Date"]
         assert root.attrib["Time"]
 
         assert get_typed_parameter_value("ProgramName", root) == wf_commons["application_name"]
         assert get_typed_parameter_value("ProgramVersion", root) == wf_commons["application_version"]
         assert get_typed_parameter_value("DiracVersion", root) == LHCbDIRAC.__version__
-        assert get_typed_parameter_value("Name", root) == self.command_id
+        assert get_typed_parameter_value("Name", root) == wf_commons["command_id"]
         assert float(get_typed_parameter_value("ExecTime", root)) > 1000
         assert get_typed_parameter_value("CPUTIME", root) == "0"
 
@@ -728,8 +714,8 @@ class TestBookkeepingReport:
         assert get_typed_parameter_value("StatisticsRequested", root) == str(wf_commons["number_of_events"])
         assert get_typed_parameter_value("NumberOfEvents", root) == str(xf_o.inputEventsTotal)
 
-        assert get_typed_parameter_value("Production", root) == self.production_id
-        assert get_typed_parameter_value("DiracJobId", root) == str(self.wms_job_id)
+        assert get_typed_parameter_value("Production", root) == wf_commons["production_id"]
+        assert get_typed_parameter_value("DiracJobId", root) == str(wf_commons["job_id"])
         assert get_typed_parameter_value("Location", root) == siteName()
         assert get_typed_parameter_value("JobStart", root)
         assert get_typed_parameter_value("JobEnd", root)
@@ -741,7 +727,7 @@ class TestBookkeepingReport:
         assert get_typed_parameter_value("WNMODEL", root)
         assert get_typed_parameter_value("WNCACHE", root)
         assert get_typed_parameter_value("WNCPUHS06", root)
-        assert get_typed_parameter_value("NumberOfProcessors", root) == str(self.number_of_processors)
+        assert get_typed_parameter_value("NumberOfProcessors", root) == str(number_of_processors)
 
         # Input should not be empty
         input_file = root.find("InputFile")
@@ -765,19 +751,19 @@ class TestBookkeepingReport:
         simulation_condition = root.find("SimulationCondition")
         assert simulation_condition is None, "SimulationCondition element should not be present."
 
-    def test_bkreport_previousError_success(self, mocker, bk_report, wf_commons):
+    def test_bkreport_previousError_success(self, mocker, bk_report, wf_commons, wf_commons_file, bookkeeping_file):
         """Test previous command failure."""
         wf_commons["application_name"] = "Gauss"
-        wf_commons["application_version"] = self.config_version
+        wf_commons["application_version"] = wf_commons["config_version"]
         wf_commons["job_type"] = "MCSimulation"
         wf_commons["step_status"] = S_ERROR()
 
-        with open(self.wf_commons_file, "w", encoding="utf-8") as f:
+        with open(wf_commons_file, "w", encoding="utf-8") as f:
             json.dump(wf_commons, f)
 
-        bk_report.execute(self.job_path)
+        bk_report.execute(job_path)
 
-        assert not os.path.exists(self.bookkeeping_file)
+        assert not os.path.exists(bookkeeping_file)
 
 
 class TestFailoverRequest:
@@ -793,10 +779,9 @@ class TestFailoverRequest:
 
         yield FailoverRequest()
 
-        Path(request_file).unlink(missing_ok=True)
-        Path(wf_commons_file).unlink(missing_ok=True)
-
-    def test_failoverRequest_success(self, mocker: MockerFixture, failover_request):
+    def test_failoverRequest_success(
+        self, mocker: MockerFixture, failover_request, wf_commons, wf_commons_file, request_file
+    ):
         """Test successful execution of FailoverRequest module."""
         problematic_files = [
             "/lhcb/data/2010/EW.DST/00008380/0000/00008380_00000287_1.ew.dst",
@@ -852,7 +837,9 @@ class TestFailoverRequest:
         # Make sure the request json does not exists
         assert not Path(request_file).exists()
 
-    def test_failoverRequest_commitFailure1(self, mocker: MockerFixture, failover_request):
+    def test_failoverRequest_commitFailure1(
+        self, mocker: MockerFixture, failover_request, wf_commons, wf_commons_file, request_file
+    ):
         """Test execution of FailoverRequest module when the fileReport.commit() fails.
 
         In this context, the second call to commit() will work, so the request should not be generated.
@@ -911,7 +898,9 @@ class TestFailoverRequest:
         # Make sure the request json does not exists
         assert not Path(request_file).exists()
 
-    def test_failoverRequest_commitFailure2(self, mocker: MockerFixture, failover_request):
+    def test_failoverRequest_commitFailure2(
+        self, mocker: MockerFixture, failover_request, wf_commons, wf_commons_file, request_file
+    ):
         """Test execution of FailoverRequest module when the fileReport.commit() fails.
 
         In this context, the second call to commit() will fail, so the request should be generated.
@@ -972,7 +961,9 @@ class TestFailoverRequest:
         # Make sure the request json does not exists
         assert Path(request_file).exists()
 
-    def test_failoverRequest_previousError_fail(self, mocker: MockerFixture, failover_request):
+    def test_failoverRequest_previousError_fail(
+        self, mocker: MockerFixture, failover_request, wf_commons, wf_commons_file, request_file
+    ):
         """Test FailoverRequest with an intentional failure."""
         problematic_files = [
             "/lhcb/data/2010/EW.DST/00008380/0000/00008380_00000287_1.ew.dst",
