@@ -12,13 +12,19 @@ from urllib.parse import urljoin
 import LHCbDIRAC
 import pytest
 from DIRAC import siteName
+from DIRAC.DataManagementSystem.Client.FailoverTransfer import FailoverTransfer
+from DIRAC.RequestManagementSystem.Client.File import File
+from DIRAC.RequestManagementSystem.Client.Operation import Operation
+from DIRAC.RequestManagementSystem.Client.Request import Request
 from DIRAC.TransformationSystem.Client.FileReport import FileReport
 from DIRAC.WorkloadManagementSystem.Client.JobReport import JobReport
 from DIRACCommon.Core.Utilities.ReturnValues import S_ERROR, S_OK
+from LHCbDIRAC.BookkeepingSystem.Client.BookkeepingClient import BookkeepingClient
 from LHCbDIRAC.Core.Utilities.XMLSummaries import XMLSummary
 from pytest_mock import MockerFixture
 
-from dirac_cwl.commands import BookeepingReport, FailoverRequest, UploadLogFile
+from dirac_cwl.commands import BookeepingReport, FailoverRequest, UploadLogFile, UploadOutputData
+from dirac_cwl.core.exceptions import WorkflowProcessingException
 
 number_of_processors = 1
 job_path = "."
@@ -46,6 +52,8 @@ def wf_commons():
         "command_number": 1,
     }
 
+    Path(os.path.join(job_path, "workflow_commons.json")).unlink(missing_ok=True)
+
 
 @pytest.fixture
 def xml_summary_file(wf_commons):
@@ -62,14 +70,6 @@ def xml_summary_file(wf_commons):
 def request_file(wf_commons):
     """RequstDict file path fixture."""
     path = os.path.join(job_path, f"{wf_commons['production_id']}_{wf_commons['prod_job_id']}_request.json")
-    yield path
-    Path(path).unlink(missing_ok=True)
-
-
-@pytest.fixture
-def wf_commons_file():
-    """Workflow commons file path fixture."""
-    path = os.path.join(job_path, "workflow_commons.json")
     yield path
     Path(path).unlink(missing_ok=True)
 
@@ -105,6 +105,14 @@ def get_output_file_details(output_file):
             details["Replicas"].append({"Name": elem.attrib["Name"], "Location": elem.attrib["Location"]})
 
     return details
+
+
+def create_workflow_commons(wf_dict):
+    """Dump the content of wf_commons to a file."""
+    path = os.path.join(job_path, "workflow_commons.json")
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(wf_dict, f)
+    return path
 
 
 @pytest.mark.skip("Deprecated command implementation")
@@ -397,9 +405,7 @@ class TestBookkeepingReport:
         Path("00209455_00001537_1").unlink(missing_ok=True)
         Path("00209455_00001537_1.sim").unlink(missing_ok=True)
 
-    def test_bkreport_prod_mcsimulation_success(
-        self, bk_report, wf_commons, wf_commons_file, bookkeeping_file, xml_summary_file
-    ):
+    def test_bkreport_prod_mcsimulation_success(self, bk_report, wf_commons, bookkeeping_file, xml_summary_file):
         """Test successful execution of BookkeepingReport module."""
         wf_commons["application_name"] = "Gauss"
         wf_commons["job_type"] = "MCSimulation"
@@ -454,11 +460,13 @@ class TestBookkeepingReport:
         wf_commons["xml_summary_path"] = xml_summary_file
         xf_o = prepare_XMLSummary_file(xml_summary_file, xml_content)
 
-        with open(wf_commons_file, "w", encoding="utf-8") as f:
-            json.dump(wf_commons, f)
+        wf_commons_path = create_workflow_commons(wf_commons)
 
         # Execute the module
         bk_report.execute(job_path)
+
+        with open(wf_commons_path, "r", encoding="utf-8") as f:
+            updated_wf_commons = json.load(f)
 
         xml_path = bookkeeping_file
         assert Path(xml_path).exists(), "XML report file not created."
@@ -469,28 +477,28 @@ class TestBookkeepingReport:
 
         # Extract fields from the XML and perform further operations
         assert root.tag == "Job", "Root tag should be Job."
-        assert root.attrib["ConfigName"] == wf_commons["config_name"]
-        assert root.attrib["ConfigVersion"] == wf_commons["config_version"]
+        assert root.attrib["ConfigName"] == updated_wf_commons["config_name"]
+        assert root.attrib["ConfigVersion"] == updated_wf_commons["config_version"]
         assert root.attrib["Date"]
         assert root.attrib["Time"]
 
-        assert get_typed_parameter_value("ProgramName", root) == wf_commons["application_name"]
-        assert get_typed_parameter_value("ProgramVersion", root) == wf_commons["application_version"]
+        assert get_typed_parameter_value("ProgramName", root) == updated_wf_commons["application_name"]
+        assert get_typed_parameter_value("ProgramVersion", root) == updated_wf_commons["application_version"]
         assert get_typed_parameter_value("DiracVersion", root) == LHCbDIRAC.__version__
-        assert get_typed_parameter_value("Name", root) == wf_commons["command_id"]
+        assert get_typed_parameter_value("Name", root) == updated_wf_commons["command_id"]
         assert float(get_typed_parameter_value("ExecTime", root)) > 1000
         assert get_typed_parameter_value("CPUTIME", root) == "0"
 
         assert get_typed_parameter_value("FirstEventNumber", root) == "1"
-        assert get_typed_parameter_value("StatisticsRequested", root) == str(wf_commons["number_of_events"])
+        assert get_typed_parameter_value("StatisticsRequested", root) == str(updated_wf_commons["number_of_events"])
         assert get_typed_parameter_value("NumberOfEvents", root) == str(xf_o.outputEventsTotal)
 
-        assert get_typed_parameter_value("Production", root) == wf_commons["production_id"]
-        assert get_typed_parameter_value("DiracJobId", root) == str(wf_commons["job_id"])
+        assert get_typed_parameter_value("Production", root) == updated_wf_commons["production_id"]
+        assert get_typed_parameter_value("DiracJobId", root) == str(updated_wf_commons["job_id"])
         assert get_typed_parameter_value("Location", root) == siteName()
         assert get_typed_parameter_value("JobStart", root)
         assert get_typed_parameter_value("JobEnd", root)
-        assert get_typed_parameter_value("JobType", root) == wf_commons["job_type"]
+        assert get_typed_parameter_value("JobType", root) == updated_wf_commons["job_type"]
 
         assert get_typed_parameter_value("WorkerNode", root)
         assert get_typed_parameter_value("WNMEMORY", root)
@@ -509,7 +517,7 @@ class TestBookkeepingReport:
         assert output_files, "No OutputFile elements found."
 
         first_output_details = get_output_file_details(output_files[0])
-        assert first_output_details["Name"] == wf_commons["production_output_data"][0]
+        assert first_output_details["Name"] == updated_wf_commons["production_output_data"][0]
         assert first_output_details["TypeName"] == "SIM"
         assert first_output_details["Parameters"]["FileSize"] == "0"
         assert "CreationDate" in first_output_details["Parameters"]
@@ -519,7 +527,7 @@ class TestBookkeepingReport:
         assert len(output_files) == 1
 
     def test_bkreport_prod_mcsimulation_noinputoutput_success(
-        self, bk_report, wf_commons, wf_commons_file, bookkeeping_file, xml_summary_file
+        self, bk_report, wf_commons, bookkeeping_file, xml_summary_file
     ):
         """Test successful execution of BookkeepingReport module.
 
@@ -577,11 +585,13 @@ class TestBookkeepingReport:
         wf_commons["xml_summary_path"] = xml_summary_file
         xf_o = prepare_XMLSummary_file(xml_summary_file, xml_content)
 
-        with open(wf_commons_file, "w", encoding="utf-8") as f:
-            json.dump(wf_commons, f)
+        wf_commons_path = create_workflow_commons(wf_commons)
 
         # Execute the module
         bk_report.execute(job_path)
+
+        with open(wf_commons_path, "r", encoding="utf-8") as f:
+            updated_wf_commons = json.load(f)
 
         # Check if the XML report file is created
         xml_path = bookkeeping_file
@@ -593,28 +603,28 @@ class TestBookkeepingReport:
 
         # Extract fields from the XML and perform further operations
         assert root.tag == "Job", "Root tag should be Job."
-        assert root.attrib["ConfigName"] == wf_commons["config_name"]
-        assert root.attrib["ConfigVersion"] == wf_commons["config_version"]
+        assert root.attrib["ConfigName"] == updated_wf_commons["config_name"]
+        assert root.attrib["ConfigVersion"] == updated_wf_commons["config_version"]
         assert root.attrib["Date"]
         assert root.attrib["Time"]
 
-        assert get_typed_parameter_value("ProgramName", root) == wf_commons["application_name"]
-        assert get_typed_parameter_value("ProgramVersion", root) == wf_commons["application_version"]
+        assert get_typed_parameter_value("ProgramName", root) == updated_wf_commons["application_name"]
+        assert get_typed_parameter_value("ProgramVersion", root) == updated_wf_commons["application_version"]
         assert get_typed_parameter_value("DiracVersion", root) == LHCbDIRAC.__version__
-        assert get_typed_parameter_value("Name", root) == wf_commons["command_id"]
+        assert get_typed_parameter_value("Name", root) == updated_wf_commons["command_id"]
         assert float(get_typed_parameter_value("ExecTime", root)) > 1000
         assert get_typed_parameter_value("CPUTIME", root) == "0"
 
         assert get_typed_parameter_value("FirstEventNumber", root) == "1"
-        assert get_typed_parameter_value("StatisticsRequested", root) == str(wf_commons["number_of_events"])
+        assert get_typed_parameter_value("StatisticsRequested", root) == str(updated_wf_commons["number_of_events"])
         assert get_typed_parameter_value("NumberOfEvents", root) == str(xf_o.outputEventsTotal)
 
-        assert get_typed_parameter_value("Production", root) == wf_commons["production_id"]
-        assert get_typed_parameter_value("DiracJobId", root) == str(wf_commons["job_id"])
+        assert get_typed_parameter_value("Production", root) == updated_wf_commons["production_id"]
+        assert get_typed_parameter_value("DiracJobId", root) == str(updated_wf_commons["job_id"])
         assert get_typed_parameter_value("Location", root) == siteName()
         assert get_typed_parameter_value("JobStart", root)
         assert get_typed_parameter_value("JobEnd", root)
-        assert get_typed_parameter_value("JobType", root) == wf_commons["job_type"]
+        assert get_typed_parameter_value("JobType", root) == updated_wf_commons["job_type"]
 
         assert get_typed_parameter_value("WorkerNode", root)
         assert get_typed_parameter_value("WNMEMORY", root)
@@ -632,9 +642,7 @@ class TestBookkeepingReport:
         output_file = root.find("OutputFile")
         assert output_file is None, "OutputFile element should not be present."
 
-    def test_bk_report_prod_mcreconstruction_success(
-        self, bk_report, wf_commons, wf_commons_file, bookkeeping_file, xml_summary_file
-    ):
+    def test_bk_report_prod_mcreconstruction_success(self, bk_report, wf_commons, bookkeeping_file, xml_summary_file):
         """Test successful execution of BookkeepingReport module."""
         wf_commons["application_name"] = "Boole"
         wf_commons["job_type"] = "MCReconstruction"
@@ -682,11 +690,13 @@ class TestBookkeepingReport:
 
         xf_o = prepare_XMLSummary_file(xml_summary_file, xml_content)
 
-        with open(wf_commons_file, "w", encoding="utf-8") as f:
-            json.dump(wf_commons, f)
+        wf_commons_path = create_workflow_commons(wf_commons)
 
         # Execute the module
         bk_report.execute(job_path)
+
+        with open(wf_commons_path, "r", encoding="utf-8") as f:
+            updated_wf_commons = json.load(f)
 
         # Check if the XML report file is created
         xml_path = bookkeeping_file
@@ -698,28 +708,28 @@ class TestBookkeepingReport:
 
         # Extract fields from the XML and perform further operations
         assert root.tag == "Job", "Root tag should be Job."
-        assert root.attrib["ConfigName"] == wf_commons["config_name"]
-        assert root.attrib["ConfigVersion"] == wf_commons["config_version"]
+        assert root.attrib["ConfigName"] == updated_wf_commons["config_name"]
+        assert root.attrib["ConfigVersion"] == updated_wf_commons["config_version"]
         assert root.attrib["Date"]
         assert root.attrib["Time"]
 
-        assert get_typed_parameter_value("ProgramName", root) == wf_commons["application_name"]
-        assert get_typed_parameter_value("ProgramVersion", root) == wf_commons["application_version"]
+        assert get_typed_parameter_value("ProgramName", root) == updated_wf_commons["application_name"]
+        assert get_typed_parameter_value("ProgramVersion", root) == updated_wf_commons["application_version"]
         assert get_typed_parameter_value("DiracVersion", root) == LHCbDIRAC.__version__
-        assert get_typed_parameter_value("Name", root) == wf_commons["command_id"]
+        assert get_typed_parameter_value("Name", root) == updated_wf_commons["command_id"]
         assert float(get_typed_parameter_value("ExecTime", root)) > 1000
         assert get_typed_parameter_value("CPUTIME", root) == "0"
 
         assert get_typed_parameter_value("FirstEventNumber", root) == "1"
-        assert get_typed_parameter_value("StatisticsRequested", root) == str(wf_commons["number_of_events"])
+        assert get_typed_parameter_value("StatisticsRequested", root) == str(updated_wf_commons["number_of_events"])
         assert get_typed_parameter_value("NumberOfEvents", root) == str(xf_o.inputEventsTotal)
 
-        assert get_typed_parameter_value("Production", root) == wf_commons["production_id"]
-        assert get_typed_parameter_value("DiracJobId", root) == str(wf_commons["job_id"])
+        assert get_typed_parameter_value("Production", root) == updated_wf_commons["production_id"]
+        assert get_typed_parameter_value("DiracJobId", root) == str(updated_wf_commons["job_id"])
         assert get_typed_parameter_value("Location", root) == siteName()
         assert get_typed_parameter_value("JobStart", root)
         assert get_typed_parameter_value("JobEnd", root)
-        assert get_typed_parameter_value("JobType", root) == wf_commons["job_type"]
+        assert get_typed_parameter_value("JobType", root) == updated_wf_commons["job_type"]
 
         assert get_typed_parameter_value("WorkerNode", root)
         assert get_typed_parameter_value("WNMEMORY", root)
@@ -738,7 +748,7 @@ class TestBookkeepingReport:
         assert output_files, "No OutputFile elements found."
 
         first_output_details = get_output_file_details(output_files[0])
-        assert first_output_details["Name"] == wf_commons["production_output_data"][0]
+        assert first_output_details["Name"] == updated_wf_commons["production_output_data"][0]
         assert first_output_details["TypeName"] == "DIGI"
         assert first_output_details["Parameters"]["FileSize"] == "0"
         assert "CreationDate" in first_output_details["Parameters"]
@@ -751,15 +761,14 @@ class TestBookkeepingReport:
         simulation_condition = root.find("SimulationCondition")
         assert simulation_condition is None, "SimulationCondition element should not be present."
 
-    def test_bkreport_previousError_success(self, mocker, bk_report, wf_commons, wf_commons_file, bookkeeping_file):
+    def test_bkreport_previousError_success(self, mocker, bk_report, wf_commons, bookkeeping_file):
         """Test previous command failure."""
         wf_commons["application_name"] = "Gauss"
         wf_commons["application_version"] = wf_commons["config_version"]
         wf_commons["job_type"] = "MCSimulation"
         wf_commons["step_status"] = S_ERROR()
 
-        with open(wf_commons_file, "w", encoding="utf-8") as f:
-            json.dump(wf_commons, f)
+        create_workflow_commons(wf_commons)
 
         bk_report.execute(job_path)
 
@@ -779,9 +788,7 @@ class TestFailoverRequest:
 
         yield FailoverRequest()
 
-    def test_failoverRequest_success(
-        self, mocker: MockerFixture, failover_request, wf_commons, wf_commons_file, request_file
-    ):
+    def test_failoverRequest_success(self, mocker: MockerFixture, failover_request, wf_commons, request_file):
         """Test successful execution of FailoverRequest module."""
         problematic_files = [
             "/lhcb/data/2010/EW.DST/00008380/0000/00008380_00000287_1.ew.dst",
@@ -805,12 +812,11 @@ class TestFailoverRequest:
             "/lhcb/data/2011/EW.DST/00008380/0000/00008380_00000281_1.ew.dst",
         ] + problematic_files
 
-        with open(wf_commons_file, "w", encoding="utf-8") as f:
-            json.dump(wf_commons, f)
+        wf_commons_path = create_workflow_commons(wf_commons)
 
         failover_request.execute(job_path)
 
-        with open(wf_commons_file, "r", encoding="utf-8") as f:
+        with open(wf_commons_path, "r", encoding="utf-8") as f:
             updated_wf_commons = json.load(f)
 
         # Check the FileReport calls: the problematic file should not appear
@@ -829,7 +835,6 @@ class TestFailoverRequest:
         assert jr.setApplicationStatus.call_count == 1
         assert jr.setApplicationStatus.call_args[0][0] == "Job Finished Successfully"
 
-        print(updated_wf_commons)
         # Make sure the forward DISET is not generated
         operations = updated_wf_commons["request_dict"]["Operations"]
         assert len(operations) == 0
@@ -837,9 +842,7 @@ class TestFailoverRequest:
         # Make sure the request json does not exists
         assert not Path(request_file).exists()
 
-    def test_failoverRequest_commitFailure1(
-        self, mocker: MockerFixture, failover_request, wf_commons, wf_commons_file, request_file
-    ):
+    def test_failoverRequest_commitFailure1(self, mocker: MockerFixture, failover_request, wf_commons, request_file):
         """Test execution of FailoverRequest module when the fileReport.commit() fails.
 
         In this context, the second call to commit() will work, so the request should not be generated.
@@ -867,12 +870,11 @@ class TestFailoverRequest:
         ] + problematic_files
 
         # Execute the module
-        with open(wf_commons_file, "w", encoding="utf-8") as f:
-            json.dump(wf_commons, f)
+        wf_commons_path = create_workflow_commons(wf_commons)
 
         failover_request.execute(job_path)
 
-        with open(wf_commons_file, "r", encoding="utf-8") as f:
+        with open(wf_commons_path, "r", encoding="utf-8") as f:
             updated_wf_commons = json.load(f)
 
         # Check the FileReport calls: the problematic file should not appear
@@ -898,9 +900,7 @@ class TestFailoverRequest:
         # Make sure the request json does not exists
         assert not Path(request_file).exists()
 
-    def test_failoverRequest_commitFailure2(
-        self, mocker: MockerFixture, failover_request, wf_commons, wf_commons_file, request_file
-    ):
+    def test_failoverRequest_commitFailure2(self, mocker: MockerFixture, failover_request, wf_commons, request_file):
         """Test execution of FailoverRequest module when the fileReport.commit() fails.
 
         In this context, the second call to commit() will fail, so the request should be generated.
@@ -927,13 +927,12 @@ class TestFailoverRequest:
             "/lhcb/data/2011/EW.DST/00008380/0000/00008380_00000281_1.ew.dst",
         ] + problematic_files
 
-        with open(wf_commons_file, "w", encoding="utf-8") as f:
-            json.dump(wf_commons, f)
+        wf_commons_path = create_workflow_commons(wf_commons)
 
         # Execute the module
         failover_request.execute(job_path)
 
-        with open(wf_commons_file, "r", encoding="utf-8") as f:
+        with open(wf_commons_path, "r", encoding="utf-8") as f:
             updated_wf_commons = json.load(f)
 
         # Check the FileReport calls: the problematic file should not appear
@@ -962,7 +961,7 @@ class TestFailoverRequest:
         assert Path(request_file).exists()
 
     def test_failoverRequest_previousError_fail(
-        self, mocker: MockerFixture, failover_request, wf_commons, wf_commons_file, request_file
+        self, mocker: MockerFixture, failover_request, wf_commons, request_file
     ):
         """Test FailoverRequest with an intentional failure."""
         problematic_files = [
@@ -989,13 +988,12 @@ class TestFailoverRequest:
         # Intentional error
         wf_commons["step_status"] = S_ERROR()
 
-        with open(wf_commons_file, "w", encoding="utf-8") as f:
-            json.dump(wf_commons, f)
+        wf_commons_path = create_workflow_commons(wf_commons)
 
         # Execute the module
         failover_request.execute(job_path)
 
-        with open(wf_commons_file, "r", encoding="utf-8") as f:
+        with open(wf_commons_path, "r", encoding="utf-8") as f:
             updated_wf_commons = json.load(f)
 
         # Check the FileReport calls: the problematic file should not appear
@@ -1019,3 +1017,785 @@ class TestFailoverRequest:
 
         # Make sure the request json does not exists
         assert not Path(request_file).exists()
+
+
+class TestUploadOutputDataFile:
+    """Collection of tests for the UploadOutputData command."""
+
+    OUTPUT_DATA_STEP = "1"
+
+    @pytest.fixture
+    def sim_file(self, wf_commons):
+        """Sim result file fixture."""
+        path = f"{wf_commons['production_id']}_{wf_commons['prod_job_id']}_{self.OUTPUT_DATA_STEP}.sim"
+        with open(path, "w") as f:
+            f.write("Bookkeeping file content")
+        yield path
+        Path(path).unlink(missing_ok=True)
+
+    @pytest.fixture
+    def bk_file(self, wf_commons):
+        """Bookkeeping file fixture."""
+        path = os.path.join(job_path, f"bookkeeping_{wf_commons['production_id']}_{wf_commons['prod_job_id']}.xml")
+        with open(path, "w") as f:
+            f.write("Sim file content")
+        yield path
+        Path(path).unlink(missing_ok=True)
+
+    @pytest.fixture
+    def watchdog_file(self, wf_commons):
+        """Watchdog file fixture."""
+        path = os.path.join(job_path, "DISABLE_WATCHDOG_CPU_WALLCLOCK_CHECK")
+        yield path
+        Path(path).unlink(missing_ok=True)
+
+    @pytest.fixture
+    def upload_output(self, mocker, wf_commons):
+        """Fixture for UploadOutputData module."""
+        mocker.patch("dirac_cwl.commands.upload_output_data.getDestinationSEList", return_value=["CERN", "CNAF"])
+        mocker.patch("LHCbDIRAC.Workflow.Modules.UploadOutputData.getDestinationSEList", return_value=["CERN", "CNAF"])
+
+        # Mock FileCatalog
+        mocker.patch("DIRAC.Resources.Catalog.FileCatalog.FileCatalog.__init__", return_value=None)
+        mocker.patch("DIRAC.Resources.Catalog.FileCatalog.FileCatalog.__getattr__", return_value=lambda x: S_OK({}))
+
+        if "ProductionOutputData" in wf_commons:
+            wf_commons.pop("ProductionOutputData")
+
+        upload_output = UploadOutputData()
+
+        yield upload_output
+
+    # Test Scenarios
+    def test_uploadOutputData_success(self, mocker, upload_output, wf_commons, sim_file, bk_file):
+        """Test successful execution of UploadOutputData module.
+
+        * The output should be uploaded and registered in the bookkeeping system.
+        * The bookkeeping report should be sent and the job parameter updated.
+        """
+        mock_file_report = mocker.patch("dirac_cwl.commands.upload_output_data.FileReport")
+        mock_job_report = mocker.patch("dirac_cwl.commands.upload_output_data.JobReport")
+        mock_request = mocker.patch("dirac_cwl.commands.upload_output_data.Request")
+        mock_failover = mocker.patch("dirac_cwl.commands.upload_output_data.FailoverTransfer")
+        mock_bk_client = mocker.patch("dirac_cwl.commands.upload_output_data.BookkeepingClient")
+
+        fr = FileReport()
+        mocker.patch.object(fr, "setFileStatus")
+        mock_file_report.return_value = fr
+
+        jr = JobReport(wf_commons["job_id"])
+        mocker.patch.object(jr, "setJobParameter")
+        mock_job_report.return_value = jr
+
+        req = Request()
+        mock_request.return_value = req
+
+        failover = FailoverTransfer(req)
+        mocker.patch.object(
+            failover, "transferAndRegisterFile", return_value=S_OK({"uploadedSE": "CERN", "lfn": sim_file})
+        )
+        mocker.patch.object(failover, "transferAndRegisterFileFailover")
+        mock_failover.return_value = failover
+
+        bkClient = BookkeepingClient()
+        mocker.patch.object(bkClient, "sendXMLBookkeepingReport", return_value=S_OK())
+        mock_bk_client.return_value = bkClient
+
+        wf_commons["outputs"] = [
+            {"outputDataName": sim_file, "outputDataType": "sim", "outputBKType": "SIM", "stepName": "Gauss_1"}
+        ]
+        wf_commons["output_SEs"] = {
+            "SIM": "Tier1-Buffer",
+        }
+        wf_commons["output_data_step"] = self.OUTPUT_DATA_STEP
+
+        wf_commons_path = create_workflow_commons(wf_commons)
+
+        # Execute module
+        upload_output.execute(job_path)
+
+        with open(wf_commons_path, "r", encoding="utf-8") as f:
+            updated_wf_commons = json.load(f)
+
+        assert fr.setFileStatus.call_count == 0
+        assert bkClient.sendXMLBookkeepingReport.call_count == 1
+
+        assert failover.transferAndRegisterFile.call_count == 1
+        assert failover.transferAndRegisterFile.call_args[1]["fileName"] == sim_file
+
+        assert failover.transferAndRegisterFileFailover.call_count == 0
+
+        assert jr.setJobParameter.call_count == 1
+        assert jr.setJobParameter.call_args[0][0] == "UploadedOutputData"
+        assert jr.setJobParameter.call_args[0][1] == sim_file
+
+        # Make sure the forward DISET is not generated
+        operations = updated_wf_commons["request_dict"]["Operations"]
+        assert len(operations) == 0
+
+    def test_uploadOutputData_failedBKRegistration(self, mocker, upload_output, wf_commons, sim_file, bk_file):
+        """Test execution of UploadOutputData module when the BK registation fails.
+
+        * The output should be uploaded but not registered in the bookkeeping system now.
+        """
+        mock_file_report = mocker.patch("dirac_cwl.commands.upload_output_data.FileReport")
+        mock_job_report = mocker.patch("dirac_cwl.commands.upload_output_data.JobReport")
+        mock_request = mocker.patch("dirac_cwl.commands.upload_output_data.Request")
+        mock_failover = mocker.patch("dirac_cwl.commands.upload_output_data.FailoverTransfer")
+        mock_bk_client = mocker.patch("dirac_cwl.commands.upload_output_data.BookkeepingClient")
+
+        fr = FileReport()
+        mocker.patch.object(fr, "setFileStatus")
+        mock_file_report.return_value = fr
+
+        jr = JobReport(wf_commons["job_id"])
+        mocker.patch.object(jr, "setJobParameter")
+        mock_job_report.return_value = jr
+
+        req = Request()
+        mock_request.return_value = req
+
+        failover = FailoverTransfer(req)
+        mocker.patch.object(
+            failover, "transferAndRegisterFile", return_value=S_OK({"uploadedSE": "CERN", "lfn": sim_file})
+        )
+        mocker.patch.object(failover, "transferAndRegisterFileFailover")
+        mock_failover.return_value = failover
+
+        bkClient = BookkeepingClient()
+        mocker.patch.object(bkClient, "sendXMLBookkeepingReport", return_value=S_OK())
+        mock_bk_client.return_value = bkClient
+
+        # BK registration failure
+        mocker.patch(
+            "DIRAC.Resources.Catalog.FileCatalog.FileCatalog.__getattr__",
+            return_value=lambda x: S_OK(
+                {
+                    "Failed": {
+                        f"/lhcb/{wf_commons['config_name']}/{wf_commons['config_version']}/"
+                        f"SIM/00000{wf_commons['production_id']}/0000/{sim_file}": "error"
+                    }
+                }
+            ),
+        )
+
+        wf_commons["outputs"] = [
+            {"outputDataName": sim_file, "outputDataType": "sim", "outputBKType": "SIM", "stepName": "Gauss_1"}
+        ]
+        wf_commons["output_SEs"] = {
+            "SIM": "Tier1-Buffer",
+        }
+        wf_commons["output_data_step"] = self.OUTPUT_DATA_STEP
+
+        wf_commons_path = create_workflow_commons(wf_commons)
+
+        # Execute module
+        upload_output.execute(job_path)
+
+        with open(wf_commons_path, "r", encoding="utf-8") as f:
+            updated_wf_commons = json.load(f)
+
+        assert fr.setFileStatus.call_count == 0
+        assert bkClient.sendXMLBookkeepingReport.call_count == 1
+
+        assert failover.transferAndRegisterFile.call_count == 1
+        assert failover.transferAndRegisterFile.call_args[1]["fileName"] == sim_file
+
+        assert failover.transferAndRegisterFileFailover.call_count == 0
+
+        assert jr.setJobParameter.call_count == 1
+        assert jr.setJobParameter.call_args[0][0] == "UploadedOutputData"
+        assert jr.setJobParameter.call_args[0][1] == sim_file
+
+        # Make sure the request is generated
+        operations = updated_wf_commons["request_dict"]["Operations"]
+        assert len(operations) == 1
+
+        assert operations[0]["Type"] == "RegisterFile"
+        assert operations[0]["Catalog"] == "BookkeepingDB"
+        assert sim_file in operations[0]["Files"][0]["LFN"]
+
+    def test_uploadOutputData_postponeBKRegistration(self, mocker, upload_output, wf_commons, sim_file, bk_file):
+        """Test execution of UploadOutputData module when there is already a RegisterFile operation on the output.
+
+        * The output should be uploaded but not registered in the bookkeeping system now.
+        """
+        mock_file_report = mocker.patch("dirac_cwl.commands.upload_output_data.FileReport")
+        mock_job_report = mocker.patch("dirac_cwl.commands.upload_output_data.JobReport")
+        mock_request = mocker.patch("dirac_cwl.commands.upload_output_data.Request")
+        mock_failover = mocker.patch("dirac_cwl.commands.upload_output_data.FailoverTransfer")
+        mock_bk_client = mocker.patch("dirac_cwl.commands.upload_output_data.BookkeepingClient")
+
+        fr = FileReport()
+        mocker.patch.object(fr, "setFileStatus")
+        mock_file_report.return_value = fr
+
+        jr = JobReport(wf_commons["job_id"])
+        mocker.patch.object(jr, "setJobParameter")
+        mock_job_report.return_value = jr
+
+        # Mock a previous failover request: the BK registration should be postponed and added to the request
+        req = Request()
+        file1 = File()
+        file1.LFN = (
+            f"/lhcb/{wf_commons['config_name']}/{wf_commons['config_version']}"
+            f"/SIM/00000{wf_commons['production_id']}/0000/{sim_file}"
+        )
+        o1 = Operation()
+        o1.Type = "RegisterFile"
+        o1.addFile(file1)
+        req.addOperation(o1)
+        mock_request.return_value = req
+
+        failover = FailoverTransfer(req)
+        mocker.patch.object(
+            failover, "transferAndRegisterFile", return_value=S_OK({"uploadedSE": "CERN", "lfn": sim_file})
+        )
+        mocker.patch.object(failover, "transferAndRegisterFileFailover")
+        mock_failover.return_value = failover
+
+        bkClient = BookkeepingClient()
+        mocker.patch.object(bkClient, "sendXMLBookkeepingReport", return_value=S_OK())
+        mock_bk_client.return_value = bkClient
+
+        wf_commons["outputs"] = [
+            {"outputDataName": sim_file, "outputDataType": "sim", "outputBKType": "SIM", "stepName": "Gauss_1"}
+        ]
+        wf_commons["output_SEs"] = {
+            "SIM": "Tier1-Buffer",
+        }
+        wf_commons["output_data_step"] = self.OUTPUT_DATA_STEP
+
+        wf_commons_path = create_workflow_commons(wf_commons)
+
+        # Execute module
+        upload_output.execute(job_path)
+
+        with open(wf_commons_path, "r", encoding="utf-8") as f:
+            updated_wf_commons = json.load(f)
+
+        assert fr.setFileStatus.call_count == 0
+        assert bkClient.sendXMLBookkeepingReport.call_count == 1
+
+        assert failover.transferAndRegisterFile.call_count == 1
+        assert failover.transferAndRegisterFile.call_args[1]["fileName"] == sim_file
+
+        assert failover.transferAndRegisterFileFailover.call_count == 0
+
+        assert jr.setJobParameter.call_count == 1
+        assert jr.setJobParameter.call_args[0][0] == "UploadedOutputData"
+        assert jr.setJobParameter.call_args[0][1] == sim_file
+
+        # Make sure the request is generated
+        operations = updated_wf_commons["request_dict"]["Operations"]
+        assert len(operations) == 2
+
+        assert operations[0]["Type"] == "RegisterFile"
+        assert operations[0]["Catalog"] is None
+        assert sim_file in operations[0]["Files"][0]["LFN"]
+
+        assert operations[1]["Type"] == "RegisterFile"
+        assert operations[1]["Catalog"] == "BookkeepingDB"
+        assert sim_file in operations[1]["Files"][0]["LFN"]
+
+    def test_uploadOutputData_errorBKRegistration(self, mocker, upload_output, wf_commons, sim_file, bk_file):
+        """Test execution of UploadOutputData module when an error occurs during the BK registation.
+
+        * The output should be uploaded but not registered in the bookkeeping system at all.
+        """
+        mock_file_report = mocker.patch("dirac_cwl.commands.upload_output_data.FileReport")
+        mock_job_report = mocker.patch("dirac_cwl.commands.upload_output_data.JobReport")
+        mock_request = mocker.patch("dirac_cwl.commands.upload_output_data.Request")
+        mock_failover = mocker.patch("dirac_cwl.commands.upload_output_data.FailoverTransfer")
+        mock_bk_client = mocker.patch("dirac_cwl.commands.upload_output_data.BookkeepingClient")
+
+        fr = FileReport()
+        mocker.patch.object(fr, "setFileStatus")
+        mock_file_report.return_value = fr
+
+        jr = JobReport(wf_commons["job_id"])
+        mocker.patch.object(jr, "setJobParameter")
+        mock_job_report.return_value = jr
+
+        req = Request()
+        mock_request.return_value = req
+
+        failover = FailoverTransfer(req)
+        mocker.patch.object(
+            failover, "transferAndRegisterFile", return_value=S_OK({"uploadedSE": "CERN", "lfn": sim_file})
+        )
+        mocker.patch.object(failover, "transferAndRegisterFileFailover")
+        mock_failover.return_value = failover
+
+        bkClient = BookkeepingClient()
+        mocker.patch.object(bkClient, "sendXMLBookkeepingReport", return_value=S_OK())
+        mock_bk_client.return_value = bkClient
+
+        # BK registration failure
+        mocker.patch(
+            "DIRAC.Resources.Catalog.FileCatalog.FileCatalog.__getattr__",
+            return_value=lambda x: S_ERROR("Error registering file"),
+        )
+
+        wf_commons["outputs"] = [
+            {"outputDataName": sim_file, "outputDataType": "sim", "outputBKType": "SIM", "stepName": "Gauss_1"}
+        ]
+        wf_commons["output_SEs"] = {
+            "SIM": "Tier1-Buffer",
+        }
+        wf_commons["output_data_step"] = self.OUTPUT_DATA_STEP
+
+        # BK registration failure
+        mocker.patch(
+            "DIRAC.Resources.Catalog.FileCatalog.FileCatalog.__getattr__",
+            return_value=lambda x: S_ERROR("Error registering file"),
+        )
+
+        wf_commons_path = create_workflow_commons(wf_commons)
+
+        # Execute module
+        with pytest.raises(WorkflowProcessingException, match="Could Not Perform BK Registration"):
+            upload_output.execute(job_path)
+
+        with open(wf_commons_path, "r", encoding="utf-8") as f:
+            updated_wf_commons = json.load(f)
+
+        assert fr.setFileStatus.call_count == 0
+        assert bkClient.sendXMLBookkeepingReport.call_count == 1
+
+        assert failover.transferAndRegisterFile.call_count == 1
+        assert failover.transferAndRegisterFile.call_args[1]["fileName"] == sim_file
+
+        assert failover.transferAndRegisterFileFailover.call_count == 0
+
+        assert jr.setJobParameter.call_count == 1
+        assert jr.setJobParameter.call_args[0][0] == "UploadedOutputData"
+        assert jr.setJobParameter.call_args[0][1] == sim_file
+
+        # Make sure the request is generated
+        operations = updated_wf_commons["request_dict"]["Operations"]
+        assert len(operations) == 0
+
+    def test_uploadOutputData_failUpload1(self, mocker, upload_output, wf_commons, sim_file, bk_file):
+        """Test execution of UploadOutputData module when there is a 1st failure to upload outputs.
+
+        * The output should be uploaded correctly with the second method.
+        """
+        mock_file_report = mocker.patch("dirac_cwl.commands.upload_output_data.FileReport")
+        mock_job_report = mocker.patch("dirac_cwl.commands.upload_output_data.JobReport")
+        mock_request = mocker.patch("dirac_cwl.commands.upload_output_data.Request")
+        mock_failover = mocker.patch("dirac_cwl.commands.upload_output_data.FailoverTransfer")
+        mock_bk_client = mocker.patch("dirac_cwl.commands.upload_output_data.BookkeepingClient")
+
+        fr = FileReport()
+        mocker.patch.object(fr, "setFileStatus")
+        mock_file_report.return_value = fr
+
+        jr = JobReport(wf_commons["job_id"])
+        mocker.patch.object(jr, "setJobParameter")
+        mock_job_report.return_value = jr
+
+        req = Request()
+        mock_request.return_value = req
+
+        failover = FailoverTransfer(req)
+        mocker.patch.object(failover, "transferAndRegisterFile", return_value=S_ERROR("Error uploading file"))
+        mocker.patch.object(failover, "transferAndRegisterFileFailover", return_value=S_OK())
+        mock_failover.return_value = failover
+
+        bkClient = BookkeepingClient()
+        mocker.patch.object(bkClient, "sendXMLBookkeepingReport", return_value=S_OK())
+        mock_bk_client.return_value = bkClient
+
+        wf_commons["outputs"] = [
+            {"outputDataName": sim_file, "outputDataType": "sim", "outputBKType": "SIM", "stepName": "Gauss_1"}
+        ]
+        wf_commons["output_SEs"] = {
+            "SIM": "Tier1-Buffer",
+        }
+        wf_commons["output_data_step"] = self.OUTPUT_DATA_STEP
+
+        wf_commons_path = create_workflow_commons(wf_commons)
+
+        # Execute module
+        upload_output.execute(job_path)
+
+        with open(wf_commons_path, "r", encoding="utf-8") as f:
+            updated_wf_commons = json.load(f)
+
+        assert fr.setFileStatus.call_count == 0
+        assert bkClient.sendXMLBookkeepingReport.call_count == 1
+
+        assert failover.transferAndRegisterFile.call_count == 1
+        assert failover.transferAndRegisterFile.call_args[1]["fileName"] == sim_file
+
+        assert failover.transferAndRegisterFileFailover.call_count == 1
+        assert failover.transferAndRegisterFileFailover.call_args[1]["fileName"] == sim_file
+
+        assert jr.setJobParameter.call_count == 1
+        assert jr.setJobParameter.call_args[0][0] == "UploadedOutputData"
+        assert jr.setJobParameter.call_args[0][1] == sim_file
+
+        # Make sure the request is not generated
+        operations = updated_wf_commons["request_dict"]["Operations"]
+        assert len(operations) == 0
+
+    def test_uploadOutputData_failUpload2(self, mocker, upload_output, wf_commons, sim_file, bk_file):
+        """Test execution of UploadOutputData module when there is a 2 failures to upload outputs.
+
+        * A request should be generated to upload outputs later.
+        """
+        mock_file_report = mocker.patch("dirac_cwl.commands.upload_output_data.FileReport")
+        mock_job_report = mocker.patch("dirac_cwl.commands.upload_output_data.JobReport")
+        mock_request = mocker.patch("dirac_cwl.commands.upload_output_data.Request")
+        mock_failover = mocker.patch("dirac_cwl.commands.upload_output_data.FailoverTransfer")
+        mock_bk_client = mocker.patch("dirac_cwl.commands.upload_output_data.BookkeepingClient")
+
+        fr = FileReport()
+        mocker.patch.object(fr, "setFileStatus")
+        mock_file_report.return_value = fr
+
+        jr = JobReport(wf_commons["job_id"])
+        mocker.patch.object(jr, "setJobParameter")
+        mock_job_report.return_value = jr
+
+        # Mock a previous failover request:
+        # Add the end of the execution, o1 should be removed
+        req = Request()
+
+        file1 = File()
+        file1.LFN = (
+            f"/lhcb/{wf_commons['config_name']}/{wf_commons['config_version']}"
+            f"/SIM/00000{wf_commons['production_id']}/0000/{sim_file}"
+        )
+        file2 = File()
+        file2.LFN = "/another/file.txt"
+
+        o1 = Operation()
+        o1.Type = "RegisterFile"
+        o1.addFile(file1)
+        o2 = Operation()
+        o2.Type = "RegisterFile"
+        o2.addFile(file2)
+
+        req.addOperation(o1)
+        req.addOperation(o2)
+
+        mock_request.return_value = req
+
+        failover = FailoverTransfer(req)
+        mocker.patch.object(failover, "transferAndRegisterFile", return_value=S_ERROR("Error uploading file"))
+        mocker.patch.object(failover, "transferAndRegisterFileFailover", return_value=S_ERROR("Error uploading file"))
+        mock_failover.return_value = failover
+
+        bkClient = BookkeepingClient()
+        mocker.patch.object(bkClient, "sendXMLBookkeepingReport", return_value=S_OK())
+        mock_bk_client.return_value = bkClient
+
+        wf_commons["outputs"] = [
+            {"outputDataName": sim_file, "outputDataType": "sim", "outputBKType": "SIM", "stepName": "Gauss_1"}
+        ]
+        wf_commons["output_SEs"] = {
+            "SIM": "Tier1-Buffer",
+        }
+        wf_commons["output_data_step"] = self.OUTPUT_DATA_STEP
+
+        wf_commons_path = create_workflow_commons(wf_commons)
+
+        # Execute module
+        with pytest.raises(WorkflowProcessingException, match="Failed to upload output data"):
+            upload_output.execute(job_path)
+
+        with open(wf_commons_path, "r", encoding="utf-8") as f:
+            updated_wf_commons = json.load(f)
+
+        assert fr.setFileStatus.call_count == 0
+        assert bkClient.sendXMLBookkeepingReport.call_count == 1
+
+        assert failover.transferAndRegisterFile.call_count == 1
+        assert failover.transferAndRegisterFile.call_args[1]["fileName"] == sim_file
+
+        assert failover.transferAndRegisterFileFailover.call_count == 1
+        assert failover.transferAndRegisterFileFailover.call_args[1]["fileName"] == sim_file
+
+        assert jr.setJobParameter.call_count == 0
+
+        # Make sure the request is generated
+
+        operations = updated_wf_commons["request_dict"]["Operations"]
+        assert len(operations) == 2
+
+        assert operations[0]["Type"] == "RegisterFile"
+        assert operations[0]["TargetSE"] is None
+        assert operations[0]["SourceSE"] is None
+        assert sim_file not in operations[0]["Files"][0]["LFN"]
+
+        assert operations[1]["Type"] == "RemoveFile"
+        assert operations[1]["TargetSE"] is None
+        assert operations[1]["SourceSE"] is None
+        assert sim_file in operations[1]["Files"][0]["LFN"]
+
+    def test_uploadOutputData_BKReportError(self, mocker, upload_output, wf_commons, sim_file, bk_file):
+        """Test execution of UploadOutputData module when the BK report cannot be sent.
+
+        * The output should be uploaded and registered in the bookkeeping system.
+        * The bookkeeping report should be added to a failover request.
+        """
+        mock_file_report = mocker.patch("dirac_cwl.commands.upload_output_data.FileReport")
+        mock_job_report = mocker.patch("dirac_cwl.commands.upload_output_data.JobReport")
+        mock_request = mocker.patch("dirac_cwl.commands.upload_output_data.Request")
+        mock_failover = mocker.patch("dirac_cwl.commands.upload_output_data.FailoverTransfer")
+        mock_bk_client = mocker.patch("dirac_cwl.commands.upload_output_data.BookkeepingClient")
+
+        fr = FileReport()
+        mocker.patch.object(fr, "setFileStatus")
+        mock_file_report.return_value = fr
+
+        jr = JobReport(wf_commons["job_id"])
+        mocker.patch.object(jr, "setJobParameter")
+        mock_job_report.return_value = jr
+
+        req = Request()
+        mock_request.return_value = req
+
+        failover = FailoverTransfer(req)
+        mocker.patch.object(
+            failover, "transferAndRegisterFile", return_value=S_OK({"uploadedSE": "CERN", "lfn": sim_file})
+        )
+        mocker.patch.object(failover, "transferAndRegisterFileFailover", return_value=S_ERROR("Error uploading file"))
+        mock_failover.return_value = failover
+
+        bkClient = BookkeepingClient()
+        # Mock the sendXMLBookkeepingReport method
+        mocker.patch.object(
+            bkClient,
+            "sendXMLBookkeepingReport",
+            return_value={"OK": False, "rpcStub": "Error", "Message": "Error sending BK report"},
+        )
+        mock_bk_client.return_value = bkClient
+
+        wf_commons["outputs"] = [
+            {"outputDataName": sim_file, "outputDataType": "sim", "outputBKType": "SIM", "stepName": "Gauss_1"}
+        ]
+        wf_commons["output_SEs"] = {
+            "SIM": "Tier1-Buffer",
+        }
+        wf_commons["output_data_step"] = self.OUTPUT_DATA_STEP
+
+        wf_commons_path = create_workflow_commons(wf_commons)
+
+        # Execute module
+        upload_output.execute(job_path)
+
+        with open(wf_commons_path, "r", encoding="utf-8") as f:
+            updated_wf_commons = json.load(f)
+
+        assert fr.setFileStatus.call_count == 0
+        assert bkClient.sendXMLBookkeepingReport.call_count == 1
+
+        assert failover.transferAndRegisterFile.call_count == 1
+        assert failover.transferAndRegisterFile.call_args[1]["fileName"] == sim_file
+
+        assert failover.transferAndRegisterFileFailover.call_count == 0
+
+        assert jr.setJobParameter.call_count == 1
+        assert jr.setJobParameter.call_args[0][0] == "UploadedOutputData"
+        assert jr.setJobParameter.call_args[0][1] == sim_file
+
+        # Make sure the request is not generated
+        operations = updated_wf_commons["request_dict"]["Operations"]
+        assert len(operations) == 1
+
+        assert operations[0]["Type"] == "ForwardDISET"
+
+    def test_uploadOutputData_withDescendents(self, mocker, upload_output, wf_commons, sim_file, bk_file):
+        """Test execution of UploadOutputData module when there is already file descendants.
+
+        It means that the input data has already been processed.
+        * The output should not be uploaded and registered in the bookkeeping system.
+        * The bookkeeping report should not be sent.
+        """
+        mock_file_report = mocker.patch("dirac_cwl.commands.upload_output_data.FileReport")
+        mock_job_report = mocker.patch("dirac_cwl.commands.upload_output_data.JobReport")
+        mock_request = mocker.patch("dirac_cwl.commands.upload_output_data.Request")
+        mock_failover = mocker.patch("dirac_cwl.commands.upload_output_data.FailoverTransfer")
+        mock_bk_client = mocker.patch("dirac_cwl.commands.upload_output_data.BookkeepingClient")
+
+        mocker.patch(
+            "dirac_cwl.commands.upload_output_data.getFileDescendents", return_value=S_OK(["/path/to/other/file.txt"])
+        )
+
+        fr = FileReport()
+        mocker.patch.object(fr, "setFileStatus")
+        mock_file_report.return_value = fr
+
+        jr = JobReport(wf_commons["job_id"])
+        mocker.patch.object(jr, "setJobParameter")
+        mock_job_report.return_value = jr
+
+        req = Request()
+        mock_request.return_value = req
+
+        failover = FailoverTransfer(req)
+        mocker.patch.object(
+            failover, "transferAndRegisterFile", return_value=S_OK({"uploadedSE": "CERN", "lfn": sim_file})
+        )
+        mocker.patch.object(failover, "transferAndRegisterFileFailover")
+        mock_failover.return_value = failover
+
+        bkClient = BookkeepingClient()
+        mocker.patch.object(bkClient, "sendXMLBookkeepingReport")
+        mock_bk_client.return_value = bkClient
+
+        wf_commons["outputs"] = [
+            {"outputDataName": sim_file, "outputDataType": "sim", "outputBKType": "SIM", "stepName": "Gauss_1"}
+        ]
+        wf_commons["output_SEs"] = {
+            "SIM": "Tier1-Buffer",
+        }
+        wf_commons["inputs"] = ["AnyInputFile1"]
+        wf_commons["output_data_step"] = self.OUTPUT_DATA_STEP
+
+        wf_commons_path = create_workflow_commons(wf_commons)
+
+        # Execute module
+        with pytest.raises(WorkflowProcessingException):
+            upload_output.execute(job_path)
+
+        with open(wf_commons_path, "r", encoding="utf-8") as f:
+            updated_wf_commons = json.load(f)
+
+        assert fr.setFileStatus.call_count == 1
+        assert fr.setFileStatus.call_args[0][0] == int(wf_commons["production_id"])
+        assert bkClient.sendXMLBookkeepingReport.call_count == 0
+
+        assert failover.transferAndRegisterFile.call_count == 0
+        assert failover.transferAndRegisterFileFailover.call_count == 0
+
+        assert jr.setJobParameter.call_count == 0
+
+        # Make sure the request is not generated
+        operations = updated_wf_commons["request_dict"]["Operations"]
+        assert len(operations) == 0
+
+    def test_uploadOutputData_noOutput(self, mocker, upload_output, wf_commons, sim_file):
+        """Test UploadOutputData with no output data."""
+        mock_file_report = mocker.patch("dirac_cwl.commands.upload_output_data.FileReport")
+        mock_job_report = mocker.patch("dirac_cwl.commands.upload_output_data.JobReport")
+        mock_request = mocker.patch("dirac_cwl.commands.upload_output_data.Request")
+        mock_failover = mocker.patch("dirac_cwl.commands.upload_output_data.FailoverTransfer")
+        mock_bk_client = mocker.patch("dirac_cwl.commands.upload_output_data.BookkeepingClient")
+
+        fr = FileReport()
+        mocker.patch.object(fr, "setFileStatus")
+        mock_file_report.return_value = fr
+
+        jr = JobReport(wf_commons["job_id"])
+        mocker.patch.object(jr, "setJobParameter")
+        mock_job_report.return_value = jr
+
+        req = Request()
+        mock_request.return_value = req
+
+        failover = FailoverTransfer(req)
+        mocker.patch.object(
+            failover, "transferAndRegisterFile", return_value=S_OK({"uploadedSE": "CERN", "lfn": sim_file})
+        )
+        mocker.patch.object(failover, "transferAndRegisterFileFailover")
+        mock_failover.return_value = failover
+
+        bkClient = BookkeepingClient()
+        mocker.patch.object(bkClient, "sendXMLBookkeepingReport")
+        mock_bk_client.return_value = bkClient
+
+        wf_commons["outputs"] = [
+            {"outputDataName": sim_file, "outputDataType": "sim", "outputBKType": "SIM", "stepName": "Gauss_1"}
+        ]
+        wf_commons["output_SEs"] = {
+            "SIM": "Tier1-Buffer",
+        }
+        wf_commons["output_data_step"] = self.OUTPUT_DATA_STEP
+
+        # Remove the output
+        Path(sim_file).unlink(missing_ok=True)
+
+        wf_commons_path = create_workflow_commons(wf_commons)
+
+        # Execute module
+        with pytest.raises(OSError, match="Output data not found"):
+            upload_output.execute(job_path)
+
+        with open(wf_commons_path, "r", encoding="utf-8") as f:
+            updated_wf_commons = json.load(f)
+
+        assert fr.setFileStatus.call_count == 0
+        assert bkClient.sendXMLBookkeepingReport.call_count == 0
+
+        assert failover.transferAndRegisterFile.call_count == 0
+        assert failover.transferAndRegisterFileFailover.call_count == 0
+
+        assert jr.setJobParameter.call_count == 0
+
+        # Make sure the request is not generated
+        print(updated_wf_commons)
+        operations = updated_wf_commons["request_dict"]["Operations"]
+        assert len(operations) == 0
+
+    def test_uploadOutputData_previousError_fail(self, mocker, upload_output, wf_commons, sim_file):
+        """Test UploadOutputData with an intentional failure."""
+        mock_file_report = mocker.patch("dirac_cwl.commands.upload_output_data.FileReport")
+        mock_job_report = mocker.patch("dirac_cwl.commands.upload_output_data.JobReport")
+        mock_request = mocker.patch("dirac_cwl.commands.upload_output_data.Request")
+        mock_failover = mocker.patch("dirac_cwl.commands.upload_output_data.FailoverTransfer")
+        mock_bk_client = mocker.patch("dirac_cwl.commands.upload_output_data.BookkeepingClient")
+
+        fr = FileReport()
+        mocker.patch.object(fr, "setFileStatus")
+        mock_file_report.return_value = fr
+
+        jr = JobReport(wf_commons["job_id"])
+        mocker.patch.object(jr, "setJobParameter")
+        mock_job_report.return_value = jr
+
+        req = Request()
+        mock_request.return_value = req
+
+        failover = FailoverTransfer(req)
+        mocker.patch.object(failover, "transferAndRegisterFile")
+        mocker.patch.object(failover, "transferAndRegisterFileFailover")
+        mock_failover.return_value = failover
+
+        bkClient = BookkeepingClient()
+        mocker.patch.object(bkClient, "sendXMLBookkeepingReport")
+        mock_bk_client.return_value = bkClient
+
+        wf_commons["outputs"] = [
+            {"outputDataName": sim_file, "outputDataType": "sim", "outputBKType": "SIM", "stepName": "Gauss_1"}
+        ]
+        wf_commons["output_SEs"] = {
+            "SIM": "Tier1-Buffer",
+        }
+        wf_commons["output_data_step"] = self.OUTPUT_DATA_STEP
+
+        wf_commons["step_status"] = S_ERROR()
+
+        Path(sim_file).unlink(missing_ok=True)
+
+        wf_commons_path = create_workflow_commons(wf_commons)
+
+        upload_output.execute(job_path)
+
+        with open(wf_commons_path, "r", encoding="utf-8") as f:
+            updated_wf_commons = json.load(f)
+
+        assert fr.setFileStatus.call_count == 0
+        assert bkClient.sendXMLBookkeepingReport.call_count == 0
+
+        assert failover.transferAndRegisterFile.call_count == 0
+        assert failover.transferAndRegisterFileFailover.call_count == 0
+
+        assert jr.setJobParameter.call_count == 0
+
+        # Make sure the request is not generated
+        operations = updated_wf_commons["request_dict"]["Operations"]
+        assert len(operations) == 0

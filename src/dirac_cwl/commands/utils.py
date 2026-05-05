@@ -5,7 +5,7 @@ import os
 import shutil
 
 from DIRAC import siteName
-from DIRAC.Core.Utilities.ReturnValues import S_OK
+from DIRAC.Core.Utilities.ReturnValues import S_ERROR, S_OK
 
 from dirac_cwl.core.exceptions import WorkflowProcessingException
 
@@ -55,11 +55,9 @@ def prepare_lhcb_workflow_commons(workflow_commons_path, extra_mandatory_values=
         "output_data_file_mask": "",
         "run_metadata": {},
         "log_target_path": "",
-        "output_mode": "",
         "production_output_data": [],
         "CPUe": 0,
         "max_number_of_events": "0",
-        "output_SEs": {},
         "output_data_type": None,
         "application_log": "",
         "application_type": None,
@@ -75,6 +73,8 @@ def prepare_lhcb_workflow_commons(workflow_commons_path, extra_mandatory_values=
         "step_status": S_OK(),
         "config_name": None,
         "config_version": None,
+        "request_dict": {},
+        "file_report_files_dict": {},
     }
 
     for k, v in extra_default_values.items():
@@ -93,18 +93,24 @@ def prepare_lhcb_workflow_commons(workflow_commons_path, extra_mandatory_values=
     return workflow_commons
 
 
-def save_workflow_commons(wf_commons, wf_file_path):
+def save_workflow_commons(wf_commons, wf_file_path, request=None, failed=False):
     """Update the workflow_commons file to accomodate for the new values.
 
     Ensures that no data is lost during the update by creating a backup.
     """
     if not (os.path.exists(wf_file_path) and os.path.isfile(wf_file_path)):
-        raise WorkflowProcessingException("")
+        raise WorkflowProcessingException(f"Workflow Commons file '{wf_file_path}' not found")
 
     wf_filename = os.path.basename(wf_file_path)
     wf_backup = f"{wf_filename}.bak"
 
     shutil.move(wf_file_path, wf_backup)
+
+    if failed:
+        wf_commons["step_status"] = S_ERROR()
+
+    if request:
+        wf_commons["request_dict"] = json.loads(request.toJSON()["Value"])
 
     try:
         with open(wf_file_path, "x", encoding="utf-8") as f:

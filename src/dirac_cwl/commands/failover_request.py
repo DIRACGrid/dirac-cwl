@@ -31,47 +31,49 @@ class FailoverRequest(PostProcessCommand):
         :param job_path: Path to the job working directory.
         :param kwargs: Additional keyword arguments.
         """
-        workflow_commons_path = kwargs.get("workflow-commons-path", os.path.join(job_path, "workflow_commons.json"))
+        failed = False
+        try:
+            workflow_commons_path = kwargs.get("workflow_commons_path", os.path.join(job_path, "workflow_commons.json"))
 
-        workflow_commons = prepare_lhcb_workflow_commons(
-            workflow_commons_path,
-            extra_mandatory_values=[],
-            extra_default_values={
-                "request_dict": None,
-                "file_report_files_dict": {},
-                "accounting_registers": {},
-            },
-        )
+            workflow_commons = prepare_lhcb_workflow_commons(
+                workflow_commons_path,
+                extra_mandatory_values=[],
+                extra_default_values={"accounting_registers": None},
+            )
 
-        request = Request(workflow_commons["request_dict"])
-        file_report = FileReport()
-        file_report.statusDict = workflow_commons["file_report_files_dict"]
+            request = Request(workflow_commons["request_dict"])
+            file_report = FileReport()
+            file_report.statusDict = workflow_commons["file_report_files_dict"]
 
-        job_report = JobReport(workflow_commons["job_id"])
+            job_report = JobReport(workflow_commons["job_id"])
 
-        _prepareRequest(request, workflow_commons["job_id"])
+            _prepareRequest(request, workflow_commons["job_id"])
 
-        filesInFileReport = file_report.getFiles()
+            filesInFileReport = file_report.getFiles()
 
-        for lfn in workflow_commons["inputs"]:
-            if lfn not in filesInFileReport:
-                status = "Processed" if workflow_commons["step_status"]["OK"] else "Unused"
-                file_report.setFileStatus(int(workflow_commons["production_id"]), lfn, status)
+            for lfn in workflow_commons["inputs"]:
+                if lfn not in filesInFileReport:
+                    status = "Processed" if workflow_commons["step_status"]["OK"] else "Unused"
+                    file_report.setFileStatus(int(workflow_commons["production_id"]), lfn, status)
 
-        file_report.commit()
+            file_report.commit()
 
-        if workflow_commons["step_status"]["OK"]:
-            if file_report.getFiles():
-                result = file_report.generateForwardDISET()
-                if result["OK"] and result["Value"]:
-                    request.addOperation(result["Value"])
+            if workflow_commons["step_status"]["OK"]:
+                if file_report.getFiles():
+                    result = file_report.generateForwardDISET()
+                    if result["OK"] and result["Value"]:
+                        request.addOperation(result["Value"])
 
-            job_report.setApplicationStatus("Job Finished Successfully", True)
+                job_report.setApplicationStatus("Job Finished Successfully", True)
 
-        self.generateFailoverFile(job_report, request, workflow_commons)
+            self.generateFailoverFile(job_report, request, workflow_commons)
 
-        workflow_commons["request_dict"] = json.loads(request.toJSON()["Value"])
-        save_workflow_commons(workflow_commons, workflow_commons_path)
+        except:
+            failed = True
+            raise
+
+        finally:
+            save_workflow_commons(workflow_commons, workflow_commons_path, request=request, failed=failed)
 
     def generateFailoverFile(self, job_report, request, workflow_commons):
         """Create a request.json file."""
