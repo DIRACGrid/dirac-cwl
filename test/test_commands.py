@@ -1,13 +1,16 @@
-"""."""
+"""Tests for the commands.
+
+This module tests the execution of the different commands.
+"""
 
 import json
 import os
-import tempfile
+import shutil
 import time
 import xml.etree.ElementTree as ET
+import zipfile
 from pathlib import Path
 from textwrap import dedent
-from urllib.parse import urljoin
 
 import LHCbDIRAC
 import pytest
@@ -123,269 +126,437 @@ def create_workflow_commons(wf_dict):
     return path
 
 
-@pytest.mark.skip("Deprecated command implementation")
 class TestUploadLogFile:
     """Collection of tests for the UploadLogFile command."""
 
-    FILENAMES = ["file.txt", "file.log", "file.err", "file.out", "file.extra"]
-    JOB_ID = "8042"
-    PRODUCTION_ID = "95376"
-    NAMESPACE = "MC"
-    CONFIG_VERSION = "2016"
+    @pytest.fixture
+    def uplogfile(self, mocker, wf_commons):
+        """Fixture for UploadLogFile module."""
+        uplogfile = UploadLogFile()
+
+        yield uplogfile
+
+        Path(f"{wf_commons['prod_job_id']}.zip").unlink(missing_ok=True)
+        shutil.rmtree("unzipped", ignore_errors=True)
 
     @pytest.fixture
-    def basedir(self):
-        """Fixture to initialize the working directory."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            for file in self.FILENAMES:
-                with open(os.path.join(tmpdir, file), "x") as f:
-                    f.write("EMPTY")
+    def prodconf_json(self):
+        """prodconf.json file fixture."""
+        filename = "prodConf_example.json"
 
-            yield tmpdir
+        with open(filename, "w") as f:
+            f.write('{"foo": "bar"}')
 
-    def test_correct_file_finding(self, basedir):
-        """Test output file finding."""
-        files = UploadLogFile().obtain_output_files(basedir)
-        files_names = [os.path.basename(file_path) for file_path in files]
+        yield filename
 
-        assert set(self.FILENAMES).difference(files_names) == {"file.extra"}
+        Path(filename).unlink(missing_ok=True)
 
-    def test_correct_file_extension_finding(self, basedir):
-        """Test output file finding."""
-        extensions = ["*.extra"]
-        files = UploadLogFile().obtain_output_files(basedir, extensions)
-        files_names = [os.path.basename(file_path) for file_path in files]
+    @pytest.fixture
+    def prodconf_py(self):
+        """prodconf.py file fixture."""
+        filename = "prodConf_example.py"
 
-        assert set(self.FILENAMES).difference(files_names) == {"file.txt", "file.log", "file.err", "file.out"}
+        with open(filename, "w") as f:
+            f.write('foo = "bar"')
 
-    def test_upload_ok(self, basedir, mocker: MockerFixture):
-        """Test a correct upload."""
-        base_lfn = f"/lhcb/{self.NAMESPACE}/{self.CONFIG_VERSION}/LOG/{self.PRODUCTION_ID.zfill(8)}/0000/"
-        zip_name = self.JOB_ID.zfill(8) + ".zip"
+        yield filename
 
-        expected_lfn = os.path.join(base_lfn, zip_name)
-        expected_path = os.path.join(basedir, zip_name)
+        Path(filename).unlink(missing_ok=True)
 
-        # Mock Operations
-        mock_ops = mocker.patch("dirac_cwl.commands.upload_log_file.Operations")
-        mock_ops.return_value.getValue = lambda value, default=None: default
-
-        # Mock JobReport
+    # Test Scenarios
+    def test_uploadLogFile_success(self, mocker, uplogfile, wf_commons, prodconf_json, prodconf_py):
+        """Test successful execution of UploadLogFile module."""
+        log_url = "notImportant"
+        mockSEMethod = mocker.patch(
+            "DIRAC.Resources.Storage.StorageElement.StorageElementItem._StorageElementItem__executeMethod",
+            return_value=S_OK({"Failed": [], "Successful": {log_url: log_url}}),
+        )
+        mock_request = mocker.patch("dirac_cwl.commands.upload_log_file.Request")
+        mock_failover = mocker.patch("dirac_cwl.commands.upload_log_file.FailoverTransfer")
         mock_job_report = mocker.patch("dirac_cwl.commands.upload_log_file.JobReport")
-        mock_set_app_status = mocker.MagicMock()
-        mock_set_job_parameter = mocker.MagicMock()
-        mock_job_report.return_value.setApplicationStatus = mock_set_app_status
-        mock_job_report.return_value.setJobParameter = mock_set_job_parameter
 
-        # Mock StorageElement
-        mock_se = mocker.patch("dirac_cwl.commands.upload_log_file.StorageElement")
-        mock_put_file = mocker.MagicMock()
-        mock_get_url = mocker.MagicMock()
-        mock_put_file.return_value = S_OK({"Successful": {expected_lfn: "Borked"}, "Failed": {}})
-        mock_get_url.return_value = S_OK(urljoin("https://lhcb-dirac-logse.web.cern.ch/", expected_lfn))
-        mock_se.return_value.putFile = mock_put_file
-        mock_se.return_value.getURL = mock_get_url
+        req = Request()
+        mock_request.return_value = req
 
-        command = UploadLogFile()
+        failover = FailoverTransfer(req)
+        mocker.patch.object(failover, "transferAndRegisterFile", return_value=S_OK())
+        mock_failover.return_value = failover
 
-        # Mock failover
-        mock_failover = mocker.patch.object(command, "generate_failover_transfer")
-        mock_failover.return_value = S_OK()
+        jr = JobReport(wf_commons["job_id"])
+        mocker.patch.object(jr, "setApplicationStatus")
+        mocker.patch.object(jr, "setJobParameter")
+        mock_job_report.return_value = jr
 
-        result = command.execute(
-            basedir,
-            job_id=self.JOB_ID,
-            production_id=self.PRODUCTION_ID,
-            namespace=self.NAMESPACE,
-            config_version=self.CONFIG_VERSION,
+        uplogfile.request = Request()
+
+        # Execute the module
+        wf_commons_path = create_workflow_commons(wf_commons)
+
+        uplogfile.execute(job_path)
+
+        with open(wf_commons_path, "r", encoding="utf-8") as f:
+            updated_wf_commons = json.load(f)
+
+        # Check the log directory
+        assert updated_wf_commons["log_dir"] != ""
+        log_dir = Path(updated_wf_commons["log_dir"])
+        assert log_dir.exists()
+        assert log_dir.is_dir()
+        assert log_dir.joinpath(prodconf_json).exists()
+        assert log_dir.joinpath(prodconf_json).read_text() == '{"foo": "bar"}'
+        assert log_dir.joinpath(prodconf_py).exists()
+        assert log_dir.joinpath(prodconf_py).read_text() == 'foo = "bar"'
+
+        for file in log_dir.iterdir():
+            assert file.stat().st_mode & 0o777 == 0o755
+
+        # Check the generated zip file
+        zipFile = Path(f"{updated_wf_commons['prod_job_id']}.zip")
+        assert zipFile.exists()
+
+        zipfile.ZipFile(zipFile, "r").extractall("unzipped")
+        unzipped = Path("unzipped").joinpath(updated_wf_commons["prod_job_id"])
+        assert unzipped.joinpath(prodconf_json).exists()
+        assert unzipped.joinpath(prodconf_py).exists()
+        assert unzipped.joinpath(prodconf_json).read_text() == '{"foo": "bar"}'
+        assert unzipped.joinpath(prodconf_py).read_text() == 'foo = "bar"'
+
+        # Make sure that StorageElement was called twice (getURL, putFile)
+        assert mockSEMethod.call_count == 2
+
+        # Make sure that the request was not created
+        assert failover.transferAndRegisterFile.call_count == 0
+
+        # Make sure the application status was not changed
+        assert jr.setApplicationStatus.call_count == 0
+
+        # Check the jobReport.setParameter arguments
+        assert jr.setJobParameter.call_count == 1
+        assert jr.setJobParameter.call_args_list
+        params = jr.setJobParameter.call_args_list[0][0]
+        assert params[0] == "Log URL"
+        assert params[1] == f'<a href="{log_url}">Log file directory</a>'
+
+        shutil.rmtree(updated_wf_commons["log_dir"], ignore_errors=True)
+
+    def test_uploadLogFile_noOutputFile(self, mocker, uplogfile, wf_commons):
+        """Test execution of UploadLogFile module when there is no output files.
+
+        * populateLogDirectory should return an error, because there is no "successful" files in log_dir.
+        """
+        mockSEMethod = mocker.patch(
+            "DIRAC.Resources.Storage.StorageElement.StorageElementItem._StorageElementItem__executeMethod",
+            return_value=S_OK({"Failed": [], "Successful": {"notImportant": "notImportant"}}),
         )
-
-        assert result["OK"]
-        mock_get_url.assert_called_once_with(expected_path, protocol="https")
-        mock_put_file.assert_called_once_with({expected_lfn: expected_path})
-        mock_failover.assert_not_called()
-        mock_set_app_status.assert_not_called()
-        mock_set_job_parameter.assert_called_once()
-
-    def test_upload_ok_to_failover(self, basedir, mocker: MockerFixture):
-        """Test a failure to upload to the LogSE but a correct one to the Failover."""
-        base_lfn = f"/lhcb/{self.NAMESPACE}/{self.CONFIG_VERSION}/LOG/{self.PRODUCTION_ID.zfill(8)}/0000/"
-        zip_name = self.JOB_ID.zfill(8) + ".zip"
-
-        expected_lfn = os.path.join(base_lfn, zip_name)
-        expected_path = os.path.join(basedir, zip_name)
-
-        # Mock Operations
-        mock_ops = mocker.patch("dirac_cwl.commands.upload_log_file.Operations")
-        mock_ops.return_value.getValue = lambda value, default=None: default
-
-        # Mock JobReport
+        mock_request = mocker.patch("dirac_cwl.commands.upload_log_file.Request")
+        mock_failover = mocker.patch("dirac_cwl.commands.upload_log_file.FailoverTransfer")
         mock_job_report = mocker.patch("dirac_cwl.commands.upload_log_file.JobReport")
-        mock_set_app_status = mocker.MagicMock()
-        mock_set_job_parameter = mocker.MagicMock()
-        mock_job_report.return_value.setApplicationStatus = mock_set_app_status
-        mock_job_report.return_value.setJobParameter = mock_set_job_parameter
 
-        # Mock StorageElement
-        mock_se = mocker.patch("dirac_cwl.commands.upload_log_file.StorageElement")
-        mock_put_file = mocker.MagicMock()
-        mock_get_url = mocker.MagicMock()
-        mock_put_file.return_value = S_OK({"Successful": {}, "Failed": {expected_lfn: "Borked"}})
-        mock_get_url.return_value = S_OK(urljoin("https://lhcb-dirac-logse.web.cern.ch/", expected_lfn))
-        mock_se.return_value.putFile = mock_put_file
-        mock_se.return_value.getURL = mock_get_url
+        req = Request()
+        mock_request.return_value = req
 
-        command = UploadLogFile()
+        failover = FailoverTransfer(req)
+        mocker.patch.object(failover, "transferAndRegisterFile", return_value=S_OK())
+        mock_failover.return_value = failover
 
-        # Mock failover
-        mock_failover = mocker.patch.object(command, "generate_failover_transfer")
-        mock_failover.return_value = S_OK()
+        jr = JobReport(wf_commons["job_id"])
+        mocker.patch.object(jr, "setApplicationStatus")
+        mocker.patch.object(jr, "setJobParameter")
+        mock_job_report.return_value = jr
 
-        result = command.execute(
-            basedir,
-            job_id=self.JOB_ID,
-            production_id=self.PRODUCTION_ID,
-            namespace=self.NAMESPACE,
-            config_version=self.CONFIG_VERSION,
+        # Execute the module
+        wf_commons_path = create_workflow_commons(wf_commons)
+
+        uplogfile.execute(job_path)
+
+        with open(wf_commons_path, "r", encoding="utf-8") as f:
+            updated_wf_commons = json.load(f)
+
+        # Check the log directory
+        assert updated_wf_commons["log_dir"] != ""
+        log_dir = Path(updated_wf_commons["log_dir"])
+        assert log_dir.exists()
+        assert log_dir.is_dir()
+        # Make sure log_dir is an empty directory
+        assert not list(log_dir.iterdir())
+
+        # Check the generated zip file
+        zipFile = Path(f"{updated_wf_commons['prod_job_id']}.zip")
+        assert not zipFile.exists()
+
+        # Make sure that StorageElement was called twice (getURL, putFile)
+        assert mockSEMethod.call_count == 0
+
+        # Make sure that the request was not created
+        assert failover.transferAndRegisterFile.call_count == 0
+
+        # Make sure the application status was changed
+        assert jr.setApplicationStatus.call_count == 1
+        assert jr.setJobParameter.call_count == 0
+
+        shutil.rmtree(updated_wf_commons["log_dir"], ignore_errors=True)
+
+    def test_uploadLogFile_zipException(self, mocker, uplogfile, wf_commons, prodconf_json, prodconf_py):
+        """Test execution of UploadLogFile module when an exception is raised when zipping files."""
+        mocker.patch("LHCbDIRAC.Workflow.Modules.UploadLogFile.zipFiles", side_effect=OSError)
+        mockSEMethod = mocker.patch(
+            "DIRAC.Resources.Storage.StorageElement.StorageElementItem._StorageElementItem__executeMethod",
+            return_value=S_OK({"Failed": [], "Successful": {"notImportant": "notImportant"}}),
         )
-
-        assert result["OK"]
-        mock_get_url.assert_called_once_with(expected_path, protocol="https")
-        mock_put_file.assert_called_once_with({expected_lfn: expected_path})
-        mock_failover.assert_called_once_with(expected_path, zip_name, expected_lfn)
-        mock_set_app_status.assert_not_called()
-        mock_set_job_parameter.assert_called_once()
-
-    def test_upload_fail(self, basedir, mocker: MockerFixture):
-        """Test both a failure to upload to the LogSE and the FailoverSE."""
-        base_lfn = f"/lhcb/{self.NAMESPACE}/{self.CONFIG_VERSION}/LOG/{self.PRODUCTION_ID.zfill(8)}/0000/"
-        zip_name = self.JOB_ID.zfill(8) + ".zip"
-
-        expected_lfn = os.path.join(base_lfn, zip_name)
-        expected_path = os.path.join(basedir, zip_name)
-
-        # Mock JobReport
+        mock_request = mocker.patch("dirac_cwl.commands.upload_log_file.Request")
+        mock_failover = mocker.patch("dirac_cwl.commands.upload_log_file.FailoverTransfer")
         mock_job_report = mocker.patch("dirac_cwl.commands.upload_log_file.JobReport")
-        mock_set_app_status = mocker.MagicMock()
-        mock_set_job_parameter = mocker.MagicMock()
-        mock_job_report.return_value.setApplicationStatus = mock_set_app_status
-        mock_job_report.return_value.setJobParameter = mock_set_job_parameter
 
-        # Mock StorageElement
-        mock_se = mocker.patch("dirac_cwl.commands.upload_log_file.StorageElement")
-        mock_put_file = mocker.MagicMock()
-        mock_get_url = mocker.MagicMock()
-        mock_put_file.return_value = S_OK({"Successful": {}, "Failed": {expected_lfn: "Borked"}})
-        mock_get_url.return_value = S_OK(urljoin("https://lhcb-dirac-logse.web.cern.ch/", expected_lfn))
-        mock_se.return_value.putFile = mock_put_file
-        mock_se.return_value.getURL = mock_get_url
+        req = Request()
+        mock_request.return_value = req
 
-        command = UploadLogFile()
+        failover = FailoverTransfer(req)
+        mocker.patch.object(failover, "transferAndRegisterFile", return_value=S_OK())
+        mock_failover.return_value = failover
 
-        # Mock failover
-        mock_failover = mocker.patch.object(command, "generate_failover_transfer")
-        mock_failover.return_value = S_ERROR()
+        jr = JobReport(wf_commons["job_id"])
+        mocker.patch.object(jr, "setApplicationStatus")
+        mock_job_report.return_value = jr
 
-        result = command.execute(
-            basedir,
-            job_id=self.JOB_ID,
-            production_id=self.PRODUCTION_ID,
-            namespace=self.NAMESPACE,
-            config_version=self.CONFIG_VERSION,
+        # Execute the module
+        wf_commons_path = create_workflow_commons(wf_commons)
+
+        uplogfile.execute(job_path)
+
+        with open(wf_commons_path, "r", encoding="utf-8") as f:
+            updated_wf_commons = json.load(f)
+
+        # Check the log directory
+        assert updated_wf_commons["log_dir"] != ""
+        log_dir = Path(updated_wf_commons["log_dir"])
+        assert log_dir.exists()
+        assert log_dir.is_dir()
+        assert log_dir.joinpath(prodconf_json).exists()
+        assert log_dir.joinpath(prodconf_json).read_text() == '{"foo": "bar"}'
+        assert log_dir.joinpath(prodconf_py).exists()
+        assert log_dir.joinpath(prodconf_py).read_text() == 'foo = "bar"'
+
+        for file in log_dir.iterdir():
+            assert file.stat().st_mode & 0o777 == 0o755
+
+        # Check the generated zip file
+        zipFile = Path(f"{updated_wf_commons['prod_job_id']}.zip")
+        assert not zipFile.exists()
+
+        # Make sure that StorageElement was called twice (getURL, putFile)
+        assert mockSEMethod.call_count == 0
+
+        # Make sure that the request was not created
+        assert failover.transferAndRegisterFile.call_count == 0
+
+        # Make sure the application status was changed
+        assert jr.setApplicationStatus.call_count == 1
+
+        shutil.rmtree(updated_wf_commons["log_dir"], ignore_errors=True)
+
+    def test_uploadLogFile_zipError(self, mocker, uplogfile, wf_commons, prodconf_json, prodconf_py):
+        """Test execution of UploadLogFile module when an error is occurring when zipping files."""
+        mocker.patch("LHCbDIRAC.Workflow.Modules.UploadLogFile.zipFiles", return_value=S_ERROR("Error"))
+        mockSEMethod = mocker.patch(
+            "DIRAC.Resources.Storage.StorageElement.StorageElementItem._StorageElementItem__executeMethod",
+            return_value=S_OK({"Failed": [], "Successful": {"notImportant": "notImportant"}}),
         )
-
-        assert not result["OK"]
-        mock_get_url.assert_not_called()
-        mock_put_file.assert_called_once_with({expected_lfn: expected_path})
-        mock_failover.assert_called_once_with(expected_path, zip_name, expected_lfn)
-        mock_set_app_status.assert_called_once()
-        mock_set_job_parameter.assert_not_called()
-
-    def test_no_files_to_zip(self, basedir, mocker):
-        """Test execution when the job did not return any files."""
-        import shutil
-
-        shutil.rmtree(basedir)
-
-        # Mock JobReport
+        mock_request = mocker.patch("dirac_cwl.commands.upload_log_file.Request")
+        mock_failover = mocker.patch("dirac_cwl.commands.upload_log_file.FailoverTransfer")
         mock_job_report = mocker.patch("dirac_cwl.commands.upload_log_file.JobReport")
-        mock_set_app_status = mocker.MagicMock()
-        mock_set_job_parameter = mocker.MagicMock()
-        mock_job_report.return_value.setApplicationStatus = mock_set_app_status
-        mock_job_report.return_value.setJobParameter = mock_set_job_parameter
 
-        result = UploadLogFile().execute(
-            basedir,
-            job_id=self.JOB_ID,
-            production_id=self.PRODUCTION_ID,
-            namespace=self.NAMESPACE,
-            config_version=self.CONFIG_VERSION,
+        req = Request()
+        mock_request.return_value = req
+
+        failover = FailoverTransfer(req)
+        mocker.patch.object(failover, "transferAndRegisterFile", return_value=S_OK())
+        mock_failover.return_value = failover
+
+        jr = JobReport(wf_commons["job_id"])
+        mocker.patch.object(jr, "setApplicationStatus")
+        mock_job_report.return_value = jr
+
+        # Execute the module
+        wf_commons_path = create_workflow_commons(wf_commons)
+
+        uplogfile.execute(job_path)
+
+        with open(wf_commons_path, "r", encoding="utf-8") as f:
+            updated_wf_commons = json.load(f)
+
+        # Check the log directory
+        assert updated_wf_commons["log_dir"] != ""
+        log_dir = Path(updated_wf_commons["log_dir"])
+        assert log_dir.exists()
+        assert log_dir.is_dir()
+        assert log_dir.joinpath(prodconf_json).exists()
+        assert log_dir.joinpath(prodconf_json).read_text() == '{"foo": "bar"}'
+        assert log_dir.joinpath(prodconf_py).exists()
+        assert log_dir.joinpath(prodconf_py).read_text() == 'foo = "bar"'
+
+        for file in log_dir.iterdir():
+            assert file.stat().st_mode & 0o777 == 0o755
+
+        # Check the generated zip file
+        zipFile = Path(f"{updated_wf_commons['prod_job_id']}.zip")
+        assert not zipFile.exists()
+
+        # Make sure that StorageElement was called twice (getURL, putFile)
+        assert mockSEMethod.call_count == 0
+
+        # Make sure that the request was not created
+        assert failover.transferAndRegisterFile.call_count == 0
+
+        # Make sure the application status was changed
+        assert jr.setApplicationStatus.call_count == 1
+
+        shutil.rmtree(updated_wf_commons["log_dir"], ignore_errors=True)
+
+    def test_uploadLogFile_SEError(self, mocker, uplogfile, wf_commons, prodconf_json, prodconf_py):
+        """Test execution of UploadLogFile module when an error is occurring when calling StorageElement."""
+        mocker.patch("LHCbDIRAC.Workflow.Modules.UploadLogFile.getDestinationSEList", return_value=["SE1", "SE2"])
+        mockSEMethod = mocker.patch(
+            "DIRAC.Resources.Storage.StorageElement.StorageElementItem._StorageElementItem__executeMethod",
+            return_value=S_ERROR("Error"),
         )
-
-        assert result["OK"]
-        assert result["Value"] == "No files to upload"
-        mock_set_app_status.assert_not_called()
-
-    def test_failed_to_zip(self, basedir, mocker: MockerFixture):
-        """Test failure while zipping."""
-        command = UploadLogFile()
-
-        # Mocker zip
-        mock_zip = mocker.patch.object(command, "zip_files")
-        mock_zip.side_effect = [AttributeError(), OSError(), ValueError()]
-
-        # Mock JobReport
+        mock_request = mocker.patch("dirac_cwl.commands.upload_log_file.Request")
+        mock_failover = mocker.patch("dirac_cwl.commands.upload_log_file.FailoverTransfer")
         mock_job_report = mocker.patch("dirac_cwl.commands.upload_log_file.JobReport")
-        mock_set_app_status = mocker.MagicMock()
-        mock_set_job_parameter = mocker.MagicMock()
-        mock_job_report.return_value.setApplicationStatus = mock_set_app_status
-        mock_job_report.return_value.setJobParameter = mock_set_job_parameter
 
-        # Test raising AttributeError
-        result = command.execute(
-            basedir,
-            job_id=self.JOB_ID,
-            production_id=self.PRODUCTION_ID,
-            namespace=self.NAMESPACE,
-            config_version=self.CONFIG_VERSION,
+        req = Request()
+        mock_request.return_value = req
+
+        failover = FailoverTransfer(req)
+        mocker.patch.object(failover, "transferAndRegisterFile", return_value=S_OK({"uploadedSE": "SE1"}))
+        mock_failover.return_value = failover
+
+        jr = JobReport(wf_commons["job_id"])
+        mocker.patch.object(jr, "setApplicationStatus")
+        mock_job_report.return_value = jr
+
+        # Execute the module
+        wf_commons_path = create_workflow_commons(wf_commons)
+
+        uplogfile.execute(job_path)
+
+        with open(wf_commons_path, "r", encoding="utf-8") as f:
+            updated_wf_commons = json.load(f)
+
+        # Check the log directory
+        assert updated_wf_commons["log_dir"] != ""
+        log_dir = Path(updated_wf_commons["log_dir"])
+        assert log_dir.exists()
+        assert log_dir.is_dir()
+        assert log_dir.joinpath(prodconf_json).exists()
+        assert log_dir.joinpath(prodconf_json).read_text() == '{"foo": "bar"}'
+        assert log_dir.joinpath(prodconf_py).exists()
+        assert log_dir.joinpath(prodconf_py).read_text() == 'foo = "bar"'
+
+        for file in log_dir.iterdir():
+            assert file.stat().st_mode & 0o777 == 0o755
+
+        # Check the generated zip file
+        zipFile = Path(f"{updated_wf_commons['prod_job_id']}.zip")
+        assert zipFile.exists()
+
+        zipfile.ZipFile(zipFile, "r").extractall("unzipped")
+        unzipped = Path("unzipped").joinpath(updated_wf_commons["prod_job_id"])
+        assert unzipped.joinpath(prodconf_json).exists()
+        assert unzipped.joinpath(prodconf_py).exists()
+        assert unzipped.joinpath(prodconf_json).read_text() == '{"foo": "bar"}'
+        assert unzipped.joinpath(prodconf_py).read_text() == 'foo = "bar"'
+
+        # Make sure that StorageElement was called twice (getURL, putFile)
+        assert mockSEMethod.call_count == 2
+
+        # Make sure that the request was created
+        assert failover.transferAndRegisterFile.call_count == 1
+
+        operations = updated_wf_commons["request_dict"]["Operations"]
+
+        assert len(operations) == 2
+        assert operations[0]["Type"] == "LogUpload"
+        assert len(operations[0]["Files"]) == 1
+        assert operations[0]["Files"][0]["LFN"] == updated_wf_commons["log_lfn_path"]
+
+        assert operations[1]["Type"] == "RemoveFile"
+        assert len(operations[1]["Files"]) == 1
+        assert operations[1]["Files"][0]["LFN"] == updated_wf_commons["log_lfn_path"]
+
+        # Make sure the application status was not changed
+        assert jr.setApplicationStatus.call_count == 0
+
+        shutil.rmtree(updated_wf_commons["log_dir"], ignore_errors=True)
+
+    def test_uploadLogFile_transferError(self, mocker, uplogfile, wf_commons, prodconf_json, prodconf_py):
+        """Test execution of UploadLogFile module when calling StorageElement and FailoverTransfer fail."""
+        mocker.patch("LHCbDIRAC.Workflow.Modules.UploadLogFile.getDestinationSEList", return_value=["SE1", "SE2"])
+        mockSEMethod = mocker.patch(
+            "DIRAC.Resources.Storage.StorageElement.StorageElementItem._StorageElementItem__executeMethod",
+            return_value=S_ERROR("Error"),
         )
+        mock_request = mocker.patch("dirac_cwl.commands.upload_log_file.Request")
+        mock_failover = mocker.patch("dirac_cwl.commands.upload_log_file.FailoverTransfer")
+        mock_job_report = mocker.patch("dirac_cwl.commands.upload_log_file.JobReport")
 
-        assert result["OK"]
-        assert "Failed to zip files" in result["Value"]
-        assert "AttributeError" in result["Value"]
-        mock_set_app_status.assert_called_once_with("Failed to create zip of log files")
-        mock_set_app_status.reset_mock()
+        req = Request()
+        mock_request.return_value = req
 
-        result = command.execute(
-            basedir,
-            job_id=self.JOB_ID,
-            production_id=self.PRODUCTION_ID,
-            namespace=self.NAMESPACE,
-            config_version=self.CONFIG_VERSION,
-        )
+        failover = FailoverTransfer(req)
+        mocker.patch.object(failover, "transferAndRegisterFile", return_value=S_ERROR("Error"))
+        mock_failover.return_value = failover
 
-        # Test raising OSError
-        assert result["OK"]
-        assert "Failed to zip files" in result["Value"]
-        assert "OSError" in result["Value"]
-        mock_set_app_status.assert_called_once_with("Failed to create zip of log files")
-        mock_set_app_status.reset_mock()
+        mock_job_report = mocker.patch("dirac_cwl.commands.upload_log_file.JobReport")
+        jr = JobReport(wf_commons["job_id"])
+        mocker.patch.object(jr, "setApplicationStatus")
+        mock_job_report.return_value = jr
 
-        result = command.execute(
-            basedir,
-            job_id=self.JOB_ID,
-            production_id=self.PRODUCTION_ID,
-            namespace=self.NAMESPACE,
-            config_version=self.CONFIG_VERSION,
-        )
+        # Execute the module
+        wf_commons_path = create_workflow_commons(wf_commons)
 
-        # Test raising ValueError
-        assert result["OK"]
-        assert "Failed to zip files" in result["Value"]
-        assert "ValueError" in result["Value"]
-        mock_set_app_status.assert_called_once_with("Failed to create zip of log files")
+        uplogfile.execute(job_path)
 
-        mock_set_job_parameter.assert_not_called()
+        with open(wf_commons_path, "r", encoding="utf-8") as f:
+            updated_wf_commons = json.load(f)
+
+        # Check the log directory
+        assert updated_wf_commons["log_dir"] != ""
+        log_dir = Path(updated_wf_commons["log_dir"])
+        assert log_dir.exists()
+        assert log_dir.is_dir()
+        assert log_dir.joinpath(prodconf_json).exists()
+        assert log_dir.joinpath(prodconf_json).read_text() == '{"foo": "bar"}'
+        assert log_dir.joinpath(prodconf_py).exists()
+        assert log_dir.joinpath(prodconf_py).read_text() == 'foo = "bar"'
+
+        for file in log_dir.iterdir():
+            assert file.stat().st_mode & 0o777 == 0o755
+
+        # Check the generated zip file
+        zipFile = Path(f"{updated_wf_commons['prod_job_id']}.zip")
+        assert zipFile.exists()
+
+        zipfile.ZipFile(zipFile, "r").extractall("unzipped")
+        unzipped = Path("unzipped").joinpath(updated_wf_commons["prod_job_id"])
+        assert unzipped.joinpath(prodconf_json).exists()
+        assert unzipped.joinpath(prodconf_py).exists()
+        assert unzipped.joinpath(prodconf_json).read_text() == '{"foo": "bar"}'
+        assert unzipped.joinpath(prodconf_py).read_text() == 'foo = "bar"'
+
+        # Make sure that StorageElement was called twice (getURL, putFile)
+        assert mockSEMethod.call_count == 2
+
+        # Make sure that the request was not created
+        assert failover.transferAndRegisterFile.call_count == 1
+
+        operations = updated_wf_commons["request_dict"]["Operations"]
+
+        assert len(operations) == 0
+
+        # Make sure the application status was changed
+        assert jr.setApplicationStatus.call_count == 1
+
+        shutil.rmtree(updated_wf_commons["log_dir"], ignore_errors=True)
 
 
 class TestBookkeepingReport:

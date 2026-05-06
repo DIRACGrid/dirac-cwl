@@ -1,24 +1,32 @@
 """Post-processing command for uploading logging information to a Storage Element."""
 
-import glob
 import os
-import random
-import stat
-import time
-import zipfile
-from urllib.parse import urljoin
+import shlex
 
-from DIRAC import S_ERROR, S_OK, siteName
 from DIRAC.ConfigurationSystem.Client.Helpers.Operations import Operations
-from DIRAC.Core.Utilities.Adler import fileAdler
 from DIRAC.Core.Utilities.ReturnValues import returnSingleResult
+from DIRAC.Core.Utilities.Subprocess import systemCall
 from DIRAC.DataManagementSystem.Client.FailoverTransfer import FailoverTransfer
-from DIRAC.DataManagementSystem.Utilities.ResolveSE import getDestinationSEList
-from DIRAC.Resources.Catalog.PoolXMLFile import getGUID
+from DIRAC.RequestManagementSystem.Client.Request import Request
 from DIRAC.Resources.Storage.StorageElement import StorageElement
 from DIRAC.WorkloadManagementSystem.Client.JobReport import JobReport
+from LHCbDIRAC.BookkeepingSystem.Client.BookkeepingClient import BookkeepingClient
+from LHCbDIRAC.Core.Utilities.ProductionData import getLogPath
+from LHCbDIRAC.Workflow.Modules.FailoverRequest import _prepareRequest
+from LHCbDIRAC.Workflow.Modules.UploadLogFile import (
+    _createLogUploadRequest,
+    _determineRelevantFiles,
+    _get_log_url,
+    _populateLogDirectory,
+    _setLogFilePermissions,
+    _uploadLogToFailoverSE,
+    _zip_files,
+)
 
-from dirac_cwl.commands import PostProcessCommand
+from dirac_cwl.core.exceptions import WorkflowProcessingException
+
+from .core import PostProcessCommand
+from .utils import prepare_lhcb_workflow_commons, save_workflow_commons
 
 
 class UploadLogFile(PostProcessCommand):
@@ -31,132 +39,111 @@ class UploadLogFile(PostProcessCommand):
         :param kwargs: Additional keyword arguments.
         """
         # Obtain workflow information
-        job_id = kwargs.get("job_id", None)
-        production_id = kwargs.get("production_id", None)
-        namespace = kwargs.get("namespace", None)
-        config_version = kwargs.get("config_version", None)
-
-        if not job_path or not production_id or not namespace or not config_version:
-            return S_ERROR("Not enough information to perform the log upload")
-
-        ops = Operations()
-        log_extensions = ops.getValue("LogFiles/Extensions", [])
-        log_se = ops.getValue("LogStorage/LogSE", "LogSE")
-
-        job_report = JobReport(job_id)
-
-        output_files = self.obtain_output_files(job_path, log_extensions)
-
-        if not output_files:
-            return S_OK("No files to upload")
-
-        # Zip files
-        zip_name = job_id.zfill(8) + ".zip"
-        zip_path = os.path.join(job_path, zip_name)
-
+        failed = False
+        workflow_commons = {}
+        request = None
         try:
-            self.zip_files(zip_path, output_files)
-        except (AttributeError, OSError, ValueError) as e:
-            job_report.setApplicationStatus("Failed to create zip of log files")
-            return S_OK(f"Failed to zip files: {repr(e)}")
+            workflow_commons_path = kwargs.get("workflow_commons_path", os.path.join(job_path, "workflow_commons.json"))
 
-        # Obtain the log destination
-        zip_lfn = self.get_zip_lfn(production_id, job_id, namespace, config_version)
+            workflow_commons = prepare_lhcb_workflow_commons(
+                workflow_commons_path,
+                extra_mandatory_values=[],
+                extra_default_values={"log_target_path": None, "log_file_path": ""},
+            )
+            request = Request(workflow_commons["request_dict"])
 
-        # Upload to the SE
-        result = returnSingleResult(StorageElement(log_se).putFile({zip_lfn: zip_path}))
+            if not workflow_commons["step_status"]["OK"]:
+                return
 
-        if not result["OK"]:  # Failed to uplaod to the LogSE
-            result = self.generate_failover_transfer(zip_path, zip_name, zip_lfn)
+            log_lfn_path = workflow_commons["log_target_path"]
+            if not log_lfn_path:
+                parameters = {
+                    "PRODUCTION_ID": workflow_commons["production_id"],
+                    "JOB_ID": workflow_commons["job_id"],
+                    "configName": workflow_commons["config_name"],
+                    "configVersion": workflow_commons["config_version"],
+                }
+                result = getLogPath(parameters, BookkeepingClient())
+                if not result["OK"]:
+                    raise WorkflowProcessingException("Could not create LogFilePath", result["Message"])
+                log_lfn_path = result["Value"]["LogTargetPath"][0]
 
+            if not isinstance(log_lfn_path, str):
+                log_lfn_path = log_lfn_path[0]
+
+            workflow_commons["log_lfn_path"] = log_lfn_path
+
+            ops = Operations()
+            log_se = ops.getValue("LogStorage/LogSE", "LogSE")
+            log_extensions = ops.getValue("LogFiles/Extensions", [])
+
+            _prepareRequest(request, workflow_commons["job_id"])
+            failover_transfer = FailoverTransfer(request)
+            job_report = JobReport(workflow_commons["job_id"])
+
+            res = systemCall(0, shlex.split("ls -al"))
+
+            workflow_commons["log_dir"] = os.path.realpath(
+                f"./job/log/{workflow_commons['production_id']}/{workflow_commons['prod_job_id']}"
+            )
+
+            ##########################################
+            # First determine the files which should be saved
+            res = _determineRelevantFiles(log_extensions)
+            if not res["OK"]:
+                return
+            selectedFiles = res["Value"]
+
+            #########################################
+            # Create a temporary directory containing these files
+            res = _populateLogDirectory(selectedFiles, workflow_commons["log_dir"])
+            if not res["OK"]:
+                job_report.setApplicationStatus("Failed To Populate Log Dir")
+                return
+
+            #########################################
+            # Make sure all the files in the log directory have the correct permissions
+            result = _setLogFilePermissions(workflow_commons["log_dir"])
+
+            # zip all files
+            result = _zip_files(workflow_commons["prod_job_id"], selectedFiles)
             if not result["OK"]:
-                job_report.setApplicationStatus("Failed To Upload Logs")
-                return S_ERROR("Failed to upload to FailoverSE")
+                job_report.setApplicationStatus("Failed to create zip of log files")
+                return
 
-        # Set the Log URL parameter
-        result = returnSingleResult(StorageElement(log_se).getURL(zip_path, protocol="https"))
-        if not result["OK"]:
-            # The rule for interpreting what is to be deflated can be found in /eos/lhcb/grid/prod/lhcb/logSE/.htaccess
-            logHttpsURL = urljoin("https://lhcb-dirac-logse.web.cern.ch/lhcb-dirac-logse/", zip_lfn)
-        else:
-            logHttpsURL = result["Value"]
+            zip_file_name = result["Value"]
 
-        logHttpsURL = logHttpsURL.replace(".zip", "/")
-        job_report.setJobParameter("Log URL", f'<a href="{logHttpsURL}">Log file directory</a>')
+            # Instantiate the failover transfer client with the global request object
+            if not failover_transfer:
+                failover_transfer = FailoverTransfer(request)
 
-        return S_OK("Log Files uploaded")
+            # logFilePath is something like /lhcb/MC/2016/LOG/00095376/0000/
+            # the zipFileName should have the same name, e.g. 00000381.zip
+            zipPath = os.path.join(workflow_commons["log_file_path"], zip_file_name)
+            logHttpsURL = _get_log_url(log_se, zipPath)
 
-    def zip_files(self, outputFile, files=None, directory=None):
-        """Zip list of files."""
-        with zipfile.ZipFile(outputFile, "w") as zipped:
-            for fileIn in files:
-                # ZIP does not support timestamps before 1980, so for those we simply "touch"
-                st = os.stat(fileIn)
-                mtime = time.localtime(st.st_mtime)
-                dateTime = mtime[0:6]
-                if dateTime[0] < 1980:
-                    os.utime(fileIn, None)  # same as "touch"
+            res = returnSingleResult(StorageElement(log_se).putFile({zipPath: zip_file_name}))
+            if not res["OK"]:
+                result = _uploadLogToFailoverSE(
+                    failover_transfer, zip_file_name, log_lfn_path, workflow_commons["site_name"]
+                )
 
-                zipped.write(fileIn)
+                if not result["OK"]:
+                    job_report.setApplicationStatus("Failed To Upload Logs")
+                else:
+                    uploadedSE = result["Value"]["uploadedSE"]
+                    request = failover_transfer.request
+                    _createLogUploadRequest(request, log_se, log_lfn_path, uploadedSE)
 
-    def obtain_output_files(self, job_path, extensions=[]):
-        """Obtain the files to be added to the log zip from the outputs."""
-        log_file_extensions = extensions
+            # While it's the zip file that is uploaded, we set in job parameters its directory,
+            # as the .zip is deflated automatically
+            job_report.setJobParameter(
+                "Log URL", f"<a href=\"{logHttpsURL.replace('.zip','/')}\">Log file directory</a>"
+            )
 
-        if not log_file_extensions:
-            log_file_extensions = [
-                "*.txt",
-                "*.log",
-                "*.out",
-                "*.output",
-                "*.xml",
-                "*.sh",
-                "*.info",
-                "*.err",
-                "prodConf*.py",
-                "prodConf*.json",
-            ]
+        except Exception as e:
+            failed = True
+            raise WorkflowProcessingException(e) from e
 
-        files = []
-
-        for extension in log_file_extensions:
-            glob_list = glob.glob(extension, root_dir=job_path, recursive=True)
-            for check in glob_list:
-                path = os.path.join(job_path, check)
-                if os.path.isfile(path):
-                    os.chmod(path, stat.S_IRWXU | stat.S_IRGRP | stat.S_IXGRP | stat.S_IROTH + stat.S_IXOTH)
-                    files.append(path)
-
-        return files
-
-    def get_zip_lfn(self, production_id, job_id, namespace, config_version):
-        """Form a logical file name from certain information from the workflow."""
-        production_id = str(production_id).zfill(8)
-        job_id = str(job_id).zfill(8)
-        jobindex = str(int(int(job_id) / 10000)).zfill(4)
-
-        log_path = os.path.join("/lhcb", namespace, config_version, "LOG", production_id, jobindex, "")
-        path = os.path.join(log_path, f"{job_id}.zip")
-        return path
-
-    def generate_failover_transfer(self, zip_path, zip_name, zip_lfn):
-        """Prepare a failover transfer ."""
-        failoverSEs = getDestinationSEList("Tier1-Failover", siteName())
-        random.shuffle(failoverSEs)
-
-        fileMetaDict = {
-            "Size": os.path.getsize(zip_path),
-            "LFN": zip_lfn,
-            "GUID": getGUID(zip_path),
-            "Checksum": fileAdler(zip_path),
-            "ChecksumType": "ADLER32",
-        }
-
-        return FailoverTransfer().transferAndRegisterFile(
-            fileName=zip_name,
-            localPath=zip_path,
-            lfn=zip_lfn,
-            destinationSEList=failoverSEs,
-            fileMetaDict=fileMetaDict,
-            masterCatalogOnly=True,
-        )
+        finally:
+            save_workflow_commons(workflow_commons, workflow_commons_path, request, failed=failed)
