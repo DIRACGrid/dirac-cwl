@@ -23,7 +23,7 @@ from LHCbDIRAC.BookkeepingSystem.Client.BookkeepingClient import BookkeepingClie
 from LHCbDIRAC.Core.Utilities.XMLSummaries import XMLSummary
 from pytest_mock import MockerFixture
 
-from dirac_cwl.commands import BookeepingReport, FailoverRequest, UploadLogFile, UploadOutputData
+from dirac_cwl.commands import AnalyseXmlSummary, BookeepingReport, FailoverRequest, UploadLogFile, UploadOutputData
 from dirac_cwl.core.exceptions import WorkflowProcessingException
 
 number_of_processors = 1
@@ -1799,3 +1799,574 @@ class TestUploadOutputDataFile:
         # Make sure the request is not generated
         operations = updated_wf_commons["request_dict"]["Operations"]
         assert len(operations) == 0
+
+
+class TestAnalyseXmlSummary:
+    """Collection of tests for the AnalyseXmlSummary command."""
+
+    @pytest.fixture
+    def axlf(self, mocker):
+        """Fixture for AnalyseXmlSummary module."""
+        mocker.patch("LHCbDIRAC.Workflow.Modules.ModuleBase.RequestValidator")
+
+        axlf = AnalyseXmlSummary()
+
+        yield axlf
+
+    # Test scenarios
+    def test_analyseXMLSummary_basic_success(self, mocker, axlf, wf_commons, xml_summary_file):
+        """Test basic success scenario."""
+        mock_file_report = mocker.patch("dirac_cwl.commands.analyze_xml_summary.FileReport")
+        mock_job_report = mocker.patch("dirac_cwl.commands.analyze_xml_summary.JobReport")
+
+        fr = FileReport()
+
+        jr = JobReport(wf_commons["job_id"])
+        mocker.patch.object(jr, "setApplicationStatus")
+        jr.setApplicationStatus.return_value = S_OK()
+
+        mock_file_report.return_value = fr
+        mock_job_report.return_value = jr
+
+        xml_content = dedent("""<?xml version="1.0" encoding="UTF-8"?>
+            <summary version="1.0" xsi:noNamespaceSchemaLocation="$XMLSUMMARYBASEROOT/xml/XMLSummary.xsd"
+            xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+                    <success>True</success>
+                    <step>finalize</step>
+                    <usage>
+                            <stat unit="KB" useOf="MemoryMaximum">866104.0</stat>
+                    </usage>
+                    <input>
+                            <file GUID="CCE96707-4BE9-E011-81CD-003048F35252" name="LFN:00012478_00000532_1.sim"
+                            status="full">200</file>
+                    </input>
+                    <output>
+                            <file GUID="229BBEF1-66E9-E011-BBD0-003048F35252" name="PFN:00012478_00000532_2.xdigi"
+                            status="full">200</file>
+                    </output>
+            </summary>
+            """)
+
+        xf_o = prepare_XMLSummary_file(xml_summary_file, xml_content)
+        wf_commons["xml_summary_path"] = xml_summary_file
+        wf_commons["number_of_events"] = -1
+
+        assert xf_o.success == "True"
+        assert xf_o.step == "finalize"
+        assert xf_o._outputsOK()
+        assert not xf_o.inputFileStats["mult"]
+        assert not xf_o.inputFileStats["other"]
+
+        create_workflow_commons(wf_commons)
+        axlf.execute(job_path)
+
+        jr.setApplicationStatus.assert_called_once()
+        assert fr.statusDict == {}
+
+    def test_analyseXMLSummary_previousError_success(self, mocker, axlf, wf_commons, xml_summary_file):
+        """Test success scenario with previous error: stepStatus = S_ERROR()."""
+        mock_file_report = mocker.patch("dirac_cwl.commands.analyze_xml_summary.FileReport")
+        mock_job_report = mocker.patch("dirac_cwl.commands.analyze_xml_summary.JobReport")
+
+        fr = FileReport()
+
+        jr = JobReport(wf_commons["job_id"])
+        mocker.patch.object(jr, "setApplicationStatus")
+        jr.setApplicationStatus.return_value = S_OK()
+
+        mock_file_report.return_value = fr
+        mock_job_report.return_value = jr
+
+        xml_content = dedent("""<?xml version="1.0" encoding="UTF-8"?>
+            <summary version="1.0" xsi:noNamespaceSchemaLocation="$XMLSUMMARYBASEROOT/xml/XMLSummary.xsd"
+            xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+                    <success>True</success>
+                    <step>finalize</step>
+                    <usage>
+                            <stat unit="KB" useOf="MemoryMaximum">866104.0</stat>
+                    </usage>
+                    <input>
+                            <file GUID="CCE96707-4BE9-E011-81CD-003048F35252" name="LFN:00012478_00000532_1.sim"
+                            status="full">200</file>
+                    </input>
+                    <output>
+                            <file GUID="229BBEF1-66E9-E011-BBD0-003048F35252" name="PFN:00012478_00000532_2.xdigi"
+                            status="full">200</file>
+                    </output>
+            </summary>
+            """)
+
+        xf_o = prepare_XMLSummary_file(xml_summary_file, xml_content)
+        wf_commons["xml_summary_path"] = xml_summary_file
+        wf_commons["step_status"] = S_ERROR()
+        wf_commons["number_of_events"] = -1
+
+        assert xf_o.success == "True"
+        assert xf_o.step == "finalize"
+        assert xf_o._outputsOK()
+        assert not xf_o.inputFileStats["mult"]
+        assert not xf_o.inputFileStats["other"]
+
+        create_workflow_commons(wf_commons)
+        axlf.execute(job_path)
+
+        jr.setApplicationStatus.assert_not_called()
+        assert fr.statusDict == {}
+
+    def test_analyseXMLSummary_badInput_success(self, mocker, axlf, wf_commons, xml_summary_file):
+        """Test success scenario with part and fail input not part of the input data list."""
+        mock_file_report = mocker.patch("dirac_cwl.commands.analyze_xml_summary.FileReport")
+        mock_job_report = mocker.patch("dirac_cwl.commands.analyze_xml_summary.JobReport")
+
+        fr = FileReport()
+
+        jr = JobReport(wf_commons["job_id"])
+        mocker.patch.object(jr, "setApplicationStatus")
+        jr.setApplicationStatus.return_value = S_OK()
+
+        mock_file_report.return_value = fr
+        mock_job_report.return_value = jr
+
+        xml_content = dedent("""<?xml version="1.0" encoding="UTF-8"?>
+            <summary version="1.0" xsi:noNamespaceSchemaLocation="$XMLSUMMARYBASEROOT/xml/XMLSummary.xsd"
+            xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+                    <success>True</success>
+                    <step>finalize</step>
+                    <usage>
+                            <stat unit="KB" useOf="MemoryMaximum">866104.0</stat>
+                    </usage>
+                    <input>
+                            <file GUID="CCE96707-4BE9-E011-81CD-003048F35252" name="LFN:00012478_00000532_1.sim"
+                            status="part">200</file>
+                            <file GUID="CCE96809-4FC6-F623-61F5-003048F35253" name="LFN:00012478_00000533_1.sim"
+                            status="fail">200</file>
+                    </input>
+                    <output>
+                            <file GUID="229BBEF1-66E9-E011-BBD0-003048F35252" name="PFN:00012478_00000532_2.xdigi"
+                            status="full">200</file>
+                    </output>
+            </summary>
+            """)
+
+        xf_o = prepare_XMLSummary_file(xml_summary_file, xml_content)
+        wf_commons["xml_summary_path"] = xml_summary_file
+        wf_commons["number_of_events"] = -1
+
+        assert xf_o.success == "True"
+        assert xf_o.step == "finalize"
+        assert xf_o._outputsOK()
+        assert not xf_o.inputFileStats["mult"]
+        assert not xf_o.inputFileStats["other"]
+
+        create_workflow_commons(wf_commons)
+        axlf.execute(job_path)
+
+        jr.setApplicationStatus.assert_called_once()
+        assert fr.statusDict == {}
+
+    def test_analyseXMLSummary_partInput_success(self, mocker, axlf, wf_commons, xml_summary_file):
+        """Test success scenario with part input part of the input data list."""
+        # Input is 'part' and is part of the input data list but the number of events is not -1
+        mock_file_report = mocker.patch("dirac_cwl.commands.analyze_xml_summary.FileReport")
+        mock_job_report = mocker.patch("dirac_cwl.commands.analyze_xml_summary.JobReport")
+
+        fr = FileReport()
+
+        jr = JobReport(wf_commons["job_id"])
+        mocker.patch.object(jr, "setApplicationStatus")
+        jr.setApplicationStatus.return_value = S_OK()
+
+        mock_file_report.return_value = fr
+        mock_job_report.return_value = jr
+
+        xml_content = dedent("""<?xml version="1.0" encoding="UTF-8"?>
+            <summary version="1.0" xsi:noNamespaceSchemaLocation="$XMLSUMMARYBASEROOT/xml/XMLSummary.xsd"
+            xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+                    <success>True</success>
+                    <step>finalize</step>
+                    <usage>
+                            <stat unit="KB" useOf="MemoryMaximum">866104.0</stat>
+                    </usage>
+                    <input>
+                            <file GUID="CCE96707-4BE9-E011-81CD-003048F35252" name="LFN:00012478_00000532_1.sim"
+                            status="part">200</file>
+                    </input>
+                    <output>
+                            <file GUID="229BBEF1-66E9-E011-BBD0-003048F35252" name="PFN:00012478_00000532_2.xdigi"
+                            status="full">200</file>
+                    </output>
+            </summary>
+            """)
+        xf_o = prepare_XMLSummary_file(xml_summary_file, xml_content)
+        wf_commons["xml_summary_path"] = xml_summary_file
+        wf_commons["inputs"] = ["00012478_00000532_1.sim"]
+        wf_commons["number_of_events"] = 1
+
+        assert xf_o.success == "True"
+        assert xf_o.step == "finalize"
+        assert xf_o._outputsOK()
+        assert not xf_o.inputFileStats["mult"]
+        assert not xf_o.inputFileStats["other"]
+
+        create_workflow_commons(wf_commons)
+        axlf.execute(job_path)
+
+        jr.setApplicationStatus.assert_called_once()
+        assert fr.statusDict == {}
+
+    def test_analyseXMLSummary_notSuccess_fail(self, mocker, axlf, wf_commons, xml_summary_file):
+        """Test failure scenario with success=False."""
+        mock_file_report = mocker.patch("dirac_cwl.commands.analyze_xml_summary.FileReport")
+        mock_job_report = mocker.patch("dirac_cwl.commands.analyze_xml_summary.JobReport")
+
+        fr = FileReport()
+
+        jr = JobReport(wf_commons["job_id"])
+        mocker.patch.object(jr, "setApplicationStatus")
+        jr.setApplicationStatus.return_value = S_OK()
+
+        mock_file_report.return_value = fr
+        mock_job_report.return_value = jr
+
+        xml_content = dedent("""<?xml version="1.0" encoding="UTF-8"?>
+            <summary version="1.0" xsi:noNamespaceSchemaLocation="$XMLSUMMARYBASEROOT/xml/XMLSummary.xsd"
+            xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+                    <success>False</success>
+                    <step>finalize</step>
+                    <usage>
+                            <stat unit="KB" useOf="MemoryMaximum">866104.0</stat>
+                    </usage>
+                    <input>
+                            <file GUID="CCE96707-4BE9-E011-81CD-003048F35252" name="LFN:00012478_00000532_1.sim"
+                            status="part">200</file>
+                    </input>
+                    <output>
+                            <file GUID="229BBEF1-66E9-E011-BBD0-003048F35252" name="PFN:00012478_00000532_2.xdigi"
+                            status="full">200</file>
+                    </output>
+            </summary>
+            """)
+
+        xf_o = prepare_XMLSummary_file(xml_summary_file, xml_content)
+        wf_commons["xml_summary_path"] = xml_summary_file
+        wf_commons["number_of_events"] = -1
+
+        assert xf_o.success == "False"
+        assert xf_o.step == "finalize"
+        assert xf_o._outputsOK()
+        assert not xf_o.inputFileStats["mult"]
+        assert not xf_o.inputFileStats["other"]
+
+        create_workflow_commons(wf_commons)
+        with pytest.raises(WorkflowProcessingException):
+            axlf.execute(job_path)
+
+        jr.setApplicationStatus.assert_called_once()
+        assert fr.statusDict == {}
+
+    def test_analyseXMLSummary_badStep_fail(self, mocker, axlf, wf_commons, xml_summary_file):
+        """Test failure scenario with step != finalize."""
+        mock_file_report = mocker.patch("dirac_cwl.commands.analyze_xml_summary.FileReport")
+        mock_job_report = mocker.patch("dirac_cwl.commands.analyze_xml_summary.JobReport")
+
+        fr = FileReport()
+
+        jr = JobReport(wf_commons["job_id"])
+        mocker.patch.object(jr, "setApplicationStatus")
+        jr.setApplicationStatus.return_value = S_OK()
+
+        mock_file_report.return_value = fr
+        mock_job_report.return_value = jr
+
+        xml_content = dedent("""<?xml version="1.0" encoding="UTF-8"?>
+            <summary version="1.0" xsi:noNamespaceSchemaLocation="$XMLSUMMARYBASEROOT/xml/XMLSummary.xsd"
+            xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+                    <success>True</success>
+                    <step>execute</step>
+                    <usage>
+                            <stat unit="KB" useOf="MemoryMaximum">866104.0</stat>
+                    </usage>
+                    <input>
+                            <file GUID="CCE96707-4BE9-E011-81CD-003048F35252" name="LFN:00012478_00000532_1.sim"
+                            status="part">200</file>
+                    </input>
+                    <output>
+                            <file GUID="229BBEF1-66E9-E011-BBD0-003048F35252" name="PFN:00012478_00000532_2.xdigi"
+                            status="full">200</file>
+                    </output>
+            </summary>
+            """)
+
+        xf_o = prepare_XMLSummary_file(xml_summary_file, xml_content)
+        wf_commons["xml_summary_path"] = xml_summary_file
+        wf_commons["number_of_events"] = -1
+
+        assert xf_o.success == "True"
+        assert xf_o.step == "execute"
+        assert xf_o._outputsOK()
+        assert not xf_o.inputFileStats["mult"]
+        assert not xf_o.inputFileStats["other"]
+
+        create_workflow_commons(wf_commons)
+        with pytest.raises(WorkflowProcessingException):
+            axlf.execute(job_path)
+
+        jr.setApplicationStatus.assert_called_once()
+        assert fr.statusDict == {}
+
+    def test_analyseXMLSummary_badOutput_fail(self, mocker, axlf, wf_commons, xml_summary_file):
+        """Test failure scenario with output status != full."""
+        mock_file_report = mocker.patch("dirac_cwl.commands.analyze_xml_summary.FileReport")
+        mock_job_report = mocker.patch("dirac_cwl.commands.analyze_xml_summary.JobReport")
+
+        fr = FileReport()
+
+        jr = JobReport(wf_commons["job_id"])
+        mocker.patch.object(jr, "setApplicationStatus")
+        jr.setApplicationStatus.return_value = S_OK()
+
+        mock_file_report.return_value = fr
+        mock_job_report.return_value = jr
+
+        xml_content = dedent("""<?xml version="1.0" encoding="UTF-8"?>
+            <summary version="1.0" xsi:noNamespaceSchemaLocation="$XMLSUMMARYBASEROOT/xml/XMLSummary.xsd"
+            xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+                    <success>True</success>
+                    <step>finalize</step>
+                    <usage>
+                            <stat unit="KB" useOf="MemoryMaximum">866104.0</stat>
+                    </usage>
+                    <input>
+                            <file GUID="CCE96707-4BE9-E011-81CD-003048F35252" name="LFN:00012478_00000532_1.sim"
+                            status="part">200</file>
+                    </input>
+                    <output>
+                            <file GUID="229BBEF1-66E9-E011-BBD0-003048F35252" name="PFN:00012478_00000532_2.xdigi"
+                            status="fail">200</file>
+                    </output>
+            </summary>
+            """)
+
+        xf_o = prepare_XMLSummary_file(xml_summary_file, xml_content)
+        wf_commons["xml_summary_path"] = xml_summary_file
+        wf_commons["number_of_events"] = -1
+
+        assert xf_o.success == "True"
+        assert xf_o.step == "finalize"
+        assert not xf_o._outputsOK()
+        assert not xf_o.inputFileStats["mult"]
+        assert not xf_o.inputFileStats["other"]
+
+        create_workflow_commons(wf_commons)
+        with pytest.raises(WorkflowProcessingException):
+            axlf.execute(job_path)
+
+        jr.setApplicationStatus.assert_called_once()
+        assert fr.statusDict == {}
+
+    def test_analyseXMLSummary_badInput_fail(self, mocker, axlf, wf_commons, xml_summary_file):
+        """Test failure scenario with input status = mult."""
+        mock_file_report = mocker.patch("dirac_cwl.commands.analyze_xml_summary.FileReport")
+        mock_job_report = mocker.patch("dirac_cwl.commands.analyze_xml_summary.JobReport")
+
+        fr = FileReport()
+
+        jr = JobReport(wf_commons["job_id"])
+        mocker.patch.object(jr, "setApplicationStatus")
+        jr.setApplicationStatus.return_value = S_OK()
+
+        mock_file_report.return_value = fr
+        mock_job_report.return_value = jr
+
+        xml_content = dedent("""<?xml version="1.0" encoding="UTF-8"?>
+            <summary version="1.0" xsi:noNamespaceSchemaLocation="$XMLSUMMARYBASEROOT/xml/XMLSummary.xsd"
+            xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+                    <success>True</success>
+                    <step>finalize</step>
+                    <usage>
+                            <stat unit="KB" useOf="MemoryMaximum">866104.0</stat>
+                    </usage>
+                    <input>
+                            <file GUID="CCE96707-4BE9-E011-81CD-003048F35252" name="LFN:00012478_00000532_1.sim"
+                            status="mult">200</file>
+                    </input>
+                    <output>
+                            <file GUID="229BBEF1-66E9-E011-BBD0-003048F35252" name="PFN:00012478_00000532_2.xdigi"
+                            status="full">200</file>
+                    </output>
+            </summary>
+            """)
+
+        xf_o = prepare_XMLSummary_file(xml_summary_file, xml_content)
+        wf_commons["xml_summary_path"] = xml_summary_file
+        wf_commons["number_of_events"] = -1
+
+        assert xf_o.success == "True"
+        assert xf_o.step == "finalize"
+        assert xf_o._outputsOK()
+        assert xf_o.inputFileStats["mult"]
+        assert not xf_o.inputFileStats["other"]
+
+        create_workflow_commons(wf_commons)
+        with pytest.raises(WorkflowProcessingException):
+            axlf.execute(job_path)
+
+        jr.setApplicationStatus.assert_called_once()
+        assert fr.statusDict == {}
+
+    def test_analyseXMLSummary_badInput2_fail(self, mocker, axlf, wf_commons, xml_summary_file):
+        """Test failure scenario with an unknown input status (weoweo)."""
+        mock_file_report = mocker.patch("dirac_cwl.commands.analyze_xml_summary.FileReport")
+        mock_job_report = mocker.patch("dirac_cwl.commands.analyze_xml_summary.JobReport")
+
+        fr = FileReport()
+
+        jr = JobReport(wf_commons["job_id"])
+        mocker.patch.object(jr, "setApplicationStatus")
+        jr.setApplicationStatus.return_value = S_OK()
+
+        mock_file_report.return_value = fr
+        mock_job_report.return_value = jr
+
+        xml_content = dedent("""<?xml version="1.0" encoding="UTF-8"?>
+            <summary version="1.0" xsi:noNamespaceSchemaLocation="$XMLSUMMARYBASEROOT/xml/XMLSummary.xsd"
+            xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+                    <success>True</success>
+                    <step>finalize</step>
+                    <usage>
+                            <stat unit="KB" useOf="MemoryMaximum">866104.0</stat>
+                    </usage>
+                    <input>
+                            <file GUID="CCE96707-4BE9-E011-81CD-003048F35252" name="LFN:00012478_00000532_1.sim"
+                            status="weoweo">200</file>
+                    </input>
+                    <output>
+                            <file GUID="229BBEF1-66E9-E011-BBD0-003048F35252" name="PFN:00012478_00000532_2.xdigi"
+                            status="full">200</file>
+                    </output>
+            </summary>
+            """)
+
+        xf_o = prepare_XMLSummary_file(xml_summary_file, xml_content)
+        wf_commons["xml_summary_path"] = xml_summary_file
+        wf_commons["number_of_events"] = -1
+
+        assert xf_o.success == "True"
+        assert xf_o.step == "finalize"
+        assert xf_o._outputsOK()
+        assert not xf_o.inputFileStats["mult"]
+        assert xf_o.inputFileStats["other"]
+
+        create_workflow_commons(wf_commons)
+        with pytest.raises(WorkflowProcessingException):
+            axlf.execute(job_path)
+
+        jr.setApplicationStatus.assert_called_once()
+        assert fr.statusDict == {}
+
+    def test_analyseXMLSummary_badInput3_fail(self, mocker, axlf, wf_commons, xml_summary_file):
+        """Test failure scenario with input status = fail."""
+        mock_file_report = mocker.patch("dirac_cwl.commands.analyze_xml_summary.FileReport")
+        mock_job_report = mocker.patch("dirac_cwl.commands.analyze_xml_summary.JobReport")
+
+        fr = FileReport()
+
+        jr = JobReport(wf_commons["job_id"])
+        mocker.patch.object(jr, "setApplicationStatus")
+        jr.setApplicationStatus.return_value = S_OK()
+
+        mock_file_report.return_value = fr
+        mock_job_report.return_value = jr
+
+        xml_content = dedent("""<?xml version="1.0" encoding="UTF-8"?>
+            <summary version="1.0" xsi:noNamespaceSchemaLocation="$XMLSUMMARYBASEROOT/xml/XMLSummary.xsd"
+            xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+                    <success>True</success>
+                    <step>finalize</step>
+                    <usage>
+                            <stat unit="KB" useOf="MemoryMaximum">866104.0</stat>
+                    </usage>
+                    <input>
+                            <file GUID="CCE96707-4BE9-E011-81CD-003048F35252" name="LFN:00012478_00000532_1.sim"
+                            status="fail">200</file>
+                            <file GUID="CCE96709-5BE9-E012-41BD-004048E36253" name="LFN:00012478_00000533_1.sim"
+                            status="fail">200</file>
+                    </input>
+                    <output>
+                            <file GUID="229BBEF1-66E9-E011-BBD0-003048F35252" name="PFN:00012478_00000532_2.xdigi"
+                            status="full">200</file>
+                    </output>
+            </summary>
+            """)
+
+        xf_o = prepare_XMLSummary_file(xml_summary_file, xml_content)
+        wf_commons["xml_summary_path"] = xml_summary_file
+        wf_commons["inputs"] = ["00012478_00000532_1.sim"]
+        wf_commons["number_of_events"] = -1
+
+        assert xf_o.success == "True"
+        assert xf_o.step == "finalize"
+        assert xf_o._outputsOK()
+        assert not xf_o.inputFileStats["mult"]
+        assert not xf_o.inputFileStats["other"]
+
+        create_workflow_commons(wf_commons)
+        with pytest.raises(WorkflowProcessingException):
+            axlf.execute(job_path)
+
+        jr.setApplicationStatus.assert_called_once()
+        assert fr.statusDict == {"00012478_00000532_1.sim": "Problematic"}
+
+    def test_analyseXMLSummary_badInput4_fail(self, mocker, axlf, wf_commons, xml_summary_file):
+        """Test failure scenario with input status = part."""
+        # Input is 'part' and is part of the input data list but the number of events is -1 (by default)
+        mock_file_report = mocker.patch("dirac_cwl.commands.analyze_xml_summary.FileReport")
+        mock_job_report = mocker.patch("dirac_cwl.commands.analyze_xml_summary.JobReport")
+
+        fr = FileReport()
+
+        jr = JobReport(wf_commons["job_id"])
+        mocker.patch.object(jr, "setApplicationStatus")
+        jr.setApplicationStatus.return_value = S_OK()
+
+        mock_file_report.return_value = fr
+        mock_job_report.return_value = jr
+
+        xml_content = dedent("""<?xml version="1.0" encoding="UTF-8"?>
+            <summary version="1.0" xsi:noNamespaceSchemaLocation="$XMLSUMMARYBASEROOT/xml/XMLSummary.xsd"
+            xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+                    <success>True</success>
+                    <step>finalize</step>
+                    <usage>
+                            <stat unit="KB" useOf="MemoryMaximum">866104.0</stat>
+                    </usage>
+                    <input>
+                            <file GUID="CCE96707-4BE9-E011-81CD-003048F35252" name="LFN:00012478_00000532_1.sim"
+                            status="part">200</file>
+                            <file GUID="CCE96709-5BE9-E012-41BD-004048E36253" name="LFN:00012478_00000533_1.sim"
+                            status="part">200</file>
+                    </input>
+                    <output>
+                            <file GUID="229BBEF1-66E9-E011-BBD0-003048F35252" name="PFN:00012478_00000532_2.xdigi"
+                            status="full">200</file>
+                    </output>
+            </summary>
+            """)
+
+        xf_o = prepare_XMLSummary_file(xml_summary_file, xml_content)
+        wf_commons["xml_summary_path"] = xml_summary_file
+        wf_commons["inputs"] = ["00012478_00000532_1.sim"]
+        wf_commons["number_of_events"] = -1
+
+        assert xf_o.success == "True"
+        assert xf_o.step == "finalize"
+        assert xf_o._outputsOK()
+        assert not xf_o.inputFileStats["mult"]
+        assert not xf_o.inputFileStats["other"]
+
+        create_workflow_commons(wf_commons)
+        with pytest.raises(WorkflowProcessingException):
+            axlf.execute(job_path)
+
+        jr.setApplicationStatus.assert_called_once()
+        assert fr.statusDict == {"00012478_00000532_1.sim": "Problematic"}
