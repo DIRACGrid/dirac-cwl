@@ -12,6 +12,7 @@ from urllib.parse import urljoin
 import LHCbDIRAC
 import pytest
 from DIRAC import siteName
+from DIRAC.AccountingSystem.Client.DataStoreClient import DataStoreClient
 from DIRAC.DataManagementSystem.Client.FailoverTransfer import FailoverTransfer
 from DIRAC.RequestManagementSystem.Client.File import File
 from DIRAC.RequestManagementSystem.Client.Operation import Operation
@@ -23,7 +24,14 @@ from LHCbDIRAC.BookkeepingSystem.Client.BookkeepingClient import BookkeepingClie
 from LHCbDIRAC.Core.Utilities.XMLSummaries import XMLSummary
 from pytest_mock import MockerFixture
 
-from dirac_cwl.commands import AnalyseXmlSummary, BookeepingReport, FailoverRequest, UploadLogFile, UploadOutputData
+from dirac_cwl.commands import (
+    AnalyseXmlSummary,
+    BookeepingReport,
+    FailoverRequest,
+    UploadLogFile,
+    UploadOutputData,
+    WorkflowAccounting,
+)
 from dirac_cwl.core.exceptions import WorkflowProcessingException
 
 number_of_processors = 1
@@ -1062,9 +1070,7 @@ class TestUploadOutputDataFile:
         if "ProductionOutputData" in wf_commons:
             wf_commons.pop("ProductionOutputData")
 
-        upload_output = UploadOutputData()
-
-        yield upload_output
+        yield UploadOutputData()
 
     # Test Scenarios
     def test_uploadOutputData_success(self, mocker, upload_output, wf_commons, sim_file, bk_file):
@@ -1807,11 +1813,7 @@ class TestAnalyseXmlSummary:
     @pytest.fixture
     def axlf(self, mocker):
         """Fixture for AnalyseXmlSummary module."""
-        mocker.patch("LHCbDIRAC.Workflow.Modules.ModuleBase.RequestValidator")
-
-        axlf = AnalyseXmlSummary()
-
-        yield axlf
+        yield AnalyseXmlSummary()
 
     # Test scenarios
     def test_analyseXMLSummary_basic_success(self, mocker, axlf, wf_commons, xml_summary_file):
@@ -2370,3 +2372,171 @@ class TestAnalyseXmlSummary:
 
         jr.setApplicationStatus.assert_called_once()
         assert fr.statusDict == {"00012478_00000532_1.sim": "Problematic"}
+
+
+class TestWorkflowAccounting:
+    """Collection of tests for the WorkflowAccounting command."""
+
+    @pytest.fixture
+    def accounting(self, mocker):
+        """Fixture for WorkflowAccounting module."""
+        yield WorkflowAccounting()
+
+    # Test Scenarios
+    def test_accounting_success(self, mocker, accounting, wf_commons, xml_summary_file):
+        """Test successful execution of WorkflowAccounting module."""
+        mock_data_store = mocker.patch("dirac_cwl.commands.workflow_accounting.DataStoreClient")
+        dsc = DataStoreClient()
+        mocker.patch.object(dsc, "addRegister")
+        mock_data_store.return_value = dsc
+
+        wf_commons["application_name"] = "Gauss"
+        xml_content = dedent("""<?xml version="1.0" encoding="UTF-8"?>
+            <summary version="1.0" xsi:noNamespaceSchemaLocation="$XMLSUMMARYBASEROOT/xml/XMLSummary.xsd"
+            xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+                    <success>True</success>
+                    <step>finalize</step>
+                    <usage>
+                            <stat unit="KB" useOf="MemoryMaximum">866104.0</stat>
+                    </usage>
+                    <input>
+                            <file GUID="CCE96707-4BE9-E011-81CD-003048F35252" name="LFN:00012478_00000532_1.sim"
+                            status="full">200</file>
+                    </input>
+                    <output>
+                            <file GUID="229BBEF1-66E9-E011-BBD0-003048F35252" name="PFN:00012478_00000532_2.xdigi"
+                            status="full">200</file>
+                    </output>
+            </summary>
+            """)
+
+        prepare_XMLSummary_file(xml_summary_file, xml_content)
+
+        wf_commons["xml_summary_path"] = xml_summary_file
+        wf_commons["bk_step_id"] = "12345"
+        wf_commons["step_proc_pass"] = "Sim09m"
+        wf_commons["event_type"] = "23103003"
+
+        create_workflow_commons(wf_commons)
+
+        accounting.execute(job_path)
+
+        # Make sure the dsc was called
+        dsc.addRegister.assert_called_once()
+
+    def test_accounting_noApplicationName_fail(self, mocker, accounting, wf_commons, xml_summary_file):
+        """Test WorkflowAccounting when there is no application name in step commons."""
+        mock_data_store = mocker.patch("dirac_cwl.commands.workflow_accounting.DataStoreClient")
+        dsc = DataStoreClient()
+        mocker.patch.object(dsc, "addRegister")
+        mock_data_store.return_value = dsc
+
+        xml_content = dedent("""<?xml version="1.0" encoding="UTF-8"?>
+            <summary version="1.0" xsi:noNamespaceSchemaLocation="$XMLSUMMARYBASEROOT/xml/XMLSummary.xsd"
+            xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+                    <success>True</success>
+                    <step>finalize</step>
+                    <usage>
+                            <stat unit="KB" useOf="MemoryMaximum">866104.0</stat>
+                    </usage>
+                    <input>
+                            <file GUID="CCE96707-4BE9-E011-81CD-003048F35252" name="LFN:00012478_00000532_1.sim"
+                            status="full">200</file>
+                    </input>
+                    <output>
+                            <file GUID="229BBEF1-66E9-E011-BBD0-003048F35252" name="PFN:00012478_00000532_2.xdigi"
+                            status="full">200</file>
+                    </output>
+            </summary>
+            """)
+
+        prepare_XMLSummary_file(xml_summary_file, xml_content)
+
+        wf_commons.pop("application_name")
+        wf_commons["xml_summary_path"] = xml_summary_file
+
+        create_workflow_commons(wf_commons)
+
+        with pytest.raises(WorkflowProcessingException):
+            accounting.execute(job_path)
+
+        assert not dsc.addRegister.called, "No accounting data should be added."
+
+    def test_accounting_incompleteData(self, mocker, accounting, wf_commons, xml_summary_file):
+        """Test successful execution of WorkflowAccounting module."""
+        mock_data_store = mocker.patch("dirac_cwl.commands.workflow_accounting.DataStoreClient")
+        dsc = DataStoreClient()
+        mocker.patch.object(dsc, "addRegister")
+        mock_data_store.return_value = dsc
+
+        xml_content = dedent("""<?xml version="1.0" encoding="UTF-8"?>
+            <summary version="1.0" xsi:noNamespaceSchemaLocation="$XMLSUMMARYBASEROOT/xml/XMLSummary.xsd"
+            xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+                    <success>True</success>
+                    <step>finalize</step>
+                    <usage>
+                            <stat unit="KB" useOf="MemoryMaximum">866104.0</stat>
+                    </usage>
+                    <input>
+                            <file GUID="CCE96707-4BE9-E011-81CD-003048F35252" name="LFN:00012478_00000532_1.sim"
+                            status="full">200</file>
+                    </input>
+                    <output>
+                            <file GUID="229BBEF1-66E9-E011-BBD0-003048F35252" name="PFN:00012478_00000532_2.xdigi"
+                            status="full">200</file>
+                    </output>
+            </summary>
+            """)
+
+        prepare_XMLSummary_file(xml_summary_file, xml_content)
+
+        wf_commons["xml_summary_path"] = xml_summary_file
+        wf_commons["application_name"] = "Gauss"
+
+        create_workflow_commons(wf_commons)
+
+        with pytest.raises(WorkflowProcessingException):
+            accounting.execute(job_path)
+
+        assert not dsc.addRegister.called, "No accounting data should be added."
+
+    def test_accounting_previousError_fail(self, mocker, accounting, wf_commons, xml_summary_file):
+        """Test WorkflowAccounting with an intentional failure."""
+        mock_data_store = mocker.patch("dirac_cwl.commands.workflow_accounting.DataStoreClient")
+        dsc = DataStoreClient()
+        mocker.patch.object(dsc, "addRegister")
+        mock_data_store.return_value = dsc
+
+        xml_content = dedent("""<?xml version="1.0" encoding="UTF-8"?>
+            <summary version="1.0" xsi:noNamespaceSchemaLocation="$XMLSUMMARYBASEROOT/xml/XMLSummary.xsd"
+            xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+                    <success>True</success>
+                    <step>finalize</step>
+                    <usage>
+                            <stat unit="KB" useOf="MemoryMaximum">866104.0</stat>
+                    </usage>
+                    <input>
+                            <file GUID="CCE96707-4BE9-E011-81CD-003048F35252" name="LFN:00012478_00000532_1.sim"
+                            status="full">200</file>
+                    </input>
+                    <output>
+                            <file GUID="229BBEF1-66E9-E011-BBD0-003048F35252" name="PFN:00012478_00000532_2.xdigi"
+                            status="full">200</file>
+                    </output>
+            </summary>
+            """)
+
+        prepare_XMLSummary_file(xml_summary_file, xml_content)
+
+        wf_commons["xml_summary_path"] = xml_summary_file
+        wf_commons["application_name"] = "Gauss"
+        wf_commons["bk_step_id"] = "12345"
+        wf_commons["step_proc_pass"] = "Sim09m"
+        wf_commons["event_type"] = "23103003"
+        wf_commons["step_status"] = S_ERROR()
+
+        create_workflow_commons(wf_commons)
+
+        accounting.execute(job_path)
+
+        assert dsc.addRegister.called, "Accounting data should be added."

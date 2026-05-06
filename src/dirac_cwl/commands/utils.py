@@ -75,6 +75,7 @@ def prepare_lhcb_workflow_commons(workflow_commons_path, extra_mandatory_values=
         "config_version": None,
         "request_dict": {},
         "file_report_files_dict": {},
+        "number_of_processors": 1,
     }
 
     for k, v in extra_default_values.items():

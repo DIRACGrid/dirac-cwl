@@ -6,6 +6,7 @@ from .core import PostProcessCommand, PreProcessCommand
 from .failover_request import FailoverRequest
 from .upload_log_file import UploadLogFile
 from .upload_output_data import UploadOutputData
+from .workflow_accounting import WorkflowAccounting
 
 __all__ = [
     "AnalyseXmlSummary",
@@ -15,4 +16,5 @@ __all__ = [
     "BookeepingReport",
     "FailoverRequest",
     "UploadOutputData",
+    "WorkflowAccounting",
 ]
