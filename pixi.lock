@@ -187,7 +187,7 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/6d/10/b37ac718c5903758fa9058a5182026a4f3b65443196b82c7840389ea0dbd/lbplatformutils-4.6.1-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/02/64/c86924898062e8217ed914a29458cfde9e4a9b80e4d4cbcca141983ba339/lbprodrun-1.12.4-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/29/ce/ed422816fb30ffa3bc11597b30d5deca06b4a1388707a04215da73c65b53/levenshtein-0.27.3-cp314-cp314-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl
-      - pypi: git+https://gitlab.cern.ch/jlisalab/LHCbDIRAC.git?rev=modules-to-cwl-migration#c441175f3289d6d85abf5d5612c3ff964edd9a5c
+      - pypi: git+https://gitlab.cern.ch/jlisalab/LHCbDIRAC.git?rev=modules-to-cwl-migration#bc5f8f1804107bc8807edcc98a97c346ef61c0e8
       - pypi: https://files.pythonhosted.org/packages/7f/37/8ea3555769b6048b5e4ec162cc90fd32e761c0e381ffb3baf888cb0d8a71/lhcbdiracx_api-0.0.8-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/68/15/bfb0c717b8f23c16907f3e73e8f56010ccd72e9900a108209665b0d9ed4b/lhcbdiracx_cli-0.0.8-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/2d/88/67602dfa2d7ab5d0518af82db34ab4d70dc2c3029b3ca788299a3be4a96d/lhcbdiracx_client-0.0.8-py3-none-any.whl
@@ -200,6 +200,7 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/2f/40/dc34d1a8d5f1e51fc64640b62b191684da52ca469da9cd74e84936ffa4a6/msgpack-1.1.2-cp314-cp314-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl
       - pypi: https://files.pythonhosted.org/packages/fe/3b/8ec5074bcfc450fe84273713b4b0a0dd47c0249358f5d82eb8104ffe2520/multidict-6.7.1-cp314-cp314-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl
       - pypi: https://files.pythonhosted.org/packages/9e/c9/b2622292ea83fbb4ec318f5b9ab867d0a28ab43c5717bb85b0a5f6b3b0a4/networkx-3.6.1-py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/76/3e/c0b690253f0b82d86e99949af13533363acfb5432ecb5d53dd5b3bce9c34/orjson-3.11.9-cp314-cp314-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
       - pypi: https://files.pythonhosted.org/packages/15/88/3cdd54fa279341afa10acf8d2b503556b1375245dccc9315659f795dd2e9/pandas-3.0.2-cp314-cp314-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl
       - pypi: https://files.pythonhosted.org/packages/a9/90/a744336f5af32c433bd09af7854599682a383b37cfd78f7de263de6ad6cb/paramiko-4.0.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/9e/c3/059298687310d527a58bb01f3b1965787ee3b40dce76752eda8b44e9a2c5/pexpect-4.9.0-py2.py3-none-any.whl
@@ -233,6 +234,7 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/89/d4/24a137517140fc8cc07f7423695b9296c993d6b6cbf2a7867d8f859de77f/schema_salad-8.9.20251102115403-cp314-cp314-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl
       - pypi: https://files.pythonhosted.org/packages/70/98/d82f14ac7ffedbd38dfa2383f142b26d18d23ca6cf35a40f4af60df666bd/sh-2.2.2-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/e0/f9/0595336914c5619e5f28a1fb793285925a8cd4b432c9da0a987836c7f822/shellingham-1.5.4-py2.py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/59/25/68f81c50aeb3f30e01c20da0f56d14c1a779b57d9308c50e19c63dc8413f/signurlarity-0.2.2-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/b7/ce/149a00dd41f10bc29e5921b496af8b574d8413afcd5e30dfa0ed46c2cc5e/six-1.17.0-py2.py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/04/be/d09147ad1ec7934636ad912901c5fd7667e1c858e19d355237db0d0cd5e4/smmap-5.0.2-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/46/2c/1462b1d0a634697ae9e55b3cecdcb64788e8b7d63f54d923fcd0bb140aed/soupsieve-2.8.3-py3-none-any.whl
@@ -429,7 +431,7 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/6d/10/b37ac718c5903758fa9058a5182026a4f3b65443196b82c7840389ea0dbd/lbplatformutils-4.6.1-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/02/64/c86924898062e8217ed914a29458cfde9e4a9b80e4d4cbcca141983ba339/lbprodrun-1.12.4-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/f3/e1/2f705da403f865a5fa3449b155738dc9c53021698fd6926253a9af03180b/levenshtein-0.27.3-cp314-cp314-macosx_10_15_x86_64.whl
-      - pypi: git+https://gitlab.cern.ch/jlisalab/LHCbDIRAC.git?rev=modules-to-cwl-migration#c441175f3289d6d85abf5d5612c3ff964edd9a5c
+      - pypi: git+https://gitlab.cern.ch/jlisalab/LHCbDIRAC.git?rev=modules-to-cwl-migration#bc5f8f1804107bc8807edcc98a97c346ef61c0e8
       - pypi: https://files.pythonhosted.org/packages/7f/37/8ea3555769b6048b5e4ec162cc90fd32e761c0e381ffb3baf888cb0d8a71/lhcbdiracx_api-0.0.8-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/68/15/bfb0c717b8f23c16907f3e73e8f56010ccd72e9900a108209665b0d9ed4b/lhcbdiracx_cli-0.0.8-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/2d/88/67602dfa2d7ab5d0518af82db34ab4d70dc2c3029b3ca788299a3be4a96d/lhcbdiracx_client-0.0.8-py3-none-any.whl
@@ -442,6 +444,7 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/22/71/201105712d0a2ff07b7873ed3c220292fb2ea5120603c00c4b634bcdafb3/msgpack-1.1.2-cp314-cp314-macosx_10_13_x86_64.whl
       - pypi: https://files.pythonhosted.org/packages/d5/22/492f2246bb5b534abd44804292e81eeaf835388901f0c574bac4eeec73c5/multidict-6.7.1-cp314-cp314-macosx_10_15_x86_64.whl
       - pypi: https://files.pythonhosted.org/packages/9e/c9/b2622292ea83fbb4ec318f5b9ab867d0a28ab43c5717bb85b0a5f6b3b0a4/networkx-3.6.1-py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/8e/eb/5da01e356015aee6ecfa1187ced87aef51364e306f5e695dd52719bf0e78/orjson-3.11.9-cp314-cp314-macosx_10_15_x86_64.macosx_11_0_arm64.macosx_10_15_universal2.whl
       - pypi: https://files.pythonhosted.org/packages/bb/40/c6ea527147c73b24fc15c891c3fcffe9c019793119c5742b8784a062c7db/pandas-3.0.2-cp314-cp314-macosx_10_15_x86_64.whl
       - pypi: https://files.pythonhosted.org/packages/a9/90/a744336f5af32c433bd09af7854599682a383b37cfd78f7de263de6ad6cb/paramiko-4.0.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/9e/c3/059298687310d527a58bb01f3b1965787ee3b40dce76752eda8b44e9a2c5/pexpect-4.9.0-py2.py3-none-any.whl
@@ -475,6 +478,7 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/62/86/3915cb5a603e1b1d798e1ee1ce2a0a390a0f85d35da97e4b6d1c6a45421b/schema_salad-8.9.20251102115403-cp314-cp314-macosx_10_15_x86_64.whl
       - pypi: https://files.pythonhosted.org/packages/70/98/d82f14ac7ffedbd38dfa2383f142b26d18d23ca6cf35a40f4af60df666bd/sh-2.2.2-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/e0/f9/0595336914c5619e5f28a1fb793285925a8cd4b432c9da0a987836c7f822/shellingham-1.5.4-py2.py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/59/25/68f81c50aeb3f30e01c20da0f56d14c1a779b57d9308c50e19c63dc8413f/signurlarity-0.2.2-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/b7/ce/149a00dd41f10bc29e5921b496af8b574d8413afcd5e30dfa0ed46c2cc5e/six-1.17.0-py2.py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/04/be/d09147ad1ec7934636ad912901c5fd7667e1c858e19d355237db0d0cd5e4/smmap-5.0.2-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/46/2c/1462b1d0a634697ae9e55b3cecdcb64788e8b7d63f54d923fcd0bb140aed/soupsieve-2.8.3-py3-none-any.whl
@@ -670,7 +674,7 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/6d/10/b37ac718c5903758fa9058a5182026a4f3b65443196b82c7840389ea0dbd/lbplatformutils-4.6.1-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/02/64/c86924898062e8217ed914a29458cfde9e4a9b80e4d4cbcca141983ba339/lbprodrun-1.12.4-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/76/2c/bb6ef359e007fe7b6b3195b68a94f4dd3ecd1885ee337ee8fbd4df55996f/levenshtein-0.27.3-cp314-cp314-macosx_11_0_arm64.whl
-      - pypi: git+https://gitlab.cern.ch/jlisalab/LHCbDIRAC.git?rev=modules-to-cwl-migration#c441175f3289d6d85abf5d5612c3ff964edd9a5c
+      - pypi: git+https://gitlab.cern.ch/jlisalab/LHCbDIRAC.git?rev=modules-to-cwl-migration#bc5f8f1804107bc8807edcc98a97c346ef61c0e8
       - pypi: https://files.pythonhosted.org/packages/7f/37/8ea3555769b6048b5e4ec162cc90fd32e761c0e381ffb3baf888cb0d8a71/lhcbdiracx_api-0.0.8-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/68/15/bfb0c717b8f23c16907f3e73e8f56010ccd72e9900a108209665b0d9ed4b/lhcbdiracx_cli-0.0.8-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/2d/88/67602dfa2d7ab5d0518af82db34ab4d70dc2c3029b3ca788299a3be4a96d/lhcbdiracx_client-0.0.8-py3-none-any.whl
@@ -683,6 +687,7 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/1b/9f/38ff9e57a2eade7bf9dfee5eae17f39fc0e998658050279cbb14d97d36d9/msgpack-1.1.2-cp314-cp314-macosx_11_0_arm64.whl
       - pypi: https://files.pythonhosted.org/packages/f1/4f/733c48f270565d78b4544f2baddc2fb2a245e5a8640254b12c36ac7ac68e/multidict-6.7.1-cp314-cp314-macosx_11_0_arm64.whl
       - pypi: https://files.pythonhosted.org/packages/9e/c9/b2622292ea83fbb4ec318f5b9ab867d0a28ab43c5717bb85b0a5f6b3b0a4/networkx-3.6.1-py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/8e/eb/5da01e356015aee6ecfa1187ced87aef51364e306f5e695dd52719bf0e78/orjson-3.11.9-cp314-cp314-macosx_10_15_x86_64.macosx_11_0_arm64.macosx_10_15_universal2.whl
       - pypi: https://files.pythonhosted.org/packages/95/25/bdb9326c3b5455f8d4d3549fce7abcf967259de146fe2cf7a82368141948/pandas-3.0.2-cp314-cp314-macosx_11_0_arm64.whl
       - pypi: https://files.pythonhosted.org/packages/a9/90/a744336f5af32c433bd09af7854599682a383b37cfd78f7de263de6ad6cb/paramiko-4.0.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/9e/c3/059298687310d527a58bb01f3b1965787ee3b40dce76752eda8b44e9a2c5/pexpect-4.9.0-py2.py3-none-any.whl
@@ -716,6 +721,7 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/71/3f/212e32937253312e102e152c954a5495df0379255719ce28e0288194748d/schema_salad-8.9.20251102115403-cp314-cp314-macosx_11_0_arm64.whl
       - pypi: https://files.pythonhosted.org/packages/70/98/d82f14ac7ffedbd38dfa2383f142b26d18d23ca6cf35a40f4af60df666bd/sh-2.2.2-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/e0/f9/0595336914c5619e5f28a1fb793285925a8cd4b432c9da0a987836c7f822/shellingham-1.5.4-py2.py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/59/25/68f81c50aeb3f30e01c20da0f56d14c1a779b57d9308c50e19c63dc8413f/signurlarity-0.2.2-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/b7/ce/149a00dd41f10bc29e5921b496af8b574d8413afcd5e30dfa0ed46c2cc5e/six-1.17.0-py2.py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/04/be/d09147ad1ec7934636ad912901c5fd7667e1c858e19d355237db0d0cd5e4/smmap-5.0.2-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/46/2c/1462b1d0a634697ae9e55b3cecdcb64788e8b7d63f54d923fcd0bb140aed/soupsieve-2.8.3-py3-none-any.whl
@@ -2668,9 +2674,9 @@ packages:
   requires_dist:
   - rapidfuzz>=3.9.0,<4.0.0
   requires_python: '>=3.10'
-- pypi: git+https://gitlab.cern.ch/jlisalab/LHCbDIRAC.git?rev=modules-to-cwl-migration#c441175f3289d6d85abf5d5612c3ff964edd9a5c
+- pypi: git+https://gitlab.cern.ch/jlisalab/LHCbDIRAC.git?rev=modules-to-cwl-migration#bc5f8f1804107bc8807edcc98a97c346ef61c0e8
   name: lhcbdirac
-  version: 0.1.dev20447+gc441175f3
+  version: 0.1.dev20470+gbc5f8f180
   requires_dist:
   - dirac~=9.1
   - lbplatformutils>=4.6.1
@@ -2694,6 +2700,7 @@ packages:
   - lhcbdiracx-client
   - lhcbdiracx-core
   - lhcbdiracx-cli
+  - signurlarity
   - oracledb ; extra == 'server'
   - dirac[server]~=9.1.0 ; extra == 'server'
   - psutil ; extra == 'server'
@@ -4472,6 +4479,16 @@ packages:
   purls: []
   size: 3104268
   timestamp: 1769556384749
+- pypi: https://files.pythonhosted.org/packages/76/3e/c0b690253f0b82d86e99949af13533363acfb5432ecb5d53dd5b3bce9c34/orjson-3.11.9-cp314-cp314-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
+  name: orjson
+  version: 3.11.9
+  sha256: aaea64f3f467d22e70eeed68bdccb3bc4f83f650446c4a03c59f2cba28a108db
+  requires_python: '>=3.10'
+- pypi: https://files.pythonhosted.org/packages/8e/eb/5da01e356015aee6ecfa1187ced87aef51364e306f5e695dd52719bf0e78/orjson-3.11.9-cp314-cp314-macosx_10_15_x86_64.macosx_11_0_arm64.macosx_10_15_universal2.whl
+  name: orjson
+  version: 3.11.9
+  sha256: b6ef1979adc4bc243523f1a2ba91418030a8e29b0a99cbe7e0e2d6807d4dce6e
+  requires_python: '>=3.10'
 - conda: https://conda.anaconda.org/conda-forge/noarch/packaging-26.0-pyhcf101f3_0.conda
   sha256: c1fc0f953048f743385d31c468b4a678b3ad20caffdeaa94bed85ba63049fd58
   md5: b76541e68fea4d511b1ac46a28dcd2c6
@@ -5852,6 +5869,25 @@ packages:
   version: 1.5.4
   sha256: 7ecfff8f2fd72616f7481040475a65b2bf8af90a56c89140852d1120324e8686
   requires_python: '>=3.7'
+- pypi: https://files.pythonhosted.org/packages/59/25/68f81c50aeb3f30e01c20da0f56d14c1a779b57d9308c50e19c63dc8413f/signurlarity-0.2.2-py3-none-any.whl
+  name: signurlarity
+  version: 0.2.2
+  sha256: 0c8089ecac04ce105e525b60749d134b171410beefc962e167e0e64141d6e7a7
+  requires_dist:
+  - cryptography>=41.0.0
+  - httpx>=0.24.0
+  - orjson
+  - aiobotocore>=2.15 ; extra == 'testing'
+  - botocore>=1.35 ; extra == 'testing'
+  - httpx ; extra == 'testing'
+  - moto[server] ; extra == 'testing'
+  - pytest ; extra == 'testing'
+  - pytest-asyncio ; extra == 'testing'
+  - pytest-benchmark ; extra == 'testing'
+  - pytest-xdist ; extra == 'testing'
+  - rich ; extra == 'testing'
+  - ty ; extra == 'testing'
+  requires_python: '>=3.11'
 - pypi: https://files.pythonhosted.org/packages/b7/ce/149a00dd41f10bc29e5921b496af8b574d8413afcd5e30dfa0ed46c2cc5e/six-1.17.0-py2.py3-none-any.whl
   name: six
   version: 1.17.0
