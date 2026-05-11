@@ -77,9 +77,9 @@ class AnalyseXmlSummary(PostProcessCommand):
 
             job_report.setApplicationStatus(f"{workflow_commons['application_name']} Step OK")
 
-        except:
+        except Exception as e:
             failed = True
-            raise
+            raise WorkflowProcessingException(e) from e
 
         finally:
             save_workflow_commons(workflow_commons, workflow_commons_path, failed=failed)

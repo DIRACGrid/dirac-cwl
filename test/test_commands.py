@@ -583,6 +583,7 @@ class TestBookkeepingReport:
 
         Path("00209455_00001537_1").unlink(missing_ok=True)
         Path("00209455_00001537_1.sim").unlink(missing_ok=True)
+        Path("application.log").unlink(missing_ok=True)
 
     def test_bkreport_prod_mcsimulation_success(self, bk_report, wf_commons, bookkeeping_file, xml_summary_file):
         """Test successful execution of BookkeepingReport module."""
@@ -1899,7 +1900,7 @@ class TestUploadOutputDataFile:
         wf_commons_path = create_workflow_commons(wf_commons)
 
         # Execute module
-        with pytest.raises(OSError, match="Output data not found"):
+        with pytest.raises(WorkflowProcessingException, match="Output data not found"):
             upload_output.execute(job_path)
 
         with open(wf_commons_path, "r", encoding="utf-8") as f:

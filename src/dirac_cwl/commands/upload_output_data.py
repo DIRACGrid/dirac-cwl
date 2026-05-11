@@ -184,8 +184,9 @@ class UploadOutputData(PostProcessCommand):
                 if not result["OK"]:
                     raise WorkflowProcessingException(result["Message"])
 
-        except:
+        except Exception as e:
             failed = True
+            raise WorkflowProcessingException(e) from e
 
         finally:
             save_workflow_commons(workflow_commons, workflow_commons_path, request=request, failed=failed)

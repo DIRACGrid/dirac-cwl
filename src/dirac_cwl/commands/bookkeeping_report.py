@@ -161,9 +161,9 @@ class BookkeepingReport(PostProcessCommand):
             with open(bfilename, "wb") as bfile:
                 bfile.write(doc)
 
-        except:
+        except Exception as e:
             failed = True
-            raise
+            raise WorkflowProcessingException(e) from e
 
         finally:
             save_workflow_commons(workflow_commons, workflow_commons_path, failed=failed)

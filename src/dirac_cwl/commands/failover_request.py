@@ -69,9 +69,9 @@ class FailoverRequest(PostProcessCommand):
 
             self.generateFailoverFile(job_report, request, workflow_commons)
 
-        except:
+        except Exception as e:
             failed = True
-            raise
+            raise WorkflowProcessingException(e) from e
 
         finally:
             save_workflow_commons(workflow_commons, workflow_commons_path, request=request, failed=failed)
