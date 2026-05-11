@@ -21,7 +21,7 @@ from .core import PostProcessCommand
 from .utils import prepare_lhcb_workflow_commons, save_workflow_commons
 
 
-class BookeepingReport(PostProcessCommand):
+class BookkeepingReport(PostProcessCommand):
     """Generates a bookkeeping report file based on the XMLSummary and the pool XML catalog."""
 
     def execute(self, job_path, **kwargs):

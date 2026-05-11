@@ -29,7 +29,7 @@ from pytest_mock import MockerFixture
 
 from dirac_cwl.commands import (
     AnalyseXmlSummary,
-    BookeepingReport,
+    BookkeepingReport,
     FailoverRequest,
     UploadLogFile,
     UploadOutputData,
@@ -579,7 +579,7 @@ class TestBookkeepingReport:
 
         mock_get_n_procs.return_value = number_of_processors
 
-        yield BookeepingReport()
+        yield BookkeepingReport()
 
         Path("00209455_00001537_1").unlink(missing_ok=True)
         Path("00209455_00001537_1.sim").unlink(missing_ok=True)
