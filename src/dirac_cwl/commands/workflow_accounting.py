@@ -29,6 +29,7 @@ class WorkflowAccounting(PostProcessCommand):
         :param kwargs: Additional keyword arguments.
         """
         failed = False
+        workflow_commons = {}
         try:
             # Obtain Workflow Commons
             workflow_commons_path = kwargs.get("workflow_commons_path", os.path.join(job_path, "workflow_commons.json"))
@@ -101,7 +102,7 @@ class WorkflowAccounting(PostProcessCommand):
 
         except Exception as e:
             failed = True
-            raise WorkflowProcessingException() from e
+            raise WorkflowProcessingException(e) from e
 
         finally:
             if workflow_commons:

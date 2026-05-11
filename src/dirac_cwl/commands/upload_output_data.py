@@ -37,7 +37,9 @@ class UploadOutputData(PostProcessCommand):
         :param job_path: Path to the job working directory.
         :param kwargs: Additional keyword arguments.
         """
-        fail = False
+        failed = False
+        workflow_commons = {}
+        request = None
         try:
             workflow_commons_path = kwargs.get("workflow_commons_path", os.path.join(job_path, "workflow_commons.json"))
 
@@ -183,8 +185,7 @@ class UploadOutputData(PostProcessCommand):
                     raise WorkflowProcessingException(result["Message"])
 
         except:
-            fail = True
-            raise
+            failed = True
 
         finally:
-            save_workflow_commons(workflow_commons, workflow_commons_path, request, failed=fail)
+            save_workflow_commons(workflow_commons, workflow_commons_path, request=request, failed=failed)
