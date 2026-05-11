@@ -103,7 +103,8 @@ def save_workflow_commons(wf_commons, wf_file_path, request=None, failed=False):
         raise WorkflowProcessingException(f"Workflow Commons file '{wf_file_path}' not found")
 
     wf_filename = os.path.basename(wf_file_path)
-    wf_backup = f"{wf_filename}.bak"
+    wf_base_path = os.path.dirname(wf_file_path)
+    wf_backup = os.path.join(wf_base_path, f"{wf_filename}.bak")
 
     shutil.move(wf_file_path, wf_backup)
 

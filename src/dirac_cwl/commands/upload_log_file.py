@@ -84,7 +84,9 @@ class UploadLogFile(PostProcessCommand):
             res = systemCall(0, shlex.split("ls -al"))
 
             workflow_commons["log_dir"] = os.path.realpath(
-                f"./job/log/{workflow_commons['production_id']}/{workflow_commons['prod_job_id']}"
+                os.path.join(
+                    job_path, f"./job/log/{workflow_commons['production_id']}/{workflow_commons['prod_job_id']}"
+                )
             )
 
             ##########################################
