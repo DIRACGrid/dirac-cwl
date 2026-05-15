@@ -3,12 +3,6 @@
 import os
 import random
 
-from DIRAC.DataManagementSystem.Client.DataManager import DataManager
-from DIRAC.DataManagementSystem.Client.FailoverTransfer import FailoverTransfer
-from DIRAC.RequestManagementSystem.Client.Request import Request
-from DIRAC.TransformationSystem.Client.FileReport import FileReport
-from DIRAC.WorkloadManagementSystem.Client.JobReport import JobReport
-from LHCbDIRAC.BookkeepingSystem.Client.BookkeepingClient import BookkeepingClient
 from LHCbDIRAC.Core.Utilities.ProductionData import constructProductionLFNs
 from LHCbDIRAC.Core.Utilities.ResolveSE import getDestinationSEList
 from LHCbDIRAC.DataManagementSystem.Client.ConsistencyChecks import getFileDescendents
@@ -25,72 +19,51 @@ from LHCbDIRAC.Workflow.Modules.UploadOutputData import (
 from dirac_cwl.core.exceptions import WorkflowProcessingException
 
 from .core import PostProcessCommand
-from .utils import prepare_lhcb_workflow_commons, save_workflow_commons
+from .workflow_commons import StepStatus, WorkflowCommons
 
 
 class UploadOutputData(PostProcessCommand):
     """Registers every output generated to the corresponding SE and Catalog or to the FailoverSE in case of failure."""
 
-    def execute(self, job_path, **kwargs):
+    def execute(self, job_path: os.PathLike, **kwargs):
         """Execute the command.
 
         :param job_path: Path to the job working directory.
         :param kwargs: Additional keyword arguments.
         """
         failed = False
-        workflow_commons = {}
-        request = None
+        workflow_commons = None
         try:
-            workflow_commons_path = kwargs.get("workflow_commons_path", os.path.join(job_path, "workflow_commons.json"))
+            workflow_commons = WorkflowCommons.load(job_path)
 
-            workflow_commons = prepare_lhcb_workflow_commons(
-                workflow_commons_path,
-                extra_mandatory_values=["output_data_step", "output_SEs"],
-                extra_default_values={
-                    "file_descendants": None,
-                    "prod_output_LFNs": None,
-                    "run_number": "Unknown",
-                    "output_mode": "Any",
-                },
-            )
-            request = Request(workflow_commons["request_dict"])
-
-            if not workflow_commons["step_status"]["OK"]:
+            if workflow_commons.step_status == StepStatus.Failed:
                 return
 
-            bk_client = BookkeepingClient()
-            data_manager = DataManager()
-
-            failover_se_list = getDestinationSEList("Tier1-Failover", workflow_commons["site_name"], outputmode="Any")
+            failover_se_list = getDestinationSEList("Tier1-Failover", workflow_commons.site_name, outputmode="Any")
             random.shuffle(failover_se_list)
 
-            file_report = FileReport()
-            file_report.statusDict = workflow_commons["file_report_files_dict"]
-
-            job_report = JobReport(workflow_commons["job_id"])
-
-            if not workflow_commons["prod_output_LFNs"]:
+            if not workflow_commons.prod_output_lfns:
                 parameters = {
-                    "PRODUCTION_ID": workflow_commons["production_id"],
-                    "JOB_ID": workflow_commons["job_id"],
-                    "configVersion": workflow_commons["config_version"],
-                    "outputList": workflow_commons["outputs"],
-                    "configName": workflow_commons["config_name"],
-                    "outputDataFileMask": workflow_commons["output_data_file_mask"],
+                    "PRODUCTION_ID": workflow_commons.production_id,
+                    "JOB_ID": workflow_commons.job_id,
+                    "configVersion": workflow_commons.config_version,
+                    "outputList": workflow_commons.outputs,
+                    "configName": workflow_commons.config_name,
+                    "outputDataFileMask": workflow_commons.output_data_file_mask,
                 }
-                result = constructProductionLFNs(parameters, bk_client)
+                result = constructProductionLFNs(parameters, workflow_commons.bk_client)
 
                 if not result["OK"]:
                     raise WorkflowProcessingException("Unable to construsct production LFNs")
 
-                workflow_commons["prod_output_LFNs"] = result["Value"]["ProductionOutputData"]
+                workflow_commons.prod_output_lfns = result["Value"]["ProductionOutputData"]
 
             file_metadata = _getFileMetada(
-                workflow_commons["outputs"],
-                workflow_commons["prod_output_LFNs"],
-                workflow_commons["output_data_file_mask"],
-                workflow_commons["output_data_step"],
-                workflow_commons["output_SEs"],
+                workflow_commons.outputs,
+                workflow_commons.prod_output_lfns,
+                workflow_commons.output_data_file_mask,
+                workflow_commons.output_data_step,
+                workflow_commons.output_SEs,
             )
 
             if not file_metadata:
@@ -99,25 +72,25 @@ class UploadOutputData(PostProcessCommand):
             final = _resolveSEs(
                 file_metadata,
                 None,
-                workflow_commons["site_name"],
-                workflow_commons["output_mode"],
-                workflow_commons["run_number"],
+                workflow_commons.site_name,
+                workflow_commons.output_mode,
+                workflow_commons.run_number,
             )
 
-            if workflow_commons["inputs"]:
-                lfns_with_descendants = workflow_commons["file_descendants"]
+            if workflow_commons.inputs:
+                lfns_with_descendants = workflow_commons.file_descendants
 
                 if not lfns_with_descendants:
                     lfns_with_descendants = getFileDescendents(
-                        workflow_commons["production_id"],
-                        workflow_commons["inputs"],
-                        dm=data_manager,
-                        bkClient=bk_client,
+                        workflow_commons.production_id,
+                        workflow_commons.inputs,
+                        dm=workflow_commons.data_manager,
+                        bkClient=workflow_commons.bk_client,
                     )
 
                 if lfns_with_descendants:
-                    file_report.setFileStatus(
-                        int(workflow_commons["production_id"]), lfns_with_descendants, "Processed"
+                    workflow_commons.file_report.setFileStatus(
+                        int(workflow_commons.production_id), lfns_with_descendants, "Processed"
                     )
                     raise WorkflowProcessingException("Input Data Already Processed")
 
@@ -127,9 +100,7 @@ class UploadOutputData(PostProcessCommand):
                 with open(bkFile) as fd:
                     bkXML = fd.read()
 
-                result = _sendBKReport(bk_client, request, bkXML)
-
-            failover_transfer = FailoverTransfer(request)
+                result = _sendBKReport(workflow_commons.bk_client, workflow_commons.request, bkXML)
 
             perform_bk_registration = []
 
@@ -137,7 +108,7 @@ class UploadOutputData(PostProcessCommand):
             for file_name, metadata in final.items():
                 targetSE = metadata["resolvedSE"]
                 file_meta_dict = _createMetaDict(metadata)
-                result = failover_transfer.transferAndRegisterFile(
+                result = workflow_commons.failover_request.transferAndRegisterFile(
                     fileName=file_name,
                     localPath=metadata["localpath"],
                     lfn=metadata["filedict"]["LFN"],
@@ -150,14 +121,14 @@ class UploadOutputData(PostProcessCommand):
                 else:
                     perform_bk_registration.append(metadata)
 
-            cleanUp = False
+            clean_up = False
             for file_name, metadata in failover.items():
                 random.shuffle(failover_se_list)
                 targetSE = metadata["resolvedSE"][0]
                 metadata["resolvedSE"] = failover_se_list
 
                 file_meta_dict = _createMetaDict(metadata)
-                result = failover_transfer.transferAndRegisterFileFailover(
+                result = workflow_commons.failover_request.transferAndRegisterFileFailover(
                     fileName=file_name,
                     localPath=metadata["localpath"],
                     lfn=metadata["filedict"]["LFN"],
@@ -167,20 +138,20 @@ class UploadOutputData(PostProcessCommand):
                     masterCatalogOnly=True,
                 )
                 if not result["OK"]:
-                    cleanUp = True
+                    clean_up = True
                     break
 
-            request = failover_transfer.request
-            if cleanUp:
-                request = _getCleanRequest(request, final)
+            workflow_commons.request = workflow_commons.failover_request.request
+            if clean_up:
+                workflow_commons.request = _getCleanRequest(workflow_commons.request, final)
                 raise WorkflowProcessingException("Failed to upload output data")
 
             if final:
                 report = ", ".join(final)
-                job_report.setJobParameter("UploadedOutputData", report)
+                workflow_commons.job_report.setJobParameter("UploadedOutputData", report)
 
             if perform_bk_registration:
-                result = _registerLFNs(request, perform_bk_registration)
+                result = _registerLFNs(workflow_commons.request, perform_bk_registration)
                 if not result["OK"]:
                     raise WorkflowProcessingException(result["Message"])
 
@@ -189,4 +160,5 @@ class UploadOutputData(PostProcessCommand):
             raise WorkflowProcessingException(e) from e
 
         finally:
-            save_workflow_commons(workflow_commons, workflow_commons_path, request=request, failed=failed)
+            if workflow_commons:
+                workflow_commons.save(job_path, failed=failed)
