@@ -54,7 +54,7 @@ class UploadOutputData(PostProcessCommand):
                 result = constructProductionLFNs(parameters, workflow_commons.bk_client)
 
                 if not result["OK"]:
-                    raise WorkflowProcessingException("Unable to construsct production LFNs")
+                    raise WorkflowProcessingException("Unable to construct production LFNs")
 
                 workflow_commons.prod_output_lfns = result["Value"]["ProductionOutputData"]
 
@@ -78,19 +78,19 @@ class UploadOutputData(PostProcessCommand):
             )
 
             if workflow_commons.inputs:
-                lfns_with_descendants = workflow_commons.file_descendants
+                lfns_with_descendents = workflow_commons.file_descendents
 
-                if not lfns_with_descendants:
-                    lfns_with_descendants = getFileDescendents(
+                if not lfns_with_descendents:
+                    lfns_with_descendents = getFileDescendents(
                         workflow_commons.production_id,
                         workflow_commons.inputs,
                         dm=workflow_commons.data_manager,
                         bkClient=workflow_commons.bk_client,
                     )
 
-                if lfns_with_descendants:
+                if lfns_with_descendents:
                     workflow_commons.file_report.setFileStatus(
-                        int(workflow_commons.production_id), lfns_with_descendants, "Processed"
+                        int(workflow_commons.production_id), lfns_with_descendents, "Processed"
                     )
                     raise WorkflowProcessingException("Input Data Already Processed")
 

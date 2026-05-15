@@ -80,7 +80,6 @@ class WorkflowCommons(BaseModel):
     file_md5_map: dict[str, str] = {}
     file_guid_map: dict[str, str] = {}
 
-    file_descendants: list[str] = []
     bookkeeping_lfns: list[str] = []
     prod_output_lfns: list[str] = []
 
