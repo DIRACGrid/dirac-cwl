@@ -905,7 +905,9 @@ class TestFailoverRequest:
 
         Cleans created files after execution.
         """
-        mocker.patch("dirac_cwl.commands.failover_request.RequestValidator")
+        mocker.patch(
+            "DIRAC.RequestManagementSystem.private.RequestValidator.RequestValidator.validate", return_value=S_OK()
+        )
 
         yield FailoverRequest()
 
@@ -1177,6 +1179,8 @@ class TestUploadOutputDataFile:
             wf_commons.pop("ProductionOutputData")
 
         yield UploadOutputData()
+
+        Path("DISABLE_WATCHDOG_CPU_WALLCLOCK_CHECK").unlink(missing_ok=True)
 
     # Test Scenarios
     def test_uploadOutputData_success(self, mocker, upload_output, wf_commons, sim_file, bk_file):

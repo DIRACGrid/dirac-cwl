@@ -3,16 +3,18 @@
 The status will be "Processed" if everything ended properly or "Unused" if it did not.
 """
 
-import json
+import logging
 import os
 
-from DIRAC.RequestManagementSystem.private.RequestValidator import RequestValidator
+from DIRAC.Core.Utilities.ReturnValues import SErrorException, returnValueOrRaise
 from LHCbDIRAC.Workflow.Modules.FailoverRequest import _prepareRequest
 
 from dirac_cwl.core.exceptions import WorkflowProcessingException
 
 from .core import PostProcessCommand
 from .workflow_commons import StepStatus, WorkflowCommons
+
+logger = logging.getLogger(__name__)
 
 
 class FailoverRequest(PostProcessCommand):
@@ -39,61 +41,54 @@ class FailoverRequest(PostProcessCommand):
             for lfn in workflow_commons.inputs:
                 if lfn not in filesInFileReport:
                     status = "Processed" if workflow_commons.step_status == StepStatus.Done else "Unused"
+                    if status == "Unused":
+                        logger.info("Set status of %s to 'Unused' due to workflow failure", lfn)
+                    else:
+                        logger.debug("No status populated for %s, setting to 'Processed'", lfn)
+
                     workflow_commons.file_report.setFileStatus(int(workflow_commons.production_id), lfn, status)
 
-            workflow_commons.file_report.commit()
+            try:
+                value = returnValueOrRaise(workflow_commons.file_report.commit())
+                if value:
+                    logger.info("Status of files have been properly updated in the TransformationDB")
+                else:
+                    logger.warning("No file status update reported. There are no input files?")
+            except SErrorException as e:
+                logger.error("Something went wrong trying fileReport.commit() %s", e)
+
+            if workflow_commons.file_report.getFiles():
+                logger.error("On first attempt, failed to report file status to TransformationDB")
+                try:
+                    value = returnValueOrRaise(workflow_commons.file_report.generateForwardDISET())
+                    if not value:
+                        logger.info("On second attempt, files correctly reported to TransformationDB")
+                    elif workflow_commons.step_status == StepStatus.Done:
+                        logger.info("Adding a SetFileStatus operation to the request")
+                        workflow_commons.request.addOperation(value)
+                    else:
+                        logger.info("The job should fail: do not set requests, as the DRA will take care")
+                except SErrorException as e:
+                    logger.warning("Could not generate Operation for file report: %s", e)
 
             if workflow_commons.step_status == StepStatus.Done:
-                if workflow_commons.file_report.getFiles():
-                    result = workflow_commons.file_report.generateForwardDISET()
-                    if result["OK"] and result["Value"]:
-                        workflow_commons.request.addOperation(result["Value"])
-
                 workflow_commons.job_report.setApplicationStatus("Job Finished Successfully", True)
 
-            self.generateFailoverFile(workflow_commons)
+            workflow_commons.generateFailoverFile()
+
+        except WorkflowProcessingException:
+            failed = True
+            raise
 
         except Exception as e:
+            logger.exception("Exception in FailoverRequest", exc_info=e)
+
             failed = True
+            if workflow_commons:
+                workflow_commons.job_report.setApplicationStatus(repr(e))
+
             raise WorkflowProcessingException(e) from e
 
         finally:
             if workflow_commons:
                 workflow_commons.save(job_path, failed=failed)
-
-    def generateFailoverFile(self, workflow_commons: WorkflowCommons):
-        """Create a workflow_commons.request.json file."""
-        result = workflow_commons.job_report.generateForwardDISET()
-
-        if result["OK"]:
-            if result["Value"]:
-                workflow_commons.request.addOperation(result["Value"])
-
-        if len(workflow_commons.request):
-            # Try to optimize the request
-            try:
-                workflow_commons.request.optimize()
-            except Exception:  # noqa: E722
-                pass
-
-            # Validate workflow_commons.request
-            result = RequestValidator().validate(workflow_commons.request)
-            if not result["OK"]:
-                raise WorkflowProcessingException(
-                    "Failed to generate FailoverFile. Invalid workflow_commons.request object", result["Message"]
-                )
-
-            # Get the workflow_commons.request as a Json
-            result = workflow_commons.request.toJSON()
-            if not result["OK"]:
-                raise WorkflowProcessingException(result["Message"])
-
-            # Write it
-            fname = f"{workflow_commons.production_id}_{workflow_commons.prod_job_id}_request.json"
-            with open(fname, "w", encoding="utf-8") as f:
-                json.dump(result["Value"], f)
-
-        if workflow_commons.accounting_registers:
-            for register in workflow_commons.accounting_registers:
-                workflow_commons.dsc.addRegister(register)
-            workflow_commons.dsc.commit()

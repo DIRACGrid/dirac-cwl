@@ -1,5 +1,6 @@
 """LHCb command for checking the XMLSummary output to ensure that the execution was done correctly."""
 
+import logging
 import os
 
 from LHCbDIRAC.Workflow.Modules.AnalyseXMLSummary import _areInputsOK, _isXMLSummaryOK
@@ -9,6 +10,8 @@ from dirac_cwl.core.exceptions import WorkflowProcessingException
 
 from .core import PostProcessCommand
 from .workflow_commons import StepStatus, WorkflowCommons
+
+logger = logging.getLogger(__name__)
 
 
 class AnalyseXmlSummary(PostProcessCommand):
@@ -24,9 +27,6 @@ class AnalyseXmlSummary(PostProcessCommand):
         workflow_commons = None
         try:
             workflow_commons = WorkflowCommons.load(job_path)
-
-            if workflow_commons.step_status == StepStatus.Failed:
-                return
 
             if not workflow_commons.xf_o:
                 workflow_commons.xf_o = _generate_xml_object(
@@ -51,10 +51,23 @@ class AnalyseXmlSummary(PostProcessCommand):
                 workflow_commons.job_report.setApplicationStatus("XMLSummary reports error")
                 raise WorkflowProcessingException("XMLSummary reports error")
 
+            if workflow_commons.step_status == StepStatus.Failed:
+                logger.info("Workflow already failed")
+                return
+
             workflow_commons.job_report.setApplicationStatus(f"{workflow_commons.application_name} Step OK")
 
-        except Exception as e:
+        except WorkflowProcessingException:
             failed = True
+            raise
+
+        except Exception as e:
+            logger.exception("Exception in AnalyzeXmlSummary", exc_info=e)
+
+            failed = True
+            if workflow_commons:
+                workflow_commons.job_report.setApplicationStatus(repr(e))
+
             raise WorkflowProcessingException(e) from e
 
         finally:

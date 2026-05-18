@@ -4,9 +4,12 @@ Formerly known as StepAccounting.
 """
 
 import datetime
+import logging
 import os
+from typing import Any, Dict
 
 from DIRAC import gConfig
+from DIRAC.Core.Utilities.ReturnValues import SErrorException, returnValueOrRaise
 from DIRAC.Workflow.Utilities.Utils import getStepCPUTimes
 from LHCbDIRAC.AccountingSystem.Client.Types.JobStep import JobStep
 
@@ -14,6 +17,8 @@ from dirac_cwl.core.exceptions import WorkflowProcessingException
 
 from .core import PostProcessCommand
 from .workflow_commons import WorkflowCommons
+
+logger = logging.getLogger(__name__)
 
 
 class WorkflowAccounting(PostProcessCommand):
@@ -31,10 +36,10 @@ class WorkflowAccounting(PostProcessCommand):
             # Obtain Workflow Commons
             workflow_commons = WorkflowCommons.load(job_path)
 
-            cpu_times = {}
-            if "start_time" in workflow_commons:
+            cpu_times: Dict[str, Any] = {}
+            if workflow_commons.start_time:
                 cpu_times["StartTime"] = workflow_commons.start_time
-            if "start_stats" in workflow_commons:
+            if workflow_commons.start_stats:
                 cpu_times["StartStats"] = workflow_commons.start_stats
 
             exec_time, cpu_time = getStepCPUTimes(cpu_times)
@@ -45,6 +50,7 @@ class WorkflowAccounting(PostProcessCommand):
             job_step = JobStep()
 
             if not workflow_commons.xf_o:
+                logger.error("XML Summary object could not be found (not produced?), skipping the report")
                 return
 
             now = datetime.datetime.now(datetime.UTC)
@@ -70,16 +76,27 @@ class WorkflowAccounting(PostProcessCommand):
 
             job_step.setValuesFromDict(dataDict)
 
-            res = job_step.checkValues()
-            if not res["OK"]:
+            try:
+                returnValueOrRaise(job_step.checkValues())
+            except SErrorException as e:
+                logger.error("Values for StepAccounting are wrong: Here are the given data: %s", dataDict, exc_info=e)
                 raise WorkflowProcessingException(
-                    "Values for StepAccounting are wrong:", f"{res['Message']}. Here are the given data: {dataDict}"
-                )
+                    f"Values for StepAccounting are wrong. Here are the given data: {dataDict}"
+                ) from e
 
             workflow_commons.accounting_registers.append(list(job_step.getValues()))
 
-        except Exception as e:
+        except WorkflowProcessingException:
             failed = True
+            raise
+
+        except Exception as e:
+            logger.exception("Exception in UploadOutputData", exc_info=e)
+
+            failed = True
+            if workflow_commons:
+                workflow_commons.job_report.setApplicationStatus(repr(e))
+
             raise WorkflowProcessingException(e) from e
 
         finally:

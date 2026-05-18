@@ -1,7 +1,10 @@
 """LHCb command for bookkeeping report file generation based on the XMLSummary and the XML catalog."""
 
+import logging
 import os
+from typing import Any, Dict
 
+from DIRAC.Core.Utilities.ReturnValues import SErrorException, returnValueOrRaise
 from DIRAC.Workflow.Utilities.Utils import getStepCPUTimes
 from LHCbDIRAC.Core.Utilities.ProductionData import constructProductionLFNs
 from LHCbDIRAC.Workflow.Modules.BookkeepingReport import (
@@ -17,6 +20,8 @@ from dirac_cwl.core.exceptions import WorkflowProcessingException
 
 from .core import PostProcessCommand
 from .workflow_commons import StepStatus, WorkflowCommons
+
+logger = logging.getLogger(__name__)
 
 
 class BookkeepingReport(PostProcessCommand):
@@ -38,7 +43,7 @@ class BookkeepingReport(PostProcessCommand):
                 return
 
             # Setup variables
-            cpu_times = {}
+            cpu_times: Dict[str, Any] = {}
             if workflow_commons.start_time:
                 cpu_times["StartTime"] = workflow_commons.start_time
             if workflow_commons.start_stats:
@@ -47,7 +52,8 @@ class BookkeepingReport(PostProcessCommand):
             exectime, cputime = getStepCPUTimes(cpu_times)
 
             number_of_processors = getNumberOfProcessorsToUse(
-                workflow_commons.job_id, workflow_commons.max_number_of_processors
+                workflow_commons.job_id,
+                workflow_commons.max_number_of_processors,
             )
 
             parameters = {
@@ -66,11 +72,16 @@ class BookkeepingReport(PostProcessCommand):
                     bk_lfns = [i.strip() for i in bk_lfns.split(";")]
 
             else:
-                result = constructProductionLFNs(parameters, workflow_commons.bk_client)
-                if not result["OK"]:
-                    raise WorkflowProcessingException("Could not create production LFNs")
+                logger.info("BookkeepingLFNs parameters not found, creating on the fly")
+                try:
+                    production_lfns_dict = returnValueOrRaise(
+                        constructProductionLFNs(parameters, workflow_commons.bk_client)
+                    )
+                except SErrorException as e:
+                    logger.error("Could not create production LFNs", exc_info=e)
+                    raise WorkflowProcessingException(f"Could not create production LFNs: {e}") from e
 
-                bk_lfns = result["Value"]["BookkeepingLFNs"]
+                bk_lfns = production_lfns_dict["BookkeepingLFNs"]
 
             ldate, ltime, ldatestart, ltimestart = _process_time(workflow_commons.start_time)
 
@@ -139,8 +150,17 @@ class BookkeepingReport(PostProcessCommand):
             with open(bfilename, "wb") as bfile:
                 bfile.write(doc)
 
-        except Exception as e:
+        except WorkflowProcessingException:
             failed = True
+            raise
+
+        except Exception as e:
+            logger.exception("Exception in BookkeepingReport", exc_info=e)
+
+            failed = True
+            if workflow_commons:
+                workflow_commons.job_report.setApplicationStatus(repr(e))
+
             raise WorkflowProcessingException(e) from e
 
         finally:

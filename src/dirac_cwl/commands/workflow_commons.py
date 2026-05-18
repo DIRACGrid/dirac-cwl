@@ -1,6 +1,9 @@
 """Workflow common values shared between steps."""
 
+from __future__ import annotations
+
 import json
+import logging
 import os
 import shutil
 from enum import Enum
@@ -9,9 +12,11 @@ from typing import Any, Optional
 
 from DIRAC import siteName
 from DIRAC.AccountingSystem.Client.DataStoreClient import DataStoreClient
+from DIRAC.Core.Utilities.ReturnValues import SErrorException, returnValueOrRaise
 from DIRAC.DataManagementSystem.Client.DataManager import DataManager
 from DIRAC.DataManagementSystem.Client.FailoverTransfer import FailoverTransfer
 from DIRAC.RequestManagementSystem.Client.Request import Request
+from DIRAC.RequestManagementSystem.private.RequestValidator import RequestValidator
 from DIRAC.TransformationSystem.Client.FileReport import FileReport
 from DIRAC.WorkloadManagementSystem.Client.JobReport import JobReport
 from LHCbDIRAC.BookkeepingSystem.Client.BookkeepingClient import BookkeepingClient
@@ -106,6 +111,8 @@ class WorkflowCommons(BaseModel):
     _dsc = PrivateAttr(default=None)
     _xf_o = PrivateAttr(default=None)
 
+    _logger = PrivateAttr(default=logging.getLogger(__name__))
+
     model_config = ConfigDict(
         validate_assignment=True,
     )
@@ -133,7 +140,7 @@ class WorkflowCommons(BaseModel):
         if self.xml_summary_path:
             self._xf_o = XMLSummary(self.xml_summary_path)
 
-    def save(self, job_path: os.PathLike, failed: bool = False):
+    def save(self, job_path: os.PathLike, failed: bool = False) -> None:
         """Update the workflow_commons file to accomodate for the new values."""
         wf_path = Path(job_path).joinpath("workflow_commons.json")
         wf_backup = Path(job_path).joinpath("workflow_commons.json.back")
@@ -155,7 +162,7 @@ class WorkflowCommons(BaseModel):
             wf_backup.unlink()
 
     @classmethod
-    def load(cls, job_path: os.PathLike):
+    def load(cls, job_path: os.PathLike) -> WorkflowCommons:
         """Return a WorkflowCommons containing the values of a workflow_commons.json file.
 
         :raises: ValidationError
@@ -218,3 +225,40 @@ class WorkflowCommons(BaseModel):
     def xf_o(self, xf_o: XMLSummary) -> None:
         """XMLSummary property getter."""
         self._xf_o = xf_o
+
+    def generateFailoverFile(self):
+        """Create a request.json file."""
+        try:
+            diset_op = returnValueOrRaise(self.job_report.generateForwardDISET())
+        except SErrorException as e:
+            self._logger.warning("Could not generate Operation for job report", exc_info=e)
+
+        if diset_op:
+            self._logger.info("Populating request with job report information")
+            self.request.addOperation(diset_op)
+
+        if len(self.request):
+            # Try to optimize the request
+            try:
+                returnValueOrRaise(self.request.optimize())
+            except SErrorException as e:
+                self._logger.error("Could not optimize", exc_info=e)
+                self._logger.error("Not failing the job because of that, keep going")
+            except Exception:
+                pass
+
+            # Validate workflow_commons.request
+            returnValueOrRaise(RequestValidator().validate(self.request))
+
+            # Get the self.request as a Json
+            request_json_content = returnValueOrRaise(self.request.toJSON())
+
+            # Write it
+            fname = f"{self.production_id}_{self.prod_job_id}_request.json"
+            with open(fname, "w", encoding="utf-8") as f:
+                json.dump(request_json_content, f)
+
+        if self.accounting_registers:
+            for register in self.accounting_registers:
+                self.dsc.addRegister(register)
+            self.dsc.commit()
