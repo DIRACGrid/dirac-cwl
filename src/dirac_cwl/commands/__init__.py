@@ -1,5 +1,20 @@
 """Command classes for workflow pre/post-processing operations."""
 
+from .analyze_xml_summary import AnalyseXmlSummary
+from .bookkeeping_report import BookkeepingReport
 from .core import PostProcessCommand, PreProcessCommand
+from .failover_request import FailoverRequest
+from .upload_log_file import UploadLogFile
+from .upload_output_data import UploadOutputData
+from .workflow_accounting import WorkflowAccounting
 
-__all__ = ["PreProcessCommand", "PostProcessCommand"]
+__all__ = [
+    "AnalyseXmlSummary",
+    "PreProcessCommand",
+    "PostProcessCommand",
+    "UploadLogFile",
+    "BookkeepingReport",
+    "FailoverRequest",
+    "UploadOutputData",
+    "WorkflowAccounting",
+]
