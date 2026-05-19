@@ -125,7 +125,7 @@ class TestUploadLogFile:
     """Collection of tests for the UploadLogFile command."""
 
     @pytest.fixture
-    def uplogfile(self, mocker, wf_commons):
+    def uplogfile(self, mocker: MockerFixture, wf_commons):
         """Fixture for UploadLogFile module."""
         uplogfile = UploadLogFile()
 
@@ -159,7 +159,7 @@ class TestUploadLogFile:
         Path(filename).unlink(missing_ok=True)
 
     # Test Scenarios
-    def test_uploadLogFile_success(self, mocker, uplogfile, wf_commons, prodconf_json, prodconf_py):
+    def test_uploadLogFile_success(self, mocker: MockerFixture, uplogfile, wf_commons, prodconf_json, prodconf_py):
         """Test successful execution of UploadLogFile module."""
         log_url = "notImportant"
         mock_se_method = mocker.patch(
@@ -224,7 +224,7 @@ class TestUploadLogFile:
 
         shutil.rmtree(updated_wf_commons.log_dir, ignore_errors=True)
 
-    def test_uploadLogFile_noOutputFile(self, mocker, uplogfile, wf_commons):
+    def test_uploadLogFile_noOutputFile(self, mocker: MockerFixture, uplogfile, wf_commons):
         """Test execution of UploadLogFile module when there is no output files.
 
         * populateLogDirectory should return an error, because there is no "successful" files in log_dir.
@@ -273,7 +273,7 @@ class TestUploadLogFile:
 
         shutil.rmtree(updated_wf_commons.log_dir, ignore_errors=True)
 
-    def test_uploadLogFile_zipException(self, mocker, uplogfile, wf_commons, prodconf_json, prodconf_py):
+    def test_uploadLogFile_zipException(self, mocker: MockerFixture, uplogfile, wf_commons, prodconf_json, prodconf_py):
         """Test execution of UploadLogFile module when an exception is raised when zipping files."""
         mocker.patch("LHCbDIRAC.Workflow.Modules.UploadLogFile.zipFiles", side_effect=OSError)
         mock_se_method = mocker.patch(
@@ -323,7 +323,7 @@ class TestUploadLogFile:
 
         shutil.rmtree(updated_wf_commons.log_dir, ignore_errors=True)
 
-    def test_uploadLogFile_zipError(self, mocker, uplogfile, wf_commons, prodconf_json, prodconf_py):
+    def test_uploadLogFile_zipError(self, mocker: MockerFixture, uplogfile, wf_commons, prodconf_json, prodconf_py):
         """Test execution of UploadLogFile module when an error is occurring when zipping files."""
         mocker.patch("LHCbDIRAC.Workflow.Modules.UploadLogFile.zipFiles", return_value=S_ERROR("Error"))
         mock_se_method = mocker.patch(
@@ -373,7 +373,7 @@ class TestUploadLogFile:
 
         shutil.rmtree(updated_wf_commons.log_dir, ignore_errors=True)
 
-    def test_uploadLogFile_SEError(self, mocker, uplogfile, wf_commons, prodconf_json, prodconf_py):
+    def test_uploadLogFile_SEError(self, mocker: MockerFixture, uplogfile, wf_commons, prodconf_json, prodconf_py):
         """Test execution of UploadLogFile module when an error is occurring when calling StorageElement."""
         mocker.patch("LHCbDIRAC.Workflow.Modules.UploadLogFile.getDestinationSEList", return_value=["SE1", "SE2"])
         mock_se_method = mocker.patch(
@@ -441,7 +441,9 @@ class TestUploadLogFile:
 
         shutil.rmtree(updated_wf_commons.log_dir, ignore_errors=True)
 
-    def test_uploadLogFile_transferError(self, mocker, uplogfile, wf_commons, prodconf_json, prodconf_py):
+    def test_uploadLogFile_transferError(
+        self, mocker: MockerFixture, uplogfile, wf_commons, prodconf_json, prodconf_py
+    ):
         """Test execution of UploadLogFile module when calling StorageElement and FailoverTransfer fail."""
         mocker.patch("LHCbDIRAC.Workflow.Modules.UploadLogFile.getDestinationSEList", return_value=["SE1", "SE2"])
         mock_se_method = mocker.patch(
@@ -514,7 +516,7 @@ class TestBookkeepingReport:
         Path(path).unlink(missing_ok=True)
 
     @pytest.fixture
-    def bk_report(self, mocker):
+    def bk_report(self, mocker: MockerFixture):
         """BookkeepingReport mocked command.
 
         Cleans created files after execution.
@@ -882,7 +884,7 @@ class TestBookkeepingReport:
         simulation_condition = root.find("SimulationCondition")
         assert simulation_condition is None, "SimulationCondition element should not be present."
 
-    def test_bkreport_previousError_success(self, mocker, bk_report, wf_commons, bookkeeping_file):
+    def test_bkreport_previousError_success(self, mocker: MockerFixture, bk_report, wf_commons, bookkeeping_file):
         """Test previous command failure."""
         wf_commons["application_name"] = "Gauss"
         wf_commons["application_version"] = wf_commons["config_version"]
@@ -1166,7 +1168,7 @@ class TestUploadOutputDataFile:
         Path(path).unlink(missing_ok=True)
 
     @pytest.fixture
-    def upload_output(self, mocker, wf_commons):
+    def upload_output(self, mocker: MockerFixture, wf_commons):
         """Fixture for UploadOutputData module."""
         mocker.patch("dirac_cwl.commands.upload_output_data.getDestinationSEList", return_value=["CERN", "CNAF"])
         mocker.patch("LHCbDIRAC.Workflow.Modules.UploadOutputData.getDestinationSEList", return_value=["CERN", "CNAF"])
@@ -1183,7 +1185,7 @@ class TestUploadOutputDataFile:
         Path("DISABLE_WATCHDOG_CPU_WALLCLOCK_CHECK").unlink(missing_ok=True)
 
     # Test Scenarios
-    def test_uploadOutputData_success(self, mocker, upload_output, wf_commons, sim_file, bk_file):
+    def test_uploadOutputData_success(self, mocker: MockerFixture, upload_output, wf_commons, sim_file, bk_file):
         """Test successful execution of UploadOutputData module.
 
         * The output should be uploaded and registered in the bookkeeping system.
@@ -1238,7 +1240,9 @@ class TestUploadOutputDataFile:
         operations = json.loads(updated_wf_commons.request.toJSON()["Value"])["Operations"]
         assert len(operations) == 0
 
-    def test_uploadOutputData_failedBKRegistration(self, mocker, upload_output, wf_commons, sim_file, bk_file):
+    def test_uploadOutputData_failedBKRegistration(
+        self, mocker: MockerFixture, upload_output, wf_commons, sim_file, bk_file
+    ):
         """Test execution of UploadOutputData module when the BK registation fails.
 
         * The output should be uploaded but not registered in the bookkeeping system now.
@@ -1309,7 +1313,9 @@ class TestUploadOutputDataFile:
         assert operations[0]["Catalog"] == "BookkeepingDB"
         assert sim_file in operations[0]["Files"][0]["LFN"]
 
-    def test_uploadOutputData_postponeBKRegistration(self, mocker, upload_output, wf_commons, sim_file, bk_file):
+    def test_uploadOutputData_postponeBKRegistration(
+        self, mocker: MockerFixture, upload_output, wf_commons, sim_file, bk_file
+    ):
         """Test execution of UploadOutputData module when there is already a RegisterFile operation on the output.
 
         * The output should be uploaded but not registered in the bookkeeping system now.
@@ -1384,7 +1390,9 @@ class TestUploadOutputDataFile:
         assert operations[1]["Catalog"] == "BookkeepingDB"
         assert sim_file in operations[1]["Files"][0]["LFN"]
 
-    def test_uploadOutputData_errorBKRegistration(self, mocker, upload_output, wf_commons, sim_file, bk_file):
+    def test_uploadOutputData_errorBKRegistration(
+        self, mocker: MockerFixture, upload_output, wf_commons, sim_file, bk_file
+    ):
         """Test execution of UploadOutputData module when an error occurs during the BK registation.
 
         * The output should be uploaded but not registered in the bookkeeping system at all.
@@ -1451,7 +1459,7 @@ class TestUploadOutputDataFile:
         operations = json.loads(updated_wf_commons.request.toJSON()["Value"])["Operations"]
         assert len(operations) == 0
 
-    def test_uploadOutputData_failUpload1(self, mocker, upload_output, wf_commons, sim_file, bk_file):
+    def test_uploadOutputData_failUpload1(self, mocker: MockerFixture, upload_output, wf_commons, sim_file, bk_file):
         """Test execution of UploadOutputData module when there is a 1st failure to upload outputs.
 
         * The output should be uploaded correctly with the second method.
@@ -1507,7 +1515,7 @@ class TestUploadOutputDataFile:
         operations = json.loads(updated_wf_commons.request.toJSON()["Value"])["Operations"]
         assert len(operations) == 0
 
-    def test_uploadOutputData_failUpload2(self, mocker, upload_output, wf_commons, sim_file, bk_file):
+    def test_uploadOutputData_failUpload2(self, mocker: MockerFixture, upload_output, wf_commons, sim_file, bk_file):
         """Test execution of UploadOutputData module when there is a 2 failures to upload outputs.
 
         * A request should be generated to upload outputs later.
@@ -1597,7 +1605,7 @@ class TestUploadOutputDataFile:
         assert operations[1]["SourceSE"] is None
         assert sim_file in operations[1]["Files"][0]["LFN"]
 
-    def test_uploadOutputData_BKReportError(self, mocker, upload_output, wf_commons, sim_file, bk_file):
+    def test_uploadOutputData_BKReportError(self, mocker: MockerFixture, upload_output, wf_commons, sim_file, bk_file):
         """Test execution of UploadOutputData module when the BK report cannot be sent.
 
         * The output should be uploaded and registered in the bookkeeping system.
@@ -1655,7 +1663,9 @@ class TestUploadOutputDataFile:
 
         assert operations[0]["Type"] == "ForwardDISET"
 
-    def test_uploadOutputData_withDescendents(self, mocker, upload_output, wf_commons, sim_file, bk_file):
+    def test_uploadOutputData_withDescendents(
+        self, mocker: MockerFixture, upload_output, wf_commons, sim_file, bk_file
+    ):
         """Test execution of UploadOutputData module when there is already file descendants.
 
         It means that the input data has already been processed.
@@ -1713,7 +1723,7 @@ class TestUploadOutputDataFile:
         operations = json.loads(updated_wf_commons.request.toJSON()["Value"])["Operations"]
         assert len(operations) == 0
 
-    def test_uploadOutputData_noOutput(self, mocker, upload_output, wf_commons, sim_file):
+    def test_uploadOutputData_noOutput(self, mocker: MockerFixture, upload_output, wf_commons, sim_file):
         """Test UploadOutputData with no output data."""
         mock_setFileStatus = mocker.patch("DIRAC.TransformationSystem.Client.FileReport.FileReport.setFileStatus")
 
@@ -1764,7 +1774,7 @@ class TestUploadOutputDataFile:
         operations = json.loads(updated_wf_commons.request.toJSON()["Value"])["Operations"]
         assert len(operations) == 0
 
-    def test_uploadOutputData_previousError_fail(self, mocker, upload_output, wf_commons, sim_file):
+    def test_uploadOutputData_previousError_fail(self, mocker: MockerFixture, upload_output, wf_commons, sim_file):
         """Test UploadOutputData with an intentional failure."""
         mock_setFileStatus = mocker.patch("DIRAC.TransformationSystem.Client.FileReport.FileReport.setFileStatus")
 
@@ -1817,12 +1827,12 @@ class TestAnalyseXmlSummary:
     """Collection of tests for the AnalyseXmlSummary command."""
 
     @pytest.fixture
-    def axlf(self, mocker):
+    def axlf(self, mocker: MockerFixture):
         """Fixture for AnalyseXmlSummary module."""
         yield AnalyseXmlSummary()
 
     # Test scenarios
-    def test_analyseXMLSummary_basic_success(self, mocker, axlf, wf_commons, xml_summary_file):
+    def test_analyseXMLSummary_basic_success(self, mocker: MockerFixture, axlf, wf_commons, xml_summary_file):
         """Test basic success scenario."""
         mock_setApplicationStatus = mocker.patch(
             "DIRAC.WorkloadManagementSystem.Client.JobReport.JobReport.setApplicationStatus", return_value=S_OK()
@@ -1864,7 +1874,7 @@ class TestAnalyseXmlSummary:
         mock_setApplicationStatus.assert_called_once()
         assert updated_wf_commons.file_report.statusDict == {}
 
-    def test_analyseXMLSummary_previousError_success(self, mocker, axlf, wf_commons, xml_summary_file):
+    def test_analyseXMLSummary_previousError_success(self, mocker: MockerFixture, axlf, wf_commons, xml_summary_file):
         """Test success scenario with previous error: stepStatus = S_ERROR()."""
         mock_setApplicationStatus = mocker.patch(
             "DIRAC.WorkloadManagementSystem.Client.JobReport.JobReport.setApplicationStatus", return_value=S_OK()
@@ -1907,7 +1917,7 @@ class TestAnalyseXmlSummary:
         mock_setApplicationStatus.assert_not_called()
         assert updated_wf_commons.file_report.statusDict == {}
 
-    def test_analyseXMLSummary_badInput_success(self, mocker, axlf, wf_commons, xml_summary_file):
+    def test_analyseXMLSummary_badInput_success(self, mocker: MockerFixture, axlf, wf_commons, xml_summary_file):
         """Test success scenario with part and fail input not part of the input data list."""
         mock_setApplicationStatus = mocker.patch(
             "DIRAC.WorkloadManagementSystem.Client.JobReport.JobReport.setApplicationStatus", return_value=S_OK()
@@ -1951,7 +1961,7 @@ class TestAnalyseXmlSummary:
         mock_setApplicationStatus.assert_called_once()
         assert updated_wf_commons.file_report.statusDict == {}
 
-    def test_analyseXMLSummary_partInput_success(self, mocker, axlf, wf_commons, xml_summary_file):
+    def test_analyseXMLSummary_partInput_success(self, mocker: MockerFixture, axlf, wf_commons, xml_summary_file):
         """Test success scenario with part input part of the input data list."""
         # Input is 'part' and is part of the input data list but the number of events is not -1
         mock_setApplicationStatus = mocker.patch(
@@ -1994,7 +2004,7 @@ class TestAnalyseXmlSummary:
         mock_setApplicationStatus.assert_called_once()
         assert updated_wf_commons.file_report.statusDict == {}
 
-    def test_analyseXMLSummary_notSuccess_fail(self, mocker, axlf, wf_commons, xml_summary_file):
+    def test_analyseXMLSummary_notSuccess_fail(self, mocker: MockerFixture, axlf, wf_commons, xml_summary_file):
         """Test failure scenario with success=False."""
         mock_setApplicationStatus = mocker.patch(
             "DIRAC.WorkloadManagementSystem.Client.JobReport.JobReport.setApplicationStatus", return_value=S_OK()
@@ -2037,7 +2047,7 @@ class TestAnalyseXmlSummary:
         mock_setApplicationStatus.assert_called_once()
         assert updated_wf_commons.file_report.statusDict == {}
 
-    def test_analyseXMLSummary_badStep_fail(self, mocker, axlf, wf_commons, xml_summary_file):
+    def test_analyseXMLSummary_badStep_fail(self, mocker: MockerFixture, axlf, wf_commons, xml_summary_file):
         """Test failure scenario with step != finalize."""
         mock_setApplicationStatus = mocker.patch(
             "DIRAC.WorkloadManagementSystem.Client.JobReport.JobReport.setApplicationStatus", return_value=S_OK()
@@ -2080,7 +2090,7 @@ class TestAnalyseXmlSummary:
         mock_setApplicationStatus.assert_called_once()
         assert updated_wf_commons.file_report.statusDict == {}
 
-    def test_analyseXMLSummary_badOutput_fail(self, mocker, axlf, wf_commons, xml_summary_file):
+    def test_analyseXMLSummary_badOutput_fail(self, mocker: MockerFixture, axlf, wf_commons, xml_summary_file):
         """Test failure scenario with output status != full."""
         mock_setApplicationStatus = mocker.patch(
             "DIRAC.WorkloadManagementSystem.Client.JobReport.JobReport.setApplicationStatus", return_value=S_OK()
@@ -2123,7 +2133,7 @@ class TestAnalyseXmlSummary:
         mock_setApplicationStatus.assert_called_once()
         assert updated_wf_commons.file_report.statusDict == {}
 
-    def test_analyseXMLSummary_badInput_fail(self, mocker, axlf, wf_commons, xml_summary_file):
+    def test_analyseXMLSummary_badInput_fail(self, mocker: MockerFixture, axlf, wf_commons, xml_summary_file):
         """Test failure scenario with input status = mult."""
         mock_setApplicationStatus = mocker.patch(
             "DIRAC.WorkloadManagementSystem.Client.JobReport.JobReport.setApplicationStatus", return_value=S_OK()
@@ -2166,7 +2176,7 @@ class TestAnalyseXmlSummary:
         mock_setApplicationStatus.assert_called_once()
         assert updated_wf_commons.file_report.statusDict == {}
 
-    def test_analyseXMLSummary_badInput2_fail(self, mocker, axlf, wf_commons, xml_summary_file):
+    def test_analyseXMLSummary_badInput2_fail(self, mocker: MockerFixture, axlf, wf_commons, xml_summary_file):
         """Test failure scenario with an unknown input status (weoweo)."""
         mock_setApplicationStatus = mocker.patch(
             "DIRAC.WorkloadManagementSystem.Client.JobReport.JobReport.setApplicationStatus", return_value=S_OK()
@@ -2209,7 +2219,7 @@ class TestAnalyseXmlSummary:
         mock_setApplicationStatus.assert_called_once()
         assert updated_wf_commons.file_report.statusDict == {}
 
-    def test_analyseXMLSummary_badInput3_fail(self, mocker, axlf, wf_commons, xml_summary_file):
+    def test_analyseXMLSummary_badInput3_fail(self, mocker: MockerFixture, axlf, wf_commons, xml_summary_file):
         """Test failure scenario with input status = fail."""
         mock_setApplicationStatus = mocker.patch(
             "DIRAC.WorkloadManagementSystem.Client.JobReport.JobReport.setApplicationStatus", return_value=S_OK()
@@ -2257,7 +2267,7 @@ class TestAnalyseXmlSummary:
         mock_setApplicationStatus.assert_called_once()
         assert updated_wf_commons.file_report.statusDict == {"00012478_00000532_1.sim": "Problematic"}
 
-    def test_analyseXMLSummary_badInput4_fail(self, mocker, axlf, wf_commons, xml_summary_file):
+    def test_analyseXMLSummary_badInput4_fail(self, mocker: MockerFixture, axlf, wf_commons, xml_summary_file):
         """Test failure scenario with input status = part."""
         # Input is 'part' and is part of the input data list but the number of events is -1 (by default)
         mock_setApplicationStatus = mocker.patch(
@@ -2313,13 +2323,15 @@ class TestWorkflowAccounting:
     """Collection of tests for the WorkflowAccounting command."""
 
     @pytest.fixture
-    def accounting(self, mocker):
+    def accounting(self, mocker: MockerFixture):
         """Fixture for WorkflowAccounting module."""
         yield WorkflowAccounting()
 
     # Test Scenarios
-    def test_accounting_success(self, mocker, accounting, wf_commons, xml_summary_file):
+    def test_accounting_success(self, mocker: MockerFixture, accounting, wf_commons, xml_summary_file):
         """Test successful execution of WorkflowAccounting module."""
+        mock_addRegister = mocker.patch("DIRAC.AccountingSystem.Client.DataStoreClient.DataStoreClient.addRegister")
+
         wf_commons["application_name"] = "Gauss"
         xml_content = dedent("""<?xml version="1.0" encoding="UTF-8"?>
             <summary version="1.0" xsi:noNamespaceSchemaLocation="$XMLSUMMARYBASEROOT/xml/XMLSummary.xsd"
@@ -2351,13 +2363,15 @@ class TestWorkflowAccounting:
 
         accounting.execute(job_path)
 
-        updated_wf_commons = WorkflowCommons.load(job_path)
+        WorkflowCommons.load(job_path)
 
         # Make sure the dsc was called
-        assert len(updated_wf_commons.accounting_registers) == 1
+        assert mock_addRegister.assert_called_once
 
-    def test_accounting_noApplicationName_fail(self, mocker, accounting, wf_commons, xml_summary_file):
+    def test_accounting_noApplicationName_fail(self, mocker: MockerFixture, accounting, wf_commons, xml_summary_file):
         """Test WorkflowAccounting when there is no application name in step commons."""
+        mock_addRegister = mocker.patch("DIRAC.AccountingSystem.Client.DataStoreClient.DataStoreClient.addRegister")
+
         xml_content = dedent("""<?xml version="1.0" encoding="UTF-8"?>
             <summary version="1.0" xsi:noNamespaceSchemaLocation="$XMLSUMMARYBASEROOT/xml/XMLSummary.xsd"
             xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
@@ -2387,13 +2401,15 @@ class TestWorkflowAccounting:
         with pytest.raises(WorkflowProcessingException):
             accounting.execute(job_path)
 
-        updated_wf_commons = WorkflowCommons.load(job_path)
+        WorkflowCommons.load(job_path)
 
         # Make sure the dsc was not called
-        assert len(updated_wf_commons.accounting_registers) == 0
+        assert mock_addRegister.assert_not_called
 
-    def test_accounting_incompleteData(self, mocker, accounting, wf_commons, xml_summary_file):
+    def test_accounting_incompleteData(self, mocker: MockerFixture, accounting, wf_commons, xml_summary_file):
         """Test successful execution of WorkflowAccounting module."""
+        mock_addRegister = mocker.patch("DIRAC.AccountingSystem.Client.DataStoreClient.DataStoreClient.addRegister")
+
         xml_content = dedent("""<?xml version="1.0" encoding="UTF-8"?>
             <summary version="1.0" xsi:noNamespaceSchemaLocation="$XMLSUMMARYBASEROOT/xml/XMLSummary.xsd"
             xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
@@ -2423,13 +2439,15 @@ class TestWorkflowAccounting:
         with pytest.raises(WorkflowProcessingException):
             accounting.execute(job_path)
 
-        updated_wf_commons = WorkflowCommons.load(job_path)
+        WorkflowCommons.load(job_path)
 
         # Make sure the dsc was not called
-        assert len(updated_wf_commons.accounting_registers) == 0
+        assert mock_addRegister.assert_not_called
 
-    def test_accounting_previousError_fail(self, mocker, accounting, wf_commons, xml_summary_file):
+    def test_accounting_previousError_fail(self, mocker: MockerFixture, accounting, wf_commons, xml_summary_file):
         """Test WorkflowAccounting with an intentional failure."""
+        mock_addRegister = mocker.patch("DIRAC.AccountingSystem.Client.DataStoreClient.DataStoreClient.addRegister")
+
         xml_content = dedent("""<?xml version="1.0" encoding="UTF-8"?>
             <summary version="1.0" xsi:noNamespaceSchemaLocation="$XMLSUMMARYBASEROOT/xml/XMLSummary.xsd"
             xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
@@ -2462,7 +2480,7 @@ class TestWorkflowAccounting:
 
         accounting.execute(job_path)
 
-        updated_wf_commons = WorkflowCommons.load(job_path)
+        WorkflowCommons.load(job_path)
 
         # Make sure the dsc was called
-        assert len(updated_wf_commons.accounting_registers) == 1
+        assert mock_addRegister.assert_called_once

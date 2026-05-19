@@ -80,4 +80,4 @@ class WorkflowAccounting(PostProcessCommand):
                 f"Values for StepAccounting are wrong. Here are the given data: {dataDict}"
             ) from e
 
-        workflow_commons.accounting_registers.append(list(job_step.getValues()))
+        workflow_commons.dsc.addRegister(job_step)

@@ -151,6 +151,7 @@ class WorkflowCommons(BaseModel):
             self.step_status = StepStatus.Failed
 
         self.request_dict = json.loads(self.request.toJSON()["Value"])
+        self.accounting_registers = self.dsc._DataStoreClient__registersList
 
         try:
             wf_dict = self.model_dump(mode="json")
@@ -257,7 +258,6 @@ class WorkflowCommons(BaseModel):
             fname = f"{self.production_id}_{self.prod_job_id}_request.json"
             with open(fname, "w", encoding="utf-8") as f:
                 json.dump(request_json_content, f)
-
         if self.accounting_registers:
             for register in self.accounting_registers:
                 self.dsc.addRegister(register)
