@@ -1,7 +1,14 @@
 """Core base classes for workflow processing commands."""
 
+import logging
+import os
 from abc import ABC, abstractmethod
-from pathlib import Path
+
+from dirac_cwl.core.exceptions import WorkflowProcessingException
+
+from .workflow_commons import WorkflowCommons
+
+logger = logging.getLogger(__name__)
 
 
 class CommandBase(ABC):
@@ -12,8 +19,38 @@ class CommandBase(ABC):
     :class:`dirac_cwl.commands.base.PostProcessCommand`
     """
 
+    def execute(self, job_path: os.PathLike, **kwargs) -> None:
+        """Execute the command in the given job path.
+
+        :param job_path: Path to the job working directory.
+        :param kwargs: Additional keyword arguments.
+        """
+        failed = False
+        workflow_commons = None
+        try:
+            workflow_commons = WorkflowCommons.load(job_path)
+
+            self._execute(job_path, workflow_commons, **kwargs)
+
+        except WorkflowProcessingException:
+            failed = True
+            raise
+
+        except Exception as e:
+            logger.exception("Exception in %s", self.__class__.__name__, exc_info=e)
+
+            failed = True
+            if workflow_commons:
+                workflow_commons.job_report.setApplicationStatus(repr(e))
+
+            raise WorkflowProcessingException(e) from e
+
+        finally:
+            if workflow_commons:
+                workflow_commons.save(job_path, failed=failed)
+
     @abstractmethod
-    def execute(self, job_path: Path, **kwargs) -> None:
+    def _execute(self, job_path: os.PathLike, workflow_commons: WorkflowCommons, **kwargs) -> None:
         """Execute the command in the given job path.
 
         :param job_path: Path to the job working directory.

@@ -31,164 +31,143 @@ logger = logging.getLogger(__name__)
 class UploadLogFile(PostProcessCommand):
     """Post-processing command for log file uploading."""
 
-    def execute(self, job_path: os.PathLike, **kwargs):
+    def _execute(self, job_path: os.PathLike, workflow_commons: WorkflowCommons, **kwargs):
         """Execute the log uploading process.
 
         :param job_path: Path to the job working directory.
+        :param workflow_commons: WorkflowCommons object.
         :param kwargs: Additional keyword arguments.
         """
         # Obtain workflow information
-        failed = False
-        workflow_commons = None
+        if workflow_commons.step_status == StepStatus.Failed:
+            return
+
+        log_lfn_path = workflow_commons.log_target_path
+        if not log_lfn_path:
+            parameters = {
+                "PRODUCTION_ID": workflow_commons.production_id,
+                "JOB_ID": workflow_commons.job_id,
+                "configName": workflow_commons.config_name,
+                "configVersion": workflow_commons.config_version,
+            }
+            try:
+                log_dict = returnValueOrRaise(getLogPath(parameters, workflow_commons.bk_client))
+            except SErrorException as e:
+                raise WorkflowProcessingException("Could not create LogFilePath") from e
+            log_lfn_path = log_dict["LogTargetPath"][0]
+
+        if not isinstance(log_lfn_path, str):
+            log_lfn_path = log_lfn_path[0]
+
+        workflow_commons.log_lfn_path = log_lfn_path
+
+        ops = Operations()
+        log_se = ops.getValue("LogStorage/LogSE", "LogSE")
+        log_extensions = ops.getValue("LogFiles/Extensions", [])
+
+        _prepareRequest(workflow_commons.request, workflow_commons.job_id)
+
         try:
-            workflow_commons = WorkflowCommons.load(job_path)
+            file_list = returnValueOrRaise(systemCall(0, shlex.split("ls -al")))
+        except SErrorException as e:
+            logger.error("Failed to list the log directory\n%s", e)
 
-            if workflow_commons.step_status == StepStatus.Failed:
-                return
+        if file_list:
+            logger.info("The contents of the working directory...")
+            logger.info(str(file_list[1]))
+        else:
+            logger.error("Failed to list the log directory\n%s", str(file_list[2]))
 
-            log_lfn_path = workflow_commons.log_target_path
-            if not log_lfn_path:
-                parameters = {
-                    "PRODUCTION_ID": workflow_commons.production_id,
-                    "JOB_ID": workflow_commons.job_id,
-                    "configName": workflow_commons.config_name,
-                    "configVersion": workflow_commons.config_version,
-                }
-                try:
-                    log_dict = returnValueOrRaise(getLogPath(parameters, workflow_commons.bk_client))
-                except SErrorException as e:
-                    raise WorkflowProcessingException("Could not create LogFilePath") from e
-                log_lfn_path = log_dict["LogTargetPath"][0]
+        workflow_commons.log_dir = os.path.realpath(
+            os.path.join(job_path, f"./job/log/{workflow_commons.production_id}/{workflow_commons.prod_job_id}")
+        )
+        logger.info("Selected log files will be temporarily stored in %s", workflow_commons.log_dir)
 
-            if not isinstance(log_lfn_path, str):
-                log_lfn_path = log_lfn_path[0]
+        ##########################################
+        # First determine the files which should be saved
+        logger.info("Determining the files to be saved in the logs.")
 
-            workflow_commons.log_lfn_path = log_lfn_path
+        try:
+            selectedFiles = returnValueOrRaise(_determineRelevantFiles(log_extensions))
+        except SErrorException as e:
+            logger.error("Completely failed to select relevant log files.", exc_info=e)
+            return  # Does not fail
 
-            ops = Operations()
-            log_se = ops.getValue("LogStorage/LogSE", "LogSE")
-            log_extensions = ops.getValue("LogFiles/Extensions", [])
+        logger.info("The following files were selected to be saved\n%s", selectedFiles)
 
-            _prepareRequest(workflow_commons.request, workflow_commons.job_id)
+        #########################################
+        # Create a temporary directory containing these files
+        logger.info("Determining the files to be saved in the logs.")
 
-            try:
-                file_list = returnValueOrRaise(systemCall(0, shlex.split("ls -al")))
-            except SErrorException as e:
-                logger.error("Failed to list the log directory\n%s", e)
+        try:
+            returnValueOrRaise(_populateLogDirectory(selectedFiles, workflow_commons.log_dir))
+        except SErrorException as e:
+            logger.error("Completely failed to populate temporary log file directory.", stack_info=e)
+            workflow_commons.job_report.setApplicationStatus("Failed To Populate Log Dir")
+            return  # Does not fail
 
-            if file_list:
-                logger.info("The contents of the working directory...")
-                logger.info(str(file_list[1]))
-            else:
-                logger.error("Failed to list the log directory\n%s", str(file_list[2]))
+        logger.debug("%s populated with log files.", workflow_commons.log_dir)
 
-            workflow_commons.log_dir = os.path.realpath(
-                os.path.join(job_path, f"./job/log/{workflow_commons.production_id}/{workflow_commons.prod_job_id}")
-            )
-            logger.info("Selected log files will be temporarily stored in %s", workflow_commons.log_dir)
+        #########################################
+        # Make sure all the files in the log directory have the correct permissions
+        try:
+            returnValueOrRaise(_setLogFilePermissions(workflow_commons.log_dir))
+        except SErrorException as e:
+            logger.error("Could not set permissions of log files to 0755 with message:\n%s", e)
 
-            ##########################################
-            # First determine the files which should be saved
-            logger.info("Determining the files to be saved in the logs.")
+        # zip all files
+        try:
+            zip_file_name = returnValueOrRaise(_zip_files(workflow_commons.prod_job_id, selectedFiles))
+        except SErrorException as e:
+            logger.error("Failed to create zip of log files %s", e)
+            workflow_commons.job_report.setApplicationStatus("Failed to create zip of log files")
+            return  # Does not fail
 
-            try:
-                selectedFiles = returnValueOrRaise(_determineRelevantFiles(log_extensions))
-            except SErrorException as e:
-                logger.error("Completely failed to select relevant log files.", exc_info=e)
-                return  # Does not fail
+        logger.info("Transferring zipped log files to the %s", log_se)
 
-            logger.info("The following files were selected to be saved\n%s", selectedFiles)
+        # logFilePath is something like /lhcb/MC/2016/LOG/00095376/0000/
+        # the zipFileName should have the same name, e.g. 00000381.zip
+        zipPath = os.path.join(workflow_commons.log_file_path, zip_file_name)
+        log_https_url = _get_log_url(log_se, zipPath)
 
-            #########################################
-            # Create a temporary directory containing these files
-            logger.info("Determining the files to be saved in the logs.")
+        logger.info("putFile %s to %s", zip_file_name, log_se)
 
-            try:
-                returnValueOrRaise(_populateLogDirectory(selectedFiles, workflow_commons.log_dir))
-            except SErrorException as e:
-                logger.error("Completely failed to populate temporary log file directory.", stack_info=e)
-                workflow_commons.job_report.setApplicationStatus("Failed To Populate Log Dir")
-                return  # Does not fail
+        try:
+            returnValueOrRaise(returnSingleResult(StorageElement(log_se).putFile({zipPath: zip_file_name})))
+            logger.info("Successfully upload log file to %s", log_se)
+            logger.info("Logs for this job may be retrieved from %s", log_https_url)
 
-            logger.debug("%s populated with log files.", workflow_commons.log_dir)
-
-            #########################################
-            # Make sure all the files in the log directory have the correct permissions
-            try:
-                returnValueOrRaise(_setLogFilePermissions(workflow_commons.log_dir))
-            except SErrorException as e:
-                logger.error("Could not set permissions of log files to 0755 with message:\n%s", e)
-
-            # zip all files
-            try:
-                zip_file_name = returnValueOrRaise(_zip_files(workflow_commons.prod_job_id, selectedFiles))
-            except SErrorException as e:
-                logger.error("Failed to create zip of log files %s", e)
-                workflow_commons.job_report.setApplicationStatus("Failed to create zip of log files")
-                return  # Does not fail
-
-            logger.info("Transferring zipped log files to the %s", log_se)
-
-            # logFilePath is something like /lhcb/MC/2016/LOG/00095376/0000/
-            # the zipFileName should have the same name, e.g. 00000381.zip
-            zipPath = os.path.join(workflow_commons.log_file_path, zip_file_name)
-            log_https_url = _get_log_url(log_se, zipPath)
-
-            logger.info("putFile %s to %s", zip_file_name, log_se)
+        except SErrorException as e:
+            logger.error("Failed to upload log files with message %s", e)
+            logger.error("Now uploading to failover SE")
 
             try:
-                returnValueOrRaise(returnSingleResult(StorageElement(log_se).putFile({zipPath: zip_file_name})))
-                logger.info("Successfully upload log file to %s", log_se)
-                logger.info("Logs for this job may be retrieved from %s", log_https_url)
-
-            except SErrorException as e:
-                logger.error("Failed to upload log files with message %s", e)
-                logger.error("Now uploading to failover SE")
-
-                try:
-                    upload_result_dict = returnValueOrRaise(
-                        _uploadLogToFailoverSE(
-                            workflow_commons.failover_request,
-                            zip_file_name,
-                            log_lfn_path,
-                            workflow_commons.site_name,
-                        )
+                upload_result_dict = returnValueOrRaise(
+                    _uploadLogToFailoverSE(
+                        workflow_commons.failover_request,
+                        zip_file_name,
+                        log_lfn_path,
+                        workflow_commons.site_name,
                     )
+                )
 
-                    uploadedSE = upload_result_dict["uploadedSE"]
+                uploadedSE = upload_result_dict["uploadedSE"]
 
-                    logger.info("Uploading logs to failover SE '%s'", uploadedSE)
-                    logger.info("Setting log upload request for %s at %s", log_lfn_path, log_se)
+                logger.info("Uploading logs to failover SE '%s'", uploadedSE)
+                logger.info("Setting log upload request for %s at %s", log_lfn_path, log_se)
 
-                    _createLogUploadRequest(workflow_commons.failover_request.request, log_se, log_lfn_path, uploadedSE)
+                _createLogUploadRequest(workflow_commons.failover_request.request, log_se, log_lfn_path, uploadedSE)
 
-                    logger.debug("Successfully created failover request")
+                logger.debug("Successfully created failover request")
 
-                except SErrorException as e:
-                    logger.error(
-                        "Failed to upload logs to all failover destinations (the job will not fail for this reason"
-                    )
-                    workflow_commons.job_report.setApplicationStatus("Failed To Upload Logs")
+            except SErrorException as e:
+                logger.error(
+                    "Failed to upload logs to all failover destinations (the job will not fail for this reason"
+                )
+                workflow_commons.job_report.setApplicationStatus("Failed To Upload Logs")
 
-            # While it's the zip file that is uploaded, we set in job parameters its directory,
-            # as the .zip is deflated automatically
-            workflow_commons.job_report.setJobParameter(
-                "Log URL", f"<a href=\"{log_https_url.replace('.zip','/')}\">Log file directory</a>"
-            )
-
-        except WorkflowProcessingException:
-            failed = True
-            raise
-
-        except Exception as e:
-            logger.exception("Exception in UploadLogFile", exc_info=e)
-
-            failed = True
-            if workflow_commons:
-                workflow_commons.job_report.setApplicationStatus(repr(e))
-
-            raise WorkflowProcessingException(e) from e
-
-        finally:
-            if workflow_commons:
-                workflow_commons.save(job_path, failed=failed)
+        # While it's the zip file that is uploaded, we set in job parameters its directory,
+        # as the .zip is deflated automatically
+        workflow_commons.job_report.setJobParameter(
+            "Log URL", f"<a href=\"{log_https_url.replace('.zip','/')}\">Log file directory</a>"
+        )

@@ -27,142 +27,121 @@ logger = logging.getLogger(__name__)
 class BookkeepingReport(PostProcessCommand):
     """Generates a bookkeeping report file based on the XMLSummary and the pool XML catalog."""
 
-    def execute(self, job_path: os.PathLike, **kwargs):
+    def _execute(self, job_path: os.PathLike, workflow_commons: WorkflowCommons, **kwargs):
         """Execute the command.
 
         :param job_path: Path to the job working directory.
+        :param workflow_commons: WorkflowCommons object
         :param kwargs: Additional keyword arguments.
         """
-        failed = False
-        workflow_commons = None
-        try:
-            # Obtain Workflow Commons
-            workflow_commons = WorkflowCommons.load(job_path)
+        # Obtain Workflow Commons
+        if workflow_commons.step_status == StepStatus.Failed:
+            return
 
-            if workflow_commons.step_status == StepStatus.Failed:
-                return
+        # Setup variables
+        cpu_times: Dict[str, Any] = {}
+        if workflow_commons.start_time:
+            cpu_times["StartTime"] = workflow_commons.start_time
+        if workflow_commons.start_stats:
+            cpu_times["StartStats"] = workflow_commons.start_stats
 
-            # Setup variables
-            cpu_times: Dict[str, Any] = {}
-            if workflow_commons.start_time:
-                cpu_times["StartTime"] = workflow_commons.start_time
-            if workflow_commons.start_stats:
-                cpu_times["StartStats"] = workflow_commons.start_stats
+        exectime, cputime = getStepCPUTimes(cpu_times)
 
-            exectime, cputime = getStepCPUTimes(cpu_times)
+        number_of_processors = getNumberOfProcessorsToUse(
+            workflow_commons.job_id,
+            workflow_commons.max_number_of_processors,
+        )
 
-            number_of_processors = getNumberOfProcessorsToUse(
-                workflow_commons.job_id,
-                workflow_commons.max_number_of_processors,
-            )
+        parameters = {
+            "PRODUCTION_ID": workflow_commons.production_id,
+            "JOB_ID": workflow_commons.prod_job_id,
+            "configVersion": workflow_commons.config_version,
+            "outputList": workflow_commons.outputs,
+            "configName": workflow_commons.config_name,
+            "outputDataFileMask": workflow_commons.output_data_file_mask,
+        }
 
-            parameters = {
-                "PRODUCTION_ID": workflow_commons.production_id,
-                "JOB_ID": workflow_commons.prod_job_id,
-                "configVersion": workflow_commons.config_version,
-                "outputList": workflow_commons.outputs,
-                "configName": workflow_commons.config_name,
-                "outputDataFileMask": workflow_commons.output_data_file_mask,
-            }
+        if workflow_commons.bookkeeping_lfns and workflow_commons.production_output_data:
+            bk_lfns = workflow_commons.bookkeeping_lfns
 
-            if workflow_commons.bookkeeping_lfns and workflow_commons.production_output_data:
-                bk_lfns = workflow_commons.bookkeeping_lfns
+            if not isinstance(bk_lfns, list):
+                bk_lfns = [i.strip() for i in bk_lfns.split(";")]
 
-                if not isinstance(bk_lfns, list):
-                    bk_lfns = [i.strip() for i in bk_lfns.split(";")]
-
-            else:
-                logger.info("BookkeepingLFNs parameters not found, creating on the fly")
-                try:
-                    production_lfns_dict = returnValueOrRaise(
-                        constructProductionLFNs(parameters, workflow_commons.bk_client)
-                    )
-                except SErrorException as e:
-                    logger.error("Could not create production LFNs", exc_info=e)
-                    raise WorkflowProcessingException(f"Could not create production LFNs: {e}") from e
-
-                bk_lfns = production_lfns_dict["BookkeepingLFNs"]
-
-            ldate, ltime, ldatestart, ltimestart = _process_time(workflow_commons.start_time)
-
-            # Obtain XMLSummary
-            if not workflow_commons.xf_o:
-                workflow_commons.xf_o = _generate_xml_object(
-                    workflow_commons.cleaned_application_name,
-                    workflow_commons.production_id,
-                    workflow_commons.prod_job_id,
-                    workflow_commons.step_number,
-                    workflow_commons.step_id,
+        else:
+            logger.info("BookkeepingLFNs parameters not found, creating on the fly")
+            try:
+                production_lfns_dict = returnValueOrRaise(
+                    constructProductionLFNs(parameters, workflow_commons.bk_client)
                 )
+            except SErrorException as e:
+                logger.error("Could not create production LFNs", exc_info=e)
+                raise WorkflowProcessingException(f"Could not create production LFNs: {e}") from e
 
-            info_dict = {
-                "exectime": exectime,
-                "cputime": cputime,
-                "numberOfProcessors": number_of_processors,
-                "production_id": workflow_commons.production_id,
-                "jobID": workflow_commons.job_id,
-                "siteName": workflow_commons.site_name,
-                "jobType": workflow_commons.job_type,
-                "applicationName": workflow_commons.application_name,
-                "applicationVersion": workflow_commons.application_version,
-                "numberOfEvents": workflow_commons.number_of_events,
-            }
+            bk_lfns = production_lfns_dict["BookkeepingLFNs"]
 
-            # Generate job_info object
-            job_info = _prepare_job_info(
-                info_dict,
-                ldatestart,
-                ltimestart,
-                ldate,
-                ltime,
-                workflow_commons.xf_o,
-                workflow_commons.inputs,
+        ldate, ltime, ldatestart, ltimestart = _process_time(workflow_commons.start_time)
+
+        # Obtain XMLSummary
+        if not workflow_commons.xf_o:
+            workflow_commons.xf_o = _generate_xml_object(
+                workflow_commons.cleaned_application_name,
+                workflow_commons.production_id,
+                workflow_commons.prod_job_id,
+                workflow_commons.step_number,
                 workflow_commons.step_id,
-                workflow_commons.bk_step_id,
-                workflow_commons.bk_client,
-                workflow_commons.config_name,
-                workflow_commons.config_version,
             )
 
-            # Add input files to job_info
-            _generateInputFiles(job_info, bk_lfns, workflow_commons.inputs)
+        info_dict = {
+            "exectime": exectime,
+            "cputime": cputime,
+            "numberOfProcessors": number_of_processors,
+            "production_id": workflow_commons.production_id,
+            "jobID": workflow_commons.job_id,
+            "siteName": workflow_commons.site_name,
+            "jobType": workflow_commons.job_type,
+            "applicationName": workflow_commons.application_name,
+            "applicationVersion": workflow_commons.application_version,
+            "numberOfEvents": workflow_commons.number_of_events,
+        }
 
-            # Add output files to job_info
-            _generateOutputFiles(
-                job_info,
-                bk_lfns,
-                workflow_commons.event_type,
-                workflow_commons.application_name,
-                workflow_commons.xf_o,
-                workflow_commons.outputs,
-                workflow_commons.inputs,
-            )
+        # Generate job_info object
+        job_info = _prepare_job_info(
+            info_dict,
+            ldatestart,
+            ltimestart,
+            ldate,
+            ltime,
+            workflow_commons.xf_o,
+            workflow_commons.inputs,
+            workflow_commons.step_id,
+            workflow_commons.bk_step_id,
+            workflow_commons.bk_client,
+            workflow_commons.config_name,
+            workflow_commons.config_version,
+        )
 
-            # Generate SimulationConditions
-            if workflow_commons.application_name == "Gauss":
-                job_info.simulation_condition = workflow_commons.sim_description
+        # Add input files to job_info
+        _generateInputFiles(job_info, bk_lfns, workflow_commons.inputs)
 
-            # Convert job_info object to XML
-            doc = job_info.to_xml()
+        # Add output files to job_info
+        _generateOutputFiles(
+            job_info,
+            bk_lfns,
+            workflow_commons.event_type,
+            workflow_commons.application_name,
+            workflow_commons.xf_o,
+            workflow_commons.outputs,
+            workflow_commons.inputs,
+        )
 
-            # Write to file
-            bfilename = f"bookkeeping_{workflow_commons.step_id}.xml"
-            with open(bfilename, "wb") as bfile:
-                bfile.write(doc)
+        # Generate SimulationConditions
+        if workflow_commons.application_name == "Gauss":
+            job_info.simulation_condition = workflow_commons.sim_description
 
-        except WorkflowProcessingException:
-            failed = True
-            raise
+        # Convert job_info object to XML
+        doc = job_info.to_xml()
 
-        except Exception as e:
-            logger.exception("Exception in BookkeepingReport", exc_info=e)
-
-            failed = True
-            if workflow_commons:
-                workflow_commons.job_report.setApplicationStatus(repr(e))
-
-            raise WorkflowProcessingException(e) from e
-
-        finally:
-            if workflow_commons:
-                workflow_commons.save(job_path, failed=failed)
+        # Write to file
+        bfilename = f"bookkeeping_{workflow_commons.step_id}.xml"
+        with open(bfilename, "wb") as bfile:
+            bfile.write(doc)
