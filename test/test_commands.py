@@ -45,17 +45,23 @@ def wf_commons():
         "job_type": "merge",
         "production_id": "123",
         "prod_job_id": "00000456",
-        "event_type": "123456789",
-        "number_of_events": "100",
-        "config_name": "aConfigName",
-        "config_version": "aConfigVersion",
-        "application_name": "someApp",
-        "application_version": "v1r0",
         "inputs": [],
         "outputs": [],
-        "executable": "",
-        "step_id": "1",
-        "step_number": 1,
+        "config_name": "aConfigName",
+        "config_version": "aConfigVersion",
+        "steps": [
+            {
+                "id": "1",
+                "name": "",
+                "number": 1,
+                "executable": "",
+                "event_type": "123456789",
+                "number_of_events": 100,
+                "application_name": "someApp",
+                "application_version": "v1r0",
+                "inputs": [],
+            }
+        ],
     }
 
     Path(os.path.join(job_path, "workflow_commons.json")).unlink(missing_ok=True)
@@ -66,7 +72,7 @@ def xml_summary_file(wf_commons):
     """XMLSummaryFile file path fixture."""
     path = os.path.join(
         job_path,
-        f"summary{wf_commons['application_name']}_{wf_commons['production_id']}_{wf_commons['prod_job_id']}_{wf_commons['step_id']}.xml",
+        f"summary{wf_commons['steps'][0]['application_name']}_{wf_commons['production_id']}_{wf_commons['prod_job_id']}_{wf_commons['steps'][0]['id']}.xml",
     )
     yield path
     Path(path).unlink(missing_ok=True)
@@ -511,7 +517,7 @@ class TestBookkeepingReport:
     @pytest.fixture
     def bookkeeping_file(self, wf_commons):
         """Bookkeeping report file fixture."""
-        path = os.path.join(job_path, f"bookkeeping_{wf_commons['step_id']}.xml")
+        path = os.path.join(job_path, f"bookkeeping_{wf_commons['steps'][0]['id']}.xml")
         yield path
         Path(path).unlink(missing_ok=True)
 
@@ -533,7 +539,7 @@ class TestBookkeepingReport:
 
     def test_bkreport_prod_mcsimulation_success(self, bk_report, wf_commons, bookkeeping_file, xml_summary_file):
         """Test successful execution of BookkeepingReport module."""
-        wf_commons["application_name"] = "Gauss"
+        wf_commons["steps"][0]["application_name"] = "Gauss"
         wf_commons["job_type"] = "MCSimulation"
 
         wf_commons["bookkeeping_lfns"] = [
@@ -543,13 +549,13 @@ class TestBookkeepingReport:
             "/lhcb/LHCb/Collision16/SIM/00209455/0000/00209455_00001537_1.sim",
         ]
 
-        wf_commons["start_time"] = time.time() - 1000
+        wf_commons["steps"][0]["start_time"] = time.time() - 1000
 
         # Input data should be None as we use Gauss (MCSimulation)
-        wf_commons["outputs"] = [
+        wf_commons["steps"][0]["outputs"] = [
             {"outputDataName": "00209455_00001537_1.sim", "outputDataType": "sim"},
         ]
-        Path(wf_commons["outputs"][0]["outputDataName"]).touch()
+        Path(wf_commons["steps"][0]["outputs"][0]["outputDataName"]).touch()
 
         # Mock the XMLSummary object
         xml_content = dedent("""\
@@ -583,7 +589,7 @@ class TestBookkeepingReport:
             </summary>
             """)
 
-        wf_commons["xml_summary_path"] = xml_summary_file
+        wf_commons["steps"][0]["xml_summary_path"] = xml_summary_file
         xf_o = prepare_XMLSummary_file(xml_summary_file, xml_content)
 
         create_workflow_commons(wf_commons)
@@ -607,15 +613,17 @@ class TestBookkeepingReport:
         assert root.attrib["Date"]
         assert root.attrib["Time"]
 
-        assert get_typed_parameter_value("ProgramName", root) == updated_wf_commons.application_name
-        assert get_typed_parameter_value("ProgramVersion", root) == updated_wf_commons.application_version
+        assert get_typed_parameter_value("ProgramName", root) == updated_wf_commons.steps[0].application_name
+        assert get_typed_parameter_value("ProgramVersion", root) == updated_wf_commons.steps[0].application_version
         assert get_typed_parameter_value("DiracVersion", root) == LHCbDIRAC.__version__
-        assert get_typed_parameter_value("Name", root) == updated_wf_commons.step_id
+        assert get_typed_parameter_value("Name", root) == updated_wf_commons.steps[0].id
         assert float(get_typed_parameter_value("ExecTime", root)) > 1000
         assert get_typed_parameter_value("CPUTIME", root) == "0"
 
         assert get_typed_parameter_value("FirstEventNumber", root) == "1"
-        assert get_typed_parameter_value("StatisticsRequested", root) == str(updated_wf_commons.number_of_events)
+        assert get_typed_parameter_value("StatisticsRequested", root) == str(
+            updated_wf_commons.steps[0].number_of_events
+        )
         assert get_typed_parameter_value("NumberOfEvents", root) == str(xf_o.outputEventsTotal)
 
         assert get_typed_parameter_value("Production", root) == updated_wf_commons.production_id
@@ -662,7 +670,7 @@ class TestBookkeepingReport:
         * Simulation conditions because the application used is Gauss
         """
         # Mock the BookkeepingReport module
-        wf_commons["application_name"] = "Gauss"
+        wf_commons["steps"][0]["application_name"] = "Gauss"
         wf_commons["job_type"] = "MCSimulation"
 
         # This was obtained from a previous module (likely GaudiApplication)
@@ -673,7 +681,7 @@ class TestBookkeepingReport:
             "/lhcb/LHCb/Collision16/SIM/00209455/0000/00209455_00001537_1",
         ]
 
-        wf_commons["start_time"] = time.time() - 1000
+        wf_commons["steps"][0]["start_time"] = time.time() - 1000
 
         # Mock the XMLSummary object
         xml_content = dedent("""\
@@ -707,7 +715,7 @@ class TestBookkeepingReport:
             </summary>
             """)
 
-        wf_commons["xml_summary_path"] = xml_summary_file
+        wf_commons["steps"][0]["xml_summary_path"] = xml_summary_file
         xf_o = prepare_XMLSummary_file(xml_summary_file, xml_content)
 
         create_workflow_commons(wf_commons)
@@ -732,15 +740,17 @@ class TestBookkeepingReport:
         assert root.attrib["Date"]
         assert root.attrib["Time"]
 
-        assert get_typed_parameter_value("ProgramName", root) == updated_wf_commons.application_name
-        assert get_typed_parameter_value("ProgramVersion", root) == updated_wf_commons.application_version
+        assert get_typed_parameter_value("ProgramName", root) == updated_wf_commons.steps[0].application_name
+        assert get_typed_parameter_value("ProgramVersion", root) == updated_wf_commons.steps[0].application_version
         assert get_typed_parameter_value("DiracVersion", root) == LHCbDIRAC.__version__
-        assert get_typed_parameter_value("Name", root) == updated_wf_commons.step_id
+        assert get_typed_parameter_value("Name", root) == updated_wf_commons.steps[0].id
         assert float(get_typed_parameter_value("ExecTime", root)) > 1000
         assert get_typed_parameter_value("CPUTIME", root) == "0"
 
         assert get_typed_parameter_value("FirstEventNumber", root) == "1"
-        assert get_typed_parameter_value("StatisticsRequested", root) == str(updated_wf_commons.number_of_events)
+        assert get_typed_parameter_value("StatisticsRequested", root) == str(
+            updated_wf_commons.steps[0].number_of_events
+        )
         assert get_typed_parameter_value("NumberOfEvents", root) == str(xf_o.outputEventsTotal)
 
         assert get_typed_parameter_value("Production", root) == updated_wf_commons.production_id
@@ -768,7 +778,7 @@ class TestBookkeepingReport:
 
     def test_bk_report_prod_mcreconstruction_success(self, bk_report, wf_commons, bookkeeping_file, xml_summary_file):
         """Test successful execution of BookkeepingReport module."""
-        wf_commons["application_name"] = "Boole"
+        wf_commons["steps"][0]["application_name"] = "Boole"
         wf_commons["job_type"] = "MCReconstruction"
 
         wf_commons["bookkeeping_lfns"] = [
@@ -779,15 +789,15 @@ class TestBookkeepingReport:
             "/lhcb/LHCb/Collision16/SIM/00209455/0000/00209455_00001537_1",
         ]
 
-        wf_commons["start_time"] = time.time() - 1000
+        wf_commons["steps"][0]["start_time"] = time.time() - 1000
 
-        wf_commons["inputs"] = ["/lhcb/MC/2018/SIM/00212581/0000/00212581_00001446_1.sim"]
-        wf_commons["outputs"] = [
+        wf_commons["steps"][0]["inputs"] = ["/lhcb/MC/2018/SIM/00212581/0000/00212581_00001446_1.sim"]
+        wf_commons["steps"][0]["outputs"] = [
             {"outputDataName": "00209455_00001537_1", "outputDataType": "digi"},
         ]
-        wf_commons["application_log"] = "application.log"
-        Path(wf_commons["application_log"]).touch()
-        Path(wf_commons["outputs"][0]["outputDataName"]).touch()
+        wf_commons["steps"][0]["application_log"] = "application.log"
+        Path(wf_commons["steps"][0]["application_log"]).touch()
+        Path(wf_commons["steps"][0]["outputs"][0]["outputDataName"]).touch()
 
         # Mock the XMLSummary object
         xml_content = dedent("""\
@@ -810,7 +820,7 @@ class TestBookkeepingReport:
             </summary>
             """)
 
-        wf_commons["xml_summary_path"] = xml_summary_file
+        wf_commons["steps"][0]["xml_summary_path"] = xml_summary_file
 
         xf_o = prepare_XMLSummary_file(xml_summary_file, xml_content)
 
@@ -836,15 +846,17 @@ class TestBookkeepingReport:
         assert root.attrib["Date"]
         assert root.attrib["Time"]
 
-        assert get_typed_parameter_value("ProgramName", root) == updated_wf_commons.application_name
-        assert get_typed_parameter_value("ProgramVersion", root) == updated_wf_commons.application_version
+        assert get_typed_parameter_value("ProgramName", root) == updated_wf_commons.steps[0].application_name
+        assert get_typed_parameter_value("ProgramVersion", root) == updated_wf_commons.steps[0].application_version
         assert get_typed_parameter_value("DiracVersion", root) == LHCbDIRAC.__version__
-        assert get_typed_parameter_value("Name", root) == updated_wf_commons.step_id
+        assert get_typed_parameter_value("Name", root) == updated_wf_commons.steps[0].id
         assert float(get_typed_parameter_value("ExecTime", root)) > 1000
         assert get_typed_parameter_value("CPUTIME", root) == "0"
 
         assert get_typed_parameter_value("FirstEventNumber", root) == "1"
-        assert get_typed_parameter_value("StatisticsRequested", root) == str(updated_wf_commons.number_of_events)
+        assert get_typed_parameter_value("StatisticsRequested", root) == str(
+            updated_wf_commons.steps[0].number_of_events
+        )
         assert get_typed_parameter_value("NumberOfEvents", root) == str(xf_o.inputEventsTotal)
 
         assert get_typed_parameter_value("Production", root) == updated_wf_commons.production_id
@@ -886,8 +898,8 @@ class TestBookkeepingReport:
 
     def test_bkreport_previousError_success(self, mocker: MockerFixture, bk_report, wf_commons, bookkeeping_file):
         """Test previous command failure."""
-        wf_commons["application_name"] = "Gauss"
-        wf_commons["application_version"] = wf_commons["config_version"]
+        wf_commons["steps"][0]["application_name"] = "Gauss"
+        wf_commons["steps"][0]["application_version"] = wf_commons["config_version"]
         wf_commons["job_type"] = "MCSimulation"
         wf_commons["step_status"] = StepStatus.Failed
 
@@ -1213,7 +1225,7 @@ class TestUploadOutputDataFile:
             {"outputDataName": sim_file, "outputDataType": "sim", "outputBKType": "SIM", "stepName": "Gauss_1"}
         ]
         wf_commons["output_SEs"] = {
-            "SIM": "Tier1-Buffer",
+            "SIM": ["Tier1-Buffer"],
         }
         wf_commons["output_data_step"] = self.OUTPUT_DATA_STEP
 
@@ -1282,7 +1294,7 @@ class TestUploadOutputDataFile:
             {"outputDataName": sim_file, "outputDataType": "sim", "outputBKType": "SIM", "stepName": "Gauss_1"}
         ]
         wf_commons["output_SEs"] = {
-            "SIM": "Tier1-Buffer",
+            "SIM": ["Tier1-Buffer"],
         }
         wf_commons["output_data_step"] = self.OUTPUT_DATA_STEP
 
@@ -1355,7 +1367,7 @@ class TestUploadOutputDataFile:
             {"outputDataName": sim_file, "outputDataType": "sim", "outputBKType": "SIM", "stepName": "Gauss_1"}
         ]
         wf_commons["output_SEs"] = {
-            "SIM": "Tier1-Buffer",
+            "SIM": ["Tier1-Buffer"],
         }
         wf_commons["output_data_step"] = self.OUTPUT_DATA_STEP
 
@@ -1425,7 +1437,7 @@ class TestUploadOutputDataFile:
             {"outputDataName": sim_file, "outputDataType": "sim", "outputBKType": "SIM", "stepName": "Gauss_1"}
         ]
         wf_commons["output_SEs"] = {
-            "SIM": "Tier1-Buffer",
+            "SIM": ["Tier1-Buffer"],
         }
         wf_commons["output_data_step"] = self.OUTPUT_DATA_STEP
 
@@ -1487,7 +1499,7 @@ class TestUploadOutputDataFile:
             {"outputDataName": sim_file, "outputDataType": "sim", "outputBKType": "SIM", "stepName": "Gauss_1"}
         ]
         wf_commons["output_SEs"] = {
-            "SIM": "Tier1-Buffer",
+            "SIM": ["Tier1-Buffer"],
         }
         wf_commons["output_data_step"] = self.OUTPUT_DATA_STEP
 
@@ -1567,7 +1579,7 @@ class TestUploadOutputDataFile:
             {"outputDataName": sim_file, "outputDataType": "sim", "outputBKType": "SIM", "stepName": "Gauss_1"}
         ]
         wf_commons["output_SEs"] = {
-            "SIM": "Tier1-Buffer",
+            "SIM": ["Tier1-Buffer"],
         }
         wf_commons["output_data_step"] = self.OUTPUT_DATA_STEP
 
@@ -1634,7 +1646,7 @@ class TestUploadOutputDataFile:
             {"outputDataName": sim_file, "outputDataType": "sim", "outputBKType": "SIM", "stepName": "Gauss_1"}
         ]
         wf_commons["output_SEs"] = {
-            "SIM": "Tier1-Buffer",
+            "SIM": ["Tier1-Buffer"],
         }
         wf_commons["output_data_step"] = self.OUTPUT_DATA_STEP
 
@@ -1697,7 +1709,7 @@ class TestUploadOutputDataFile:
             {"outputDataName": sim_file, "outputDataType": "sim", "outputBKType": "SIM", "stepName": "Gauss_1"}
         ]
         wf_commons["output_SEs"] = {
-            "SIM": "Tier1-Buffer",
+            "SIM": ["Tier1-Buffer"],
         }
         wf_commons["inputs"] = ["AnyInputFile1"]
         wf_commons["output_data_step"] = self.OUTPUT_DATA_STEP
@@ -1746,7 +1758,7 @@ class TestUploadOutputDataFile:
             {"outputDataName": sim_file, "outputDataType": "sim", "outputBKType": "SIM", "stepName": "Gauss_1"}
         ]
         wf_commons["output_SEs"] = {
-            "SIM": "Tier1-Buffer",
+            "SIM": ["Tier1-Buffer"],
         }
         wf_commons["output_data_step"] = self.OUTPUT_DATA_STEP
 
@@ -1796,7 +1808,7 @@ class TestUploadOutputDataFile:
             {"outputDataName": sim_file, "outputDataType": "sim", "outputBKType": "SIM", "stepName": "Gauss_1"}
         ]
         wf_commons["output_SEs"] = {
-            "SIM": "Tier1-Buffer",
+            "SIM": ["Tier1-Buffer"],
         }
         wf_commons["output_data_step"] = self.OUTPUT_DATA_STEP
 
@@ -1858,8 +1870,8 @@ class TestAnalyseXmlSummary:
             """)
 
         xf_o = prepare_XMLSummary_file(xml_summary_file, xml_content)
-        wf_commons["xml_summary_path"] = xml_summary_file
-        wf_commons["number_of_events"] = -1
+        wf_commons["steps"][0]["xml_summary_path"] = xml_summary_file
+        wf_commons["steps"][0]["number_of_events"] = -1
 
         assert xf_o.success == "True"
         assert xf_o.step == "finalize"
@@ -1900,9 +1912,9 @@ class TestAnalyseXmlSummary:
             """)
 
         xf_o = prepare_XMLSummary_file(xml_summary_file, xml_content)
-        wf_commons["xml_summary_path"] = xml_summary_file
+        wf_commons["steps"][0]["xml_summary_path"] = xml_summary_file
         wf_commons["step_status"] = StepStatus.Failed
-        wf_commons["number_of_events"] = -1
+        wf_commons["steps"][0]["number_of_events"] = -1
 
         assert xf_o.success == "True"
         assert xf_o.step == "finalize"
@@ -1945,8 +1957,8 @@ class TestAnalyseXmlSummary:
             """)
 
         xf_o = prepare_XMLSummary_file(xml_summary_file, xml_content)
-        wf_commons["xml_summary_path"] = xml_summary_file
-        wf_commons["number_of_events"] = -1
+        wf_commons["steps"][0]["xml_summary_path"] = xml_summary_file
+        wf_commons["steps"][0]["number_of_events"] = -1
 
         assert xf_o.success == "True"
         assert xf_o.step == "finalize"
@@ -1987,9 +1999,9 @@ class TestAnalyseXmlSummary:
             </summary>
             """)
         xf_o = prepare_XMLSummary_file(xml_summary_file, xml_content)
-        wf_commons["xml_summary_path"] = xml_summary_file
-        wf_commons["inputs"] = ["00012478_00000532_1.sim"]
-        wf_commons["number_of_events"] = 1
+        wf_commons["steps"][0]["xml_summary_path"] = xml_summary_file
+        wf_commons["steps"][0]["inputs"] = ["00012478_00000532_1.sim"]
+        wf_commons["steps"][0]["number_of_events"] = 1
 
         assert xf_o.success == "True"
         assert xf_o.step == "finalize"
@@ -2030,8 +2042,8 @@ class TestAnalyseXmlSummary:
             """)
 
         xf_o = prepare_XMLSummary_file(xml_summary_file, xml_content)
-        wf_commons["xml_summary_path"] = xml_summary_file
-        wf_commons["number_of_events"] = -1
+        wf_commons["steps"][0]["xml_summary_path"] = xml_summary_file
+        wf_commons["steps"][0]["number_of_events"] = -1
 
         assert xf_o.success == "False"
         assert xf_o.step == "finalize"
@@ -2073,8 +2085,8 @@ class TestAnalyseXmlSummary:
             """)
 
         xf_o = prepare_XMLSummary_file(xml_summary_file, xml_content)
-        wf_commons["xml_summary_path"] = xml_summary_file
-        wf_commons["number_of_events"] = -1
+        wf_commons["steps"][0]["xml_summary_path"] = xml_summary_file
+        wf_commons["steps"][0]["number_of_events"] = -1
 
         assert xf_o.success == "True"
         assert xf_o.step == "execute"
@@ -2116,8 +2128,8 @@ class TestAnalyseXmlSummary:
             """)
 
         xf_o = prepare_XMLSummary_file(xml_summary_file, xml_content)
-        wf_commons["xml_summary_path"] = xml_summary_file
-        wf_commons["number_of_events"] = -1
+        wf_commons["steps"][0]["xml_summary_path"] = xml_summary_file
+        wf_commons["steps"][0]["number_of_events"] = -1
 
         assert xf_o.success == "True"
         assert xf_o.step == "finalize"
@@ -2159,8 +2171,8 @@ class TestAnalyseXmlSummary:
             """)
 
         xf_o = prepare_XMLSummary_file(xml_summary_file, xml_content)
-        wf_commons["xml_summary_path"] = xml_summary_file
-        wf_commons["number_of_events"] = -1
+        wf_commons["steps"][0]["xml_summary_path"] = xml_summary_file
+        wf_commons["steps"][0]["number_of_events"] = -1
 
         assert xf_o.success == "True"
         assert xf_o.step == "finalize"
@@ -2202,8 +2214,8 @@ class TestAnalyseXmlSummary:
             """)
 
         xf_o = prepare_XMLSummary_file(xml_summary_file, xml_content)
-        wf_commons["xml_summary_path"] = xml_summary_file
-        wf_commons["number_of_events"] = -1
+        wf_commons["steps"][0]["xml_summary_path"] = xml_summary_file
+        wf_commons["steps"][0]["number_of_events"] = -1
 
         assert xf_o.success == "True"
         assert xf_o.step == "finalize"
@@ -2247,9 +2259,9 @@ class TestAnalyseXmlSummary:
             """)
 
         xf_o = prepare_XMLSummary_file(xml_summary_file, xml_content)
-        wf_commons["xml_summary_path"] = xml_summary_file
-        wf_commons["inputs"] = ["00012478_00000532_1.sim"]
-        wf_commons["number_of_events"] = -1
+        wf_commons["steps"][0]["xml_summary_path"] = xml_summary_file
+        wf_commons["steps"][0]["inputs"] = ["00012478_00000532_1.sim"]
+        wf_commons["steps"][0]["number_of_events"] = -1
 
         assert xf_o.success == "True"
         assert xf_o.step == "finalize"
@@ -2296,9 +2308,9 @@ class TestAnalyseXmlSummary:
             """)
 
         xf_o = prepare_XMLSummary_file(xml_summary_file, xml_content)
-        wf_commons["xml_summary_path"] = xml_summary_file
-        wf_commons["inputs"] = ["00012478_00000532_1.sim"]
-        wf_commons["number_of_events"] = -1
+        wf_commons["steps"][0]["xml_summary_path"] = xml_summary_file
+        wf_commons["steps"][0]["inputs"] = ["00012478_00000532_1.sim"]
+        wf_commons["steps"][0]["number_of_events"] = -1
 
         assert xf_o.success == "True"
         assert xf_o.step == "finalize"
@@ -2332,7 +2344,7 @@ class TestWorkflowAccounting:
         """Test successful execution of WorkflowAccounting module."""
         mock_addRegister = mocker.patch("DIRAC.AccountingSystem.Client.DataStoreClient.DataStoreClient.addRegister")
 
-        wf_commons["application_name"] = "Gauss"
+        wf_commons["steps"][0]["application_name"] = "Gauss"
         xml_content = dedent("""<?xml version="1.0" encoding="UTF-8"?>
             <summary version="1.0" xsi:noNamespaceSchemaLocation="$XMLSUMMARYBASEROOT/xml/XMLSummary.xsd"
             xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
@@ -2354,10 +2366,10 @@ class TestWorkflowAccounting:
 
         prepare_XMLSummary_file(xml_summary_file, xml_content)
 
-        wf_commons["xml_summary_path"] = xml_summary_file
-        wf_commons["bk_step_id"] = "12345"
-        wf_commons["step_proc_pass"] = "Sim09m"
-        wf_commons["event_type"] = "23103003"
+        wf_commons["steps"][0]["xml_summary_path"] = xml_summary_file
+        wf_commons["steps"][0]["bk_id"] = "12345"
+        wf_commons["steps"][0]["proc_pass"] = "Sim09m"
+        wf_commons["steps"][0]["event_type"] = "23103003"
 
         create_workflow_commons(wf_commons)
 
@@ -2393,20 +2405,19 @@ class TestWorkflowAccounting:
 
         prepare_XMLSummary_file(xml_summary_file, xml_content)
 
-        wf_commons.pop("application_name")
-        wf_commons["xml_summary_path"] = xml_summary_file
+        wf_commons["steps"][0]["application_name"] = None
+        wf_commons["steps"][0]["xml_summary_path"] = xml_summary_file
 
         create_workflow_commons(wf_commons)
 
-        with pytest.raises(WorkflowProcessingException):
-            accounting.execute(job_path)
+        accounting.execute(job_path)
 
         WorkflowCommons.load(job_path)
 
         # Make sure the dsc was not called
         assert mock_addRegister.assert_not_called
 
-    def test_accounting_incompleteData(self, mocker: MockerFixture, accounting, wf_commons, xml_summary_file):
+    def test_accounting_incompleteData_success(self, mocker: MockerFixture, accounting, wf_commons, xml_summary_file):
         """Test successful execution of WorkflowAccounting module."""
         mock_addRegister = mocker.patch("DIRAC.AccountingSystem.Client.DataStoreClient.DataStoreClient.addRegister")
 
@@ -2431,13 +2442,12 @@ class TestWorkflowAccounting:
 
         prepare_XMLSummary_file(xml_summary_file, xml_content)
 
-        wf_commons["xml_summary_path"] = xml_summary_file
-        wf_commons["application_name"] = "Gauss"
+        wf_commons["steps"][0]["xml_summary_path"] = xml_summary_file
+        wf_commons["steps"][0]["application_name"] = "Gauss"
 
         create_workflow_commons(wf_commons)
 
-        with pytest.raises(WorkflowProcessingException):
-            accounting.execute(job_path)
+        accounting.execute(job_path)
 
         WorkflowCommons.load(job_path)
 
@@ -2469,11 +2479,11 @@ class TestWorkflowAccounting:
 
         prepare_XMLSummary_file(xml_summary_file, xml_content)
 
-        wf_commons["xml_summary_path"] = xml_summary_file
-        wf_commons["application_name"] = "Gauss"
-        wf_commons["bk_step_id"] = "12345"
-        wf_commons["step_proc_pass"] = "Sim09m"
-        wf_commons["event_type"] = "23103003"
+        wf_commons["steps"][0]["xml_summary_path"] = xml_summary_file
+        wf_commons["steps"][0]["application_name"] = "Gauss"
+        wf_commons["steps"][0]["bk_id"] = "12345"
+        wf_commons["steps"][0]["proc_pass"] = "Sim09m"
+        wf_commons["steps"][0]["event_type"] = "23103003"
         wf_commons["step_status"] = StepStatus.Failed
 
         create_workflow_commons(wf_commons)

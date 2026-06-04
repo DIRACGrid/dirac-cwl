@@ -1,5 +1,6 @@
 """LHCb command for bookkeeping report file generation based on the XMLSummary and the XML catalog."""
 
+import copy
 import logging
 import os
 from typing import Any, Dict
@@ -19,7 +20,7 @@ from LHCbDIRAC.Workflow.Modules.ModulesUtilities import getNumberOfProcessorsToU
 from dirac_cwl.core.exceptions import WorkflowProcessingException
 
 from .core import PostProcessCommand
-from .workflow_commons import StepStatus, WorkflowCommons
+from .workflow_commons import Step, StepStatus, WorkflowCommons
 
 logger = logging.getLogger(__name__)
 
@@ -34,29 +35,40 @@ class BookkeepingReport(PostProcessCommand):
         :param workflow_commons: WorkflowCommons object
         :param kwargs: Additional keyword arguments.
         """
-        # Obtain Workflow Commons
-        if workflow_commons.step_status == StepStatus.Failed:
-            return
+        for step in workflow_commons.steps:
+            if workflow_commons.step_status == StepStatus.Failed:
+                return
 
+            self._execute_for_step(job_path, workflow_commons, step, **kwargs)
+
+    def _execute_for_step(self, job_path: os.PathLike, workflow_commons: WorkflowCommons, step_commons: Step, **kwargs):
         # Setup variables
         cpu_times: Dict[str, Any] = {}
-        if workflow_commons.start_time:
-            cpu_times["StartTime"] = workflow_commons.start_time
-        if workflow_commons.start_stats:
-            cpu_times["StartStats"] = workflow_commons.start_stats
+        if step_commons.start_time:
+            cpu_times["StartTime"] = step_commons.start_time
+        if step_commons.start_stats:
+            cpu_times["StartStats"] = step_commons.start_stats
 
         exectime, cputime = getStepCPUTimes(cpu_times)
 
-        number_of_processors = getNumberOfProcessorsToUse(
-            workflow_commons.job_id,
-            workflow_commons.max_number_of_processors,
-        )
+        number_of_processors = workflow_commons.number_of_processors
+
+        if (step_commons.multicore and workflow_commons.multicore) or (
+            workflow_commons.job_type.lower() == "user" and workflow_commons.max_number_of_processors
+        ):
+            number_of_processors = getNumberOfProcessorsToUse(
+                workflow_commons.job_id,
+                workflow_commons.max_number_of_processors,
+            )
+
+        all_outputs = copy.deepcopy(step_commons.outputs)
+        all_outputs.extend(step_commons.outputs)
 
         parameters = {
             "PRODUCTION_ID": workflow_commons.production_id,
             "JOB_ID": workflow_commons.prod_job_id,
             "configVersion": workflow_commons.config_version,
-            "outputList": workflow_commons.outputs,
+            "outputList": all_outputs,
             "configName": workflow_commons.config_name,
             "outputDataFileMask": workflow_commons.output_data_file_mask,
         }
@@ -79,16 +91,16 @@ class BookkeepingReport(PostProcessCommand):
 
             bk_lfns = production_lfns_dict["BookkeepingLFNs"]
 
-        ldate, ltime, ldatestart, ltimestart = _process_time(workflow_commons.start_time)
+        ldate, ltime, ldatestart, ltimestart = _process_time(step_commons.start_time)
 
         # Obtain XMLSummary
-        if not workflow_commons.xf_o:
-            workflow_commons.xf_o = _generate_xml_object(
-                workflow_commons.cleaned_application_name,
+        if not step_commons.xf_o:
+            step_commons.xf_o = _generate_xml_object(
+                step_commons.cleaned_application_name,
                 workflow_commons.production_id,
                 workflow_commons.prod_job_id,
-                workflow_commons.step_number,
-                workflow_commons.step_id,
+                step_commons.number,
+                step_commons.id,
             )
 
         info_dict = {
@@ -99,9 +111,9 @@ class BookkeepingReport(PostProcessCommand):
             "jobID": workflow_commons.job_id,
             "siteName": workflow_commons.site_name,
             "jobType": workflow_commons.job_type,
-            "applicationName": workflow_commons.application_name,
-            "applicationVersion": workflow_commons.application_version,
-            "numberOfEvents": workflow_commons.number_of_events,
+            "applicationName": step_commons.application_name,
+            "applicationVersion": step_commons.application_version,
+            "numberOfEvents": step_commons.number_of_events,
         }
 
         # Generate job_info object
@@ -111,37 +123,40 @@ class BookkeepingReport(PostProcessCommand):
             ltimestart,
             ldate,
             ltime,
-            workflow_commons.xf_o,
-            workflow_commons.inputs,
-            workflow_commons.step_id,
-            workflow_commons.bk_step_id,
+            step_commons.xf_o,
+            step_commons.inputs,
+            step_commons.id,
+            step_commons.bk_id,
             workflow_commons.bk_client,
             workflow_commons.config_name,
             workflow_commons.config_version,
         )
 
         # Add input files to job_info
-        _generateInputFiles(job_info, bk_lfns, workflow_commons.inputs)
+        _generateInputFiles(job_info, bk_lfns, step_commons.inputs)
 
         # Add output files to job_info
         _generateOutputFiles(
             job_info,
             bk_lfns,
-            workflow_commons.event_type,
-            workflow_commons.application_name,
-            workflow_commons.xf_o,
-            workflow_commons.outputs,
-            workflow_commons.inputs,
+            step_commons.event_type,
+            step_commons.application_name,
+            step_commons.xf_o,
+            step_commons.outputs,
+            step_commons.inputs,
+            step_commons.size,
+            step_commons.md5,
+            step_commons.guid,
         )
 
         # Generate SimulationConditions
-        if workflow_commons.application_name == "Gauss":
+        if step_commons.application_name == "Gauss":
             job_info.simulation_condition = workflow_commons.sim_description
 
         # Convert job_info object to XML
         doc = job_info.to_xml()
 
         # Write to file
-        bfilename = f"bookkeeping_{workflow_commons.step_id}.xml"
+        bfilename = f"bookkeeping_{step_commons.id}.xml"
         with open(bfilename, "wb") as bfile:
             bfile.write(doc)

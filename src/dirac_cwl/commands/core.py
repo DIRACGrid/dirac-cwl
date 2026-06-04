@@ -29,7 +29,7 @@ class CommandBase(ABC):
         workflow_commons = None
         try:
             workflow_commons = WorkflowCommons.load(job_path)
-
+            logger.info("WorkflowCommons:\n%s", workflow_commons)
             self._execute(job_path, workflow_commons, **kwargs)
 
         except WorkflowProcessingException:
