@@ -264,7 +264,7 @@ class WorkflowCommons(BaseModel):
         """DataStoreClient property getter."""
         return self._dsc
 
-    def generateFailoverFile(self):
+    def generate_failover_file(self):
         """Create a request.json file."""
         try:
             diset_op = returnValueOrRaise(self.job_report.generateForwardDISET())

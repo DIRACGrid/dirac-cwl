@@ -47,8 +47,8 @@ class WorkflowAccounting(PostProcessCommand):
 
         exec_time, cpu_time = getStepCPUTimes(cpu_times)
 
-        cpuNormFactor = gConfig.getValue("/LocalSite/CPUNormalizationFactor", 0.0)
-        normCPU = cpu_time * cpuNormFactor
+        cpu_norm_factor = gConfig.getValue("/LocalSite/CPUNormalizationFactor", 0.0)
+        norm_cpu = cpu_time * cpu_norm_factor
 
         job_step = JobStep()
 
@@ -62,7 +62,7 @@ class WorkflowAccounting(PostProcessCommand):
         job_step.setStartTime(now)
         job_step.setEndTime(now)
 
-        dataDict = {
+        data_dict = {
             "JobGroup": str(workflow_commons.production_id),
             "RunNumber": workflow_commons.run_number,
             "EventType": step_commons.event_type,
@@ -71,7 +71,7 @@ class WorkflowAccounting(PostProcessCommand):
             "Site": workflow_commons.site_name,
             "FinalStepState": workflow_commons.step_status,
             "CPUTime": cpu_time,
-            "NormCPUTime": normCPU,
+            "NormCPUTime": norm_cpu,
             "ExecTime": exec_time * workflow_commons.number_of_processors,
             "InputData": sum(xf_o.inputFileStats.values()),
             "OutputData": sum(xf_o.outputFileStats.values()),
@@ -79,14 +79,14 @@ class WorkflowAccounting(PostProcessCommand):
             "OutputEvents": xf_o.outputEventsTotal,
         }
 
-        job_step.setValuesFromDict(dataDict)
+        job_step.setValuesFromDict(data_dict)
 
         try:
             returnValueOrRaise(job_step.checkValues())
         except SErrorException as e:
-            logger.error("Values for StepAccounting are wrong: Here are the given data: %s", dataDict, exc_info=e)
+            logger.error("Values for StepAccounting are wrong: Here are the given data: %s", data_dict, exc_info=e)
             raise WorkflowProcessingException(
-                f"Values for StepAccounting are wrong. Here are the given data: {dataDict}"
+                f"Values for StepAccounting are wrong. Here are the given data: {data_dict}"
             ) from e
 
         workflow_commons.dsc.addRegister(job_step)

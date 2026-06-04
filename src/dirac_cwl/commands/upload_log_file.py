@@ -88,19 +88,19 @@ class UploadLogFile(PostProcessCommand):
         logger.info("Determining the files to be saved in the logs.")
 
         try:
-            selectedFiles = returnValueOrRaise(_determineRelevantFiles(log_extensions))
+            selected_files = returnValueOrRaise(_determineRelevantFiles(log_extensions))
         except SErrorException as e:
             logger.error("Completely failed to select relevant log files.", exc_info=e)
             return  # Does not fail
 
-        logger.info("The following files were selected to be saved\n%s", selectedFiles)
+        logger.info("The following files were selected to be saved\n%s", selected_files)
 
         #########################################
         # Create a temporary directory containing these files
         logger.info("Determining the files to be saved in the logs.")
 
         try:
-            returnValueOrRaise(_populateLogDirectory(selectedFiles, workflow_commons.log_dir))
+            returnValueOrRaise(_populateLogDirectory(selected_files, workflow_commons.log_dir))
         except SErrorException as e:
             logger.error("Completely failed to populate temporary log file directory.", stack_info=e)
             workflow_commons.job_report.setApplicationStatus("Failed To Populate Log Dir")
@@ -117,7 +117,7 @@ class UploadLogFile(PostProcessCommand):
 
         # zip all files
         try:
-            zip_file_name = returnValueOrRaise(_zip_files(workflow_commons.prod_job_id, selectedFiles))
+            zip_file_name = returnValueOrRaise(_zip_files(workflow_commons.prod_job_id, selected_files))
         except SErrorException as e:
             logger.error("Failed to create zip of log files %s", e)
             workflow_commons.job_report.setApplicationStatus("Failed to create zip of log files")
@@ -127,13 +127,13 @@ class UploadLogFile(PostProcessCommand):
 
         # logFilePath is something like /lhcb/MC/2016/LOG/00095376/0000/
         # the zipFileName should have the same name, e.g. 00000381.zip
-        zipPath = os.path.join(workflow_commons.log_file_path, zip_file_name)
-        log_https_url = _get_log_url(log_se, zipPath)
+        zip_path = os.path.join(workflow_commons.log_file_path, zip_file_name)
+        log_https_url = _get_log_url(log_se, zip_path)
 
         logger.info("putFile %s to %s", zip_file_name, log_se)
 
         try:
-            returnValueOrRaise(returnSingleResult(StorageElement(log_se).putFile({zipPath: zip_file_name})))
+            returnValueOrRaise(returnSingleResult(StorageElement(log_se).putFile({zip_path: zip_file_name})))
             logger.info("Successfully upload log file to %s", log_se)
             logger.info("Logs for this job may be retrieved from %s", log_https_url)
 

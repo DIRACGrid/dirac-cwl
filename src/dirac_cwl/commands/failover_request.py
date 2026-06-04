@@ -30,10 +30,10 @@ class FailoverRequest(PostProcessCommand):
         """
         _prepareRequest(workflow_commons.request, workflow_commons.job_id)
 
-        filesInFileReport = workflow_commons.file_report.getFiles()
+        files_in_file_report = workflow_commons.file_report.getFiles()
 
         for lfn in workflow_commons.inputs:
-            if lfn not in filesInFileReport:
+            if lfn not in files_in_file_report:
                 status = "Processed" if workflow_commons.step_status == StepStatus.Done else "Unused"
                 if status == "Unused":
                     logger.info("Set status of %s to 'Unused' due to workflow failure", lfn)
@@ -68,4 +68,4 @@ class FailoverRequest(PostProcessCommand):
         if workflow_commons.step_status == StepStatus.Done:
             workflow_commons.job_report.setApplicationStatus("Job Finished Successfully", True)
 
-        workflow_commons.generateFailoverFile()
+        workflow_commons.generate_failover_file()

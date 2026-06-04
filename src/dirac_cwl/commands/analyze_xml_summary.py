@@ -28,17 +28,17 @@ class AnalyseXmlSummary(PostProcessCommand):
 
     def _execute_for_step(self, job_path: os.PathLike, workflow_commons: WorkflowCommons, step_commons: Step, **kwargs):
         """Execute the command for a specific step."""
-        jobOk = _isXMLSummaryOK(step_commons.xf_o)
+        job_ok = _isXMLSummaryOK(step_commons.xf_o)
 
-        if jobOk:
-            jobOk = _areInputsOK(
+        if job_ok:
+            job_ok = _areInputsOK(
                 step_commons.xf_o,
                 step_commons.inputs,
                 step_commons.number_of_events,
                 workflow_commons.production_id,
                 workflow_commons.file_report,
             )
-        if not jobOk:
+        if not job_ok:
             workflow_commons.job_report.setApplicationStatus("XMLSummary reports error")
             raise WorkflowProcessingException("XMLSummary reports error")
 

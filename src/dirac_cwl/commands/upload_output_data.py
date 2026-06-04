@@ -80,8 +80,8 @@ class UploadOutputData(PostProcessCommand):
         )
         logger.info("The following files will be uploaded: %s", ", ".join(final))
 
-        for fileName, metadata in final.items():
-            logger.info("--------%s--------", fileName)
+        for file_name, metadata in final.items():
+            logger.info("--------%s--------", file_name)
             for name, val in metadata.items():
                 logger.info("%s = %s", name, val)
 
@@ -110,20 +110,20 @@ class UploadOutputData(PostProcessCommand):
                 )
                 raise WorkflowProcessingException("Input Data Already Processed")
 
-        bkFiles = _getBKFiles()
-        logger.info("The following BK records will be sent\n%s", ", ".join(bkFiles))
+        bk_files = _getBKFiles()
+        logger.info("The following BK records will be sent\n%s", ", ".join(bk_files))
 
-        for bkFile in bkFiles:
-            with open(bkFile) as fd:
+        for bk_file in bk_files:
+            with open(bk_file) as fd:
                 bkXML = fd.read()
 
             logger.info("Sending BK record:\n%s", bkXML)
             try:
                 returnValueOrRaise(_sendBKReport(workflow_commons.bk_client, workflow_commons.request, bkXML))
-                logger.info("Bookkeeping report sent for %s", bkFile)
+                logger.info("Bookkeeping report sent for %s", bk_file)
             except SErrorException as e:
                 logger.error("Could not send Bookkeeping XML file to server:\n%s", e)
-                logger.info("Preparing DISET request for %s", bkFile)
+                logger.info("Preparing DISET request for %s", bk_file)
 
         logger.info("Creating DISABLE_WATCHDOG_CPU_WALLCLOCK_CHECK in order to disable the Watchdog")
         with open("DISABLE_WATCHDOG_CPU_WALLCLOCK_CHECK", "w") as f:
@@ -135,7 +135,7 @@ class UploadOutputData(PostProcessCommand):
         for file_name, metadata in final.items():
             targetSE = metadata["resolvedSE"]
 
-            logger.info("Attempting to store file to SE %s to the following SE(s):\n%s", fileName, ", ".join(targetSE))
+            logger.info("Attempting to store file to SE %s to the following SE(s):\n%s", file_name, ", ".join(targetSE))
 
             file_meta_dict = _createMetaDict(metadata)
 
@@ -151,10 +151,10 @@ class UploadOutputData(PostProcessCommand):
                     )
                 )
                 perform_bk_registration.append(metadata)
-                logger.info("File uploaded, will be registered in BK if all files uploaded for job %s", fileName)
+                logger.info("File uploaded, will be registered in BK if all files uploaded for job %s", file_name)
 
             except SErrorException:
-                logger.error("Could not transfer and register %s with metadata:\n %s", fileName, metadata)
+                logger.error("Could not transfer and register %s with metadata:\n %s", file_name, metadata)
                 failover[file_name] = metadata
 
         clean_up = False
@@ -179,7 +179,7 @@ class UploadOutputData(PostProcessCommand):
                     )
                 )
             except SErrorException:
-                logger.error("Could not transfer and register %s in failover with metadata:\n %s", fileName, metadata)
+                logger.error("Could not transfer and register %s in failover with metadata:\n %s", file_name, metadata)
                 clean_up = True
                 break
 
