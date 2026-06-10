@@ -123,11 +123,11 @@ class UploadOutputData(PostProcessCommand):
 
         for bk_file in bk_files:
             with open(bk_file) as fd:
-                bkXML = fd.read()
+                bk_xml = fd.read()
 
-            logger.info("Sending BK record:\n%s", bkXML)
+            logger.info("Sending BK record:\n%s", bk_xml)
             try:
-                returnValueOrRaise(_sendBKReport(self.bk_client, self.request, bkXML))
+                returnValueOrRaise(_sendBKReport(self.bk_client, self.request, bk_xml))
                 logger.info("Bookkeeping report sent for %s", bk_file)
             except SErrorException as e:
                 logger.error("Could not send Bookkeeping XML file to server:\n%s", e)
@@ -141,9 +141,9 @@ class UploadOutputData(PostProcessCommand):
 
         failover = {}
         for file_name, metadata in final.items():
-            targetSE = metadata["resolvedSE"]
+            target_se = metadata["resolvedSE"]
 
-            logger.info("Attempting to store file to SE %s to the following SE(s):\n%s", file_name, ", ".join(targetSE))
+            logger.info("Attempting to store file to SE %s to the following SE(s):\n%s", file_name, ", ".join(target_se))
 
             file_meta_dict = _createMetaDict(metadata)
 
@@ -153,7 +153,7 @@ class UploadOutputData(PostProcessCommand):
                         fileName=file_name,
                         localPath=metadata["localpath"],
                         lfn=metadata["filedict"]["LFN"],
-                        destinationSEList=targetSE,
+                        destinationSEList=target_se,
                         fileMetaDict=file_meta_dict,
                         masterCatalogOnly=True,
                     )
@@ -170,7 +170,7 @@ class UploadOutputData(PostProcessCommand):
             logger.info("Setting default catalog for %s failover transfer registration to master catalog", file_name)
 
             random.shuffle(failover_se_list)
-            targetSE = metadata["resolvedSE"][0]
+            target_se = metadata["resolvedSE"][0]
             metadata["resolvedSE"] = failover_se_list
 
             file_meta_dict = _createMetaDict(metadata)
@@ -180,7 +180,7 @@ class UploadOutputData(PostProcessCommand):
                         fileName=file_name,
                         localPath=metadata["localpath"],
                         lfn=metadata["filedict"]["LFN"],
-                        targetSE=targetSE,
+                        targetSE=target_se,
                         failoverSEList=metadata["resolvedSE"],
                         fileMetaDict=file_meta_dict,
                         masterCatalogOnly=True,

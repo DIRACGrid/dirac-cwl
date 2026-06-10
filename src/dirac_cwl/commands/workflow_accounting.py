@@ -50,8 +50,8 @@ class WorkflowAccounting(PostProcessCommand):
 
         exec_time, cpu_time = getStepCPUTimes(cpu_times)
 
-        cpu_norm_factor = gConfig.getValue("/LocalSite/CPUNormalizationFactor", 0.0)
-        norm_cpu = cpu_time * cpu_norm_factor
+        cpu_power = gConfig.getValue("/LocalSite/CPUNormalizationFactor", 1.0)
+        norm_cpu = cpu_time * cpu_power
 
         job_step = JobStep()
 
