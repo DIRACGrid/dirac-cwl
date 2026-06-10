@@ -76,14 +76,13 @@ class UploadLogFile(PostProcessCommand):
 
         try:
             file_list = returnValueOrRaise(systemCall(0, shlex.split("ls -al")))
+            if file_list:
+                logger.info("The contents of the working directory...")
+                logger.info(str(file_list[1]))
+            else:
+                logger.error("Failed to list the log directory\n%s", str(file_list[2]))
         except SErrorException as e:
             logger.error("Failed to list the log directory\n%s", e)
-
-        if file_list:
-            logger.info("The contents of the working directory...")
-            logger.info(str(file_list[1]))
-        else:
-            logger.error("Failed to list the log directory\n%s", str(file_list[2]))
 
         workflow_commons.log_dir = os.path.realpath(
             os.path.join(job_path, f"./job/log/{workflow_commons.production_id}/{workflow_commons.prod_job_id}")

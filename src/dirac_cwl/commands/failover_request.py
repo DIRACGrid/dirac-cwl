@@ -91,12 +91,11 @@ class FailoverRequest(PostProcessCommand):
         """Create a request.json file."""
         try:
             diset_op = returnValueOrRaise(self.job_report.generateForwardDISET())
+            if diset_op:
+                logger.info("Populating request with job report information")
+                self.request.addOperation(diset_op)
         except SErrorException as e:
             logger.warning("Could not generate Operation for job report", exc_info=e)
-
-        if diset_op:
-            logger.info("Populating request with job report information")
-            self.request.addOperation(diset_op)
 
         if len(self.request):
             # Try to optimize the request
