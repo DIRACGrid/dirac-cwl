@@ -1,4 +1,4 @@
-"""Test for the WorkflowAccounting command class."""
+"""Test for the RegisterAccountingReport command class."""
 
 from pathlib import Path
 from textwrap import dedent
@@ -7,17 +7,17 @@ import pytest
 from DIRAC.AccountingSystem.Client.DataStoreClient import DataStoreClient
 from pytest_mock import MockerFixture
 
-from dirac_cwl.commands import WorkflowAccounting
+from dirac_cwl.commands import RegisterAccountingReport
 from dirac_cwl.commands.workflow_commons import StepStatus, WorkflowCommons
 
 
-class TestWorkflowAccounting:
-    """Collection of tests for the WorkflowAccounting command."""
+class TestRegisterAccountingReport:
+    """Collection of tests for the RegisterAccountingReport command."""
 
     @pytest.fixture
     def accounting(self, mocker: MockerFixture, job_path):
-        """Fixture for WorkflowAccounting module."""
-        command = WorkflowAccounting()
+        """Fixture for RegisterAccountingReport module."""
+        command = RegisterAccountingReport()
 
         command.dsc = DataStoreClient()
         mocker.patch.object(command.dsc, "addRegister")
@@ -28,7 +28,7 @@ class TestWorkflowAccounting:
 
     # Test Scenarios
     def test_accounting_success(self, mocker: MockerFixture, job_path, accounting, wf_commons, xml_summary_file):
-        """Test successful execution of WorkflowAccounting module."""
+        """Test successful execution of RegisterAccountingReport module."""
         wf_commons["steps"][0]["application_name"] = "Gauss"
         xml_content = dedent("""<?xml version="1.0" encoding="UTF-8"?>
             <summary version="1.0" xsi:noNamespaceSchemaLocation="$XMLSUMMARYBASEROOT/xml/XMLSummary.xsd"
@@ -69,7 +69,7 @@ class TestWorkflowAccounting:
     def test_accounting_noApplicationName_fail(
         self, mocker: MockerFixture, job_path, accounting, wf_commons, xml_summary_file
     ):
-        """Test WorkflowAccounting when there is no application name in step commons."""
+        """Test RegisterAccountingReport when there is no application name in step commons."""
         xml_content = dedent("""<?xml version="1.0" encoding="UTF-8"?>
             <summary version="1.0" xsi:noNamespaceSchemaLocation="$XMLSUMMARYBASEROOT/xml/XMLSummary.xsd"
             xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
@@ -107,7 +107,7 @@ class TestWorkflowAccounting:
     def test_accounting_incompleteData_success(
         self, mocker: MockerFixture, job_path, accounting, wf_commons, xml_summary_file
     ):
-        """Test successful execution of WorkflowAccounting module."""
+        """Test successful execution of RegisterAccountingReport module."""
         xml_content = dedent("""<?xml version="1.0" encoding="UTF-8"?>
             <summary version="1.0" xsi:noNamespaceSchemaLocation="$XMLSUMMARYBASEROOT/xml/XMLSummary.xsd"
             xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
@@ -145,7 +145,7 @@ class TestWorkflowAccounting:
     def test_accounting_previousError_fail(
         self, mocker: MockerFixture, job_path, accounting, wf_commons, xml_summary_file
     ):
-        """Test WorkflowAccounting with an intentional failure."""
+        """Test RegisterAccountingReport with an intentional failure."""
         xml_content = dedent("""<?xml version="1.0" encoding="UTF-8"?>
             <summary version="1.0" xsi:noNamespaceSchemaLocation="$XMLSUMMARYBASEROOT/xml/XMLSummary.xsd"
             xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">

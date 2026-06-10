@@ -22,7 +22,7 @@ from .workflow_commons import Step, WorkflowCommons
 logger = logging.getLogger(__name__)
 
 
-class WorkflowAccounting(PostProcessCommand):
+class RegisterAccountingReport(PostProcessCommand):
     """Prepares and sends accounting information to the DIRAC Accounting system."""
 
     def _execute(self, job_path: os.PathLike[str], workflow_commons: WorkflowCommons, **kwargs):

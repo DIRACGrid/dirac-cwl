@@ -20,7 +20,7 @@ from .workflow_commons import StepStatus, WorkflowCommons
 logger = logging.getLogger(__name__)
 
 
-class FailoverRequest(PostProcessCommand):
+class CreateFailoverRequest(PostProcessCommand):
     """Commits the status of the files in the file report.
 
     The status will be "Processed" if everything ended properly or "Unused" if it did not.

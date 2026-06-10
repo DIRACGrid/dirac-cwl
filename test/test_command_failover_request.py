@@ -11,11 +11,11 @@ from DIRAC.WorkloadManagementSystem.Client.JobReport import JobReport
 from DIRACCommon.Core.Utilities.ReturnValues import S_ERROR, S_OK
 from pytest_mock import MockerFixture
 
-from dirac_cwl.commands import FailoverRequest
+from dirac_cwl.commands import CreateFailoverRequest
 from dirac_cwl.commands.workflow_commons import WorkflowCommons
 
 
-class TestFailoverRequest:
+class TestCreateFailoverRequest:
     """Collection of tests for the FailoverRequest command."""
 
     @pytest.fixture
@@ -28,7 +28,7 @@ class TestFailoverRequest:
             "DIRAC.RequestManagementSystem.private.RequestValidator.RequestValidator.validate", return_value=S_OK()
         )
 
-        command = FailoverRequest()
+        command = CreateFailoverRequest()
         command.request = Request()
         command.file_report = FileReport()
         command.failover_transfer = FailoverTransfer(command.request)
@@ -41,7 +41,9 @@ class TestFailoverRequest:
 
         Path(job_path).joinpath("workflow_commons.json").unlink(missing_ok=True)
 
-    def test_failoverRequest_success(self, mocker: MockerFixture, failover_request, job_path, wf_commons, request_file):
+    def test_failover_request_success(
+        self, mocker: MockerFixture, failover_request, job_path, wf_commons, request_file
+    ):
         """Test successful execution of FailoverRequest module."""
         problematic_files = [
             "/lhcb/data/2010/EW.DST/00008380/0000/00008380_00000287_1.ew.dst",
@@ -86,7 +88,7 @@ class TestFailoverRequest:
         # Make sure the request json does not exists
         assert not Path(request_file).exists()
 
-    def test_failoverRequest_commitFailure1(
+    def test_failover_request_commitFailure1(
         self, mocker: MockerFixture, failover_request, job_path, wf_commons, request_file
     ):
         """Test execution of FailoverRequest module when the fileReport.commit() fails.
@@ -139,7 +141,7 @@ class TestFailoverRequest:
         # Make sure the request json does not exists
         assert not Path(request_file).exists()
 
-    def test_failoverRequest_commitFailure2(
+    def test_failover_request_commitFailure2(
         self, mocker: MockerFixture, failover_request, job_path, wf_commons, request_file
     ):
         """Test execution of FailoverRequest module when the fileReport.commit() fails.
@@ -196,7 +198,7 @@ class TestFailoverRequest:
         # Make sure the request json does not exists
         assert Path(request_file).exists()
 
-    def test_failoverRequest_previousError_fail(
+    def test_failover_request_previousError_fail(
         self, mocker: MockerFixture, failover_request, job_path, wf_commons, request_file
     ):
         """Test FailoverRequest with an intentional failure."""

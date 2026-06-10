@@ -1,4 +1,4 @@
-"""Test for the BookkeepingReport command class."""
+"""Test for the ReportBookkeeping command class."""
 
 import time
 import xml.etree.ElementTree as ET
@@ -11,7 +11,7 @@ from DIRAC import siteName
 from LHCbDIRAC.Core.Utilities.XMLSummaries import XMLSummary
 from pytest_mock import MockerFixture
 
-from dirac_cwl.commands import BookkeepingReport
+from dirac_cwl.commands import ReportBookkeeping
 from dirac_cwl.commands.workflow_commons import StepStatus, WorkflowCommons
 
 
@@ -41,31 +41,31 @@ def get_output_file_details(output_file):
     return details
 
 
-class TestBookkeepingReport:
-    """Collection of tests for the BookkeepingReport command."""
+class TestReportBookkeeping:
+    """Collection of tests for the ReportBookkeeping command."""
 
     number_of_processors = 1
 
     @pytest.fixture
-    def bk_report(self, mocker: MockerFixture, job_path):
-        """BookkeepingReport mocked command.
+    def report_bk(self, mocker: MockerFixture, job_path):
+        """ReportBookkeeping mocked command.
 
         Cleans created files after execution.
         """
-        mock_get_n_procs = mocker.patch("dirac_cwl.commands.bookkeeping_report.getNumberOfProcessorsToUse")
+        mock_get_n_procs = mocker.patch("dirac_cwl.commands.report_bookkeeping.getNumberOfProcessorsToUse")
         mock_get_n_procs.return_value = self.number_of_processors
 
-        yield BookkeepingReport()
+        yield ReportBookkeeping()
 
         Path(job_path).joinpath("00209455_00001537_1").unlink(missing_ok=True)
         Path(job_path).joinpath("00209455_00001537_1.sim").unlink(missing_ok=True)
         Path(job_path).joinpath("application.log").unlink(missing_ok=True)
         Path(job_path).joinpath("workflow_commons.json").unlink(missing_ok=True)
 
-    def test_bkreport_prod_mcsimulation_success(
-        self, bk_report, job_path, wf_commons, bookkeeping_file, xml_summary_file
+    def test_report_bk_prod_mcsimulation_success(
+        self, report_bk, job_path, wf_commons, bookkeeping_file, xml_summary_file
     ):
-        """Test successful execution of BookkeepingReport module."""
+        """Test successful execution of ReportBookkeeping module."""
         wf_commons["steps"][0]["application_name"] = "Gauss"
         wf_commons["job_type"] = "MCSimulation"
 
@@ -124,7 +124,7 @@ class TestBookkeepingReport:
 
         WorkflowCommons(**wf_commons).save(job_path)
 
-        bk_report.execute(job_path)
+        report_bk.execute(job_path)
 
         updated_wf_commons = WorkflowCommons.load(job_path)
 
@@ -187,17 +187,17 @@ class TestBookkeepingReport:
 
         assert len(output_files) == 1
 
-    def test_bkreport_prod_mcsimulation_noinputoutput_success(
-        self, bk_report, job_path, wf_commons, bookkeeping_file, xml_summary_file
+    def test_report_bk_prod_mcsimulation_noinputoutput_success(
+        self, report_bk, job_path, wf_commons, bookkeeping_file, xml_summary_file
     ):
-        """Test successful execution of BookkeepingReport module.
+        """Test successful execution of ReportBookkeeping module.
 
         * No input files because wf_commons["stepInputData is empty
         * No output files because wf_commons["stepOutputData is empty
         * No pool xml catalog
         * Simulation conditions because the application used is Gauss
         """
-        # Mock the BookkeepingReport module
+        # Mock the ReportBookkeeping module
         wf_commons["steps"][0]["application_name"] = "Gauss"
         wf_commons["job_type"] = "MCSimulation"
 
@@ -251,7 +251,7 @@ class TestBookkeepingReport:
 
         WorkflowCommons(**wf_commons).save(job_path)
 
-        bk_report.execute(job_path)
+        report_bk.execute(job_path)
 
         updated_wf_commons = WorkflowCommons.load(job_path)
 
@@ -305,10 +305,10 @@ class TestBookkeepingReport:
         output_file = root.find("OutputFile")
         assert output_file is None, "OutputFile element should not be present."
 
-    def test_bk_report_prod_mcreconstruction_success(
-        self, bk_report, job_path, wf_commons, bookkeeping_file, xml_summary_file
+    def test_report_bk_prod_mcreconstruction_success(
+        self, report_bk, job_path, wf_commons, bookkeeping_file, xml_summary_file
     ):
-        """Test successful execution of BookkeepingReport module."""
+        """Test successful execution of ReportBookkeeping module."""
         wf_commons["steps"][0]["application_name"] = "Boole"
         wf_commons["job_type"] = "MCReconstruction"
 
@@ -359,7 +359,7 @@ class TestBookkeepingReport:
 
         WorkflowCommons(**wf_commons).save(job_path)
 
-        bk_report.execute(job_path)
+        report_bk.execute(job_path)
 
         updated_wf_commons = WorkflowCommons.load(job_path)
 
@@ -427,7 +427,7 @@ class TestBookkeepingReport:
         simulation_condition = root.find("SimulationCondition")
         assert simulation_condition is None, "SimulationCondition element should not be present."
 
-    def test_bkreport_previousError_success(self, bk_report, job_path, wf_commons, bookkeeping_file):
+    def test_report_bk_previousError_success(self, report_bk, job_path, wf_commons, bookkeeping_file):
         """Test previous command failure."""
         wf_commons["steps"][0]["application_name"] = "Gauss"
         wf_commons["steps"][0]["application_version"] = wf_commons["config_version"]
@@ -436,6 +436,6 @@ class TestBookkeepingReport:
 
         WorkflowCommons(**wf_commons).save(job_path)
 
-        bk_report.execute(job_path)
+        report_bk.execute(job_path)
 
         assert not Path(bookkeeping_file).exists()

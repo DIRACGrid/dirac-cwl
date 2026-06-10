@@ -26,7 +26,7 @@ from .workflow_commons import Step, StepStatus, WorkflowCommons
 logger = logging.getLogger(__name__)
 
 
-class BookkeepingReport(PostProcessCommand):
+class ReportBookkeeping(PostProcessCommand):
     """Generates a bookkeeping report file based on the XMLSummary and the pool XML catalog."""
 
     def _execute(self, job_path: os.PathLike[str], workflow_commons: WorkflowCommons, **kwargs):
