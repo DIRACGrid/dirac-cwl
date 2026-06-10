@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 class AnalyseXmlSummary(PostProcessCommand):
     """Performs a series of checks on the XMLSummary output to make sure the execution was done correctly."""
 
-    def _execute(self, job_path: os.PathLike, workflow_commons: WorkflowCommons, **kwargs):
+    def _execute(self, job_path: os.PathLike[str], workflow_commons: WorkflowCommons, **kwargs):
         """Execute the command.
 
         :param job_path: Path to the job working directory.
@@ -27,7 +27,9 @@ class AnalyseXmlSummary(PostProcessCommand):
         for step in workflow_commons.steps:
             self._execute_for_step(job_path, workflow_commons, step, **kwargs)
 
-    def _execute_for_step(self, job_path: os.PathLike, workflow_commons: WorkflowCommons, step_commons: Step, **kwargs):
+    def _execute_for_step(
+        self, job_path: os.PathLike[str], workflow_commons: WorkflowCommons, step_commons: Step, **kwargs
+    ):
         """Execute the command for a specific step."""
         job_ok = _isXMLSummaryOK(step_commons.xf_o)
 
@@ -49,7 +51,7 @@ class AnalyseXmlSummary(PostProcessCommand):
 
         self.job_report.setApplicationStatus(f"{step_commons.application_name} Step OK")
 
-    def _resolve_clients(self, workflow_commons):
+    def _resolve_clients(self, workflow_commons: WorkflowCommons):
         super()._resolve_clients(workflow_commons)
 
         if not self.file_report:

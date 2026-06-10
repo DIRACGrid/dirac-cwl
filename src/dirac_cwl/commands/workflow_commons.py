@@ -8,7 +8,7 @@ import os
 import shutil
 from enum import Enum
 from pathlib import Path
-from typing import Any, Optional, Union
+from typing import Any, Optional
 
 from DIRAC import siteName
 from DIRAC.AccountingSystem.Client.DataStoreClient import DataStoreClient
@@ -153,8 +153,6 @@ class WorkflowCommons(BaseModel):
 
     step_status: StepStatus = StepStatus.Done
 
-    _logger = PrivateAttr(default=logging.getLogger(__name__))
-
     model_config = ConfigDict(validate_assignment=True, extra="forbid")
 
     def __init__(self, **data):
@@ -163,9 +161,9 @@ class WorkflowCommons(BaseModel):
 
     def save(
         self,
-        job_path: os.PathLike,
-        request: Union[Request, None] = None,
-        dsc: Union[DataStoreClient, None] = None,
+        job_path: os.PathLike[str],
+        request: Optional[Request] = None,
+        dsc: Optional[DataStoreClient] = None,
         failed: bool = False,
     ) -> None:
         """Update the workflow_commons file to accomodate for the new values."""
@@ -189,18 +187,20 @@ class WorkflowCommons(BaseModel):
             with open(wf_path, "w", encoding="utf-8") as f:
                 json.dump(wf_dict, f)
         except Exception as e:
-            self._logger.exception("Failed to save the workflows commons in a file", exc_info=e)
+            logger.exception("Failed to save the workflows commons in a file", exc_info=e)
             raise
         finally:
+            if not wf_path.exists():
+                wf_backup.copy(wf_path)  # type: ignore[attr-defined]
             wf_backup.unlink(missing_ok=True)
 
     @classmethod
-    def load(cls, job_path: os.PathLike) -> WorkflowCommons:
+    def load(cls, job_path: os.PathLike[str]) -> WorkflowCommons:
         """Return a WorkflowCommons containing the values of a workflow_commons.json file.
 
         :raises: ValidationError
         """
-        wf_path = os.path.join(job_path, "workflow_commons.json")
+        wf_path = Path(job_path).joinpath("workflow_commons.json")
 
         with open(wf_path, "r", encoding="utf-8") as f:
             wf_dict = json.load(f)

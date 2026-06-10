@@ -26,7 +26,7 @@ class FailoverRequest(PostProcessCommand):
     The status will be "Processed" if everything ended properly or "Unused" if it did not.
     """
 
-    def _execute(self, job_path: os.PathLike, workflow_commons: WorkflowCommons, **kwargs):
+    def _execute(self, job_path: os.PathLike[str], workflow_commons: WorkflowCommons, **kwargs):
         """Execute the command.
 
         :param job_path: Path to the job working directory.
@@ -78,7 +78,7 @@ class FailoverRequest(PostProcessCommand):
 
         self.generate_failover_file(workflow_commons)
 
-    def _resolve_clients(self, workflow_commons):
+    def _resolve_clients(self, workflow_commons: WorkflowCommons):
         super()._resolve_clients(workflow_commons)
 
         if not self.file_report:
@@ -87,15 +87,15 @@ class FailoverRequest(PostProcessCommand):
         if not self.dsc:
             self.dsc = DataStoreClient()
 
-    def generate_failover_file(self, workflow_commons):
+    def generate_failover_file(self, workflow_commons: WorkflowCommons):
         """Create a request.json file."""
         try:
             diset_op = returnValueOrRaise(self.job_report.generateForwardDISET())
         except SErrorException as e:
-            self._logger.warning("Could not generate Operation for job report", exc_info=e)
+            logger.warning("Could not generate Operation for job report", exc_info=e)
 
         if diset_op:
-            self._logger.info("Populating request with job report information")
+            logger.info("Populating request with job report information")
             self.request.addOperation(diset_op)
 
         if len(self.request):
@@ -103,8 +103,8 @@ class FailoverRequest(PostProcessCommand):
             try:
                 returnValueOrRaise(self.request.optimize())
             except SErrorException as e:
-                self._logger.error("Could not optimize", exc_info=e)
-                self._logger.error("Not failing the job because of that, keep going")
+                logger.error("Could not optimize", exc_info=e)
+                logger.error("Not failing the job because of that, keep going")
             except Exception:
                 pass
 

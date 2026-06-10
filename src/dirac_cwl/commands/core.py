@@ -35,7 +35,7 @@ class CommandBase(ABC):
     bk_client: BookkeepingClient = None
     dsc: DataStoreClient = None
 
-    def execute(self, job_path: os.PathLike, **kwargs) -> None:
+    def execute(self, job_path: os.PathLike[str], **kwargs) -> None:
         """Execute the command in the given job path.
 
         :param job_path: Path to the job working directory.
@@ -69,7 +69,7 @@ class CommandBase(ABC):
             if workflow_commons:
                 workflow_commons.save(job_path, request=self.request, dsc=self.dsc, failed=failed)
 
-    def _resolve_clients(self, workflow_commons):
+    def _resolve_clients(self, workflow_commons: WorkflowCommons):
         """Initialize the required clients.
 
         JobReport is always needed, so when overriding, this needs to be called via super().
@@ -78,7 +78,7 @@ class CommandBase(ABC):
             self.job_report = JobReport(workflow_commons.job_id)
 
     @abstractmethod
-    def _execute(self, job_path: os.PathLike, workflow_commons: WorkflowCommons, **kwargs) -> None:
+    def _execute(self, job_path: os.PathLike[str], workflow_commons: WorkflowCommons, **kwargs) -> None:
         """Execute the command in the given job path.
 
         :param job_path: Path to the job working directory.

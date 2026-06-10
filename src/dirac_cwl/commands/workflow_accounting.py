@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 class WorkflowAccounting(PostProcessCommand):
     """Prepares and sends accounting information to the DIRAC Accounting system."""
 
-    def _execute(self, job_path: os.PathLike, workflow_commons: WorkflowCommons, **kwargs):
+    def _execute(self, job_path: os.PathLike[str], workflow_commons: WorkflowCommons, **kwargs):
         """Execute the command.
 
         :param job_path: Path to the job working directory.
@@ -35,7 +35,9 @@ class WorkflowAccounting(PostProcessCommand):
         for step in workflow_commons.steps:
             self._execute_for_step(job_path, workflow_commons, step, **kwargs)
 
-    def _execute_for_step(self, job_path: os.PathLike, workflow_commons: WorkflowCommons, step_commons: Step, **kwargs):
+    def _execute_for_step(
+        self, job_path: os.PathLike[str], workflow_commons: WorkflowCommons, step_commons: Step, **kwargs
+    ):
         cpu_times: Dict[str, Any] = {}
         if step_commons.start_time:
             cpu_times["StartTime"] = step_commons.start_time
@@ -92,7 +94,7 @@ class WorkflowAccounting(PostProcessCommand):
 
         self.dsc.addRegister(job_step)
 
-    def _resolve_clients(self, workflow_commons):
+    def _resolve_clients(self, workflow_commons: WorkflowCommons):
         super()._resolve_clients(workflow_commons)
 
         if not self.dsc:

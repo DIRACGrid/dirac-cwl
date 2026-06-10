@@ -34,7 +34,7 @@ logger = logging.getLogger(__name__)
 class UploadLogFile(PostProcessCommand):
     """Post-processing command for log file uploading."""
 
-    def _execute(self, job_path: os.PathLike, workflow_commons: WorkflowCommons, **kwargs):
+    def _execute(self, job_path: os.PathLike[str], workflow_commons: WorkflowCommons, **kwargs):
         """Execute the log uploading process.
 
         :param job_path: Path to the job working directory.
@@ -179,7 +179,7 @@ class UploadLogFile(PostProcessCommand):
             "Log URL", f"<a href=\"{log_https_url.replace('.zip','/')}\">Log file directory</a>"
         )
 
-    def _resolve_clients(self, workflow_commons):
+    def _resolve_clients(self, workflow_commons: WorkflowCommons):
         super()._resolve_clients(workflow_commons)
 
         if not self.bk_client:

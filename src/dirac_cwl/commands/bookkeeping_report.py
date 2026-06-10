@@ -29,7 +29,7 @@ logger = logging.getLogger(__name__)
 class BookkeepingReport(PostProcessCommand):
     """Generates a bookkeeping report file based on the XMLSummary and the pool XML catalog."""
 
-    def _execute(self, job_path: os.PathLike, workflow_commons: WorkflowCommons, **kwargs):
+    def _execute(self, job_path: os.PathLike[str], workflow_commons: WorkflowCommons, **kwargs):
         """Execute the command.
 
         :param job_path: Path to the job working directory.
@@ -42,7 +42,9 @@ class BookkeepingReport(PostProcessCommand):
 
             self._execute_for_step(job_path, workflow_commons, step, **kwargs)
 
-    def _execute_for_step(self, job_path: os.PathLike, workflow_commons: WorkflowCommons, step_commons: Step, **kwargs):
+    def _execute_for_step(
+        self, job_path: os.PathLike[str], workflow_commons: WorkflowCommons, step_commons: Step, **kwargs
+    ):
         # Setup variables
         cpu_times: Dict[str, Any] = {}
         if step_commons.start_time:
@@ -160,7 +162,7 @@ class BookkeepingReport(PostProcessCommand):
         with open(bfilename, "wb") as bfile:
             bfile.write(doc)
 
-    def _resolve_clients(self, workflow_commons):
+    def _resolve_clients(self, workflow_commons: WorkflowCommons):
         super()._resolve_clients(workflow_commons)
 
         if not self.bk_client:

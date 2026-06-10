@@ -35,7 +35,7 @@ logger = logging.getLogger(__name__)
 class UploadOutputData(PostProcessCommand):
     """Registers every output generated to the corresponding SE and Catalog or to the FailoverSE in case of failure."""
 
-    def _execute(self, job_path: os.PathLike, workflow_commons: WorkflowCommons, **kwargs) -> None:
+    def _execute(self, job_path: os.PathLike[str], workflow_commons: WorkflowCommons, **kwargs) -> None:
         """Execute the command.
 
         :param job_path: Path to the job working directory.
@@ -203,7 +203,7 @@ class UploadOutputData(PostProcessCommand):
         if perform_bk_registration:
             returnValueOrRaise(_registerLFNs(self.request, perform_bk_registration))
 
-    def _resolve_clients(self, workflow_commons):
+    def _resolve_clients(self, workflow_commons: WorkflowCommons):
         super()._resolve_clients(workflow_commons)
 
         if not self.bk_client:
