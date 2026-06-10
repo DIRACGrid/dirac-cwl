@@ -34,7 +34,7 @@ class TestUploadOutputDataFile:
         with open(path, "w") as f:
             f.write("Bookkeeping file content")
 
-        yield str(path)
+        yield str(path.name)
 
         path.unlink(missing_ok=True)
 
@@ -555,7 +555,7 @@ class TestUploadOutputDataFile:
         wf_commons["output_data_step"] = self.OUTPUT_DATA_STEP
 
         # Remove the output
-        Path(sim_file).unlink(missing_ok=True)
+        Path(job_path).joinpath(sim_file).unlink(missing_ok=True)
 
         WorkflowCommons(**wf_commons).save(job_path)
 

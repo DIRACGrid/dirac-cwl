@@ -82,7 +82,7 @@ class TestReportBookkeeping:
         wf_commons["steps"][0]["outputs"] = [
             {"outputDataName": "00209455_00001537_1.sim", "outputDataType": "sim"},
         ]
-        Path(wf_commons["steps"][0]["outputs"][0]["outputDataName"]).touch()
+        Path(job_path).joinpath(wf_commons["steps"][0]["outputs"][0]["outputDataName"]).touch()
 
         # Mock the XMLSummary object
         xml_content = dedent("""\
@@ -327,8 +327,8 @@ class TestReportBookkeeping:
             {"outputDataName": "00209455_00001537_1", "outputDataType": "digi"},
         ]
         wf_commons["steps"][0]["application_log"] = "application.log"
-        Path(wf_commons["steps"][0]["application_log"]).touch()
-        Path(wf_commons["steps"][0]["outputs"][0]["outputDataName"]).touch()
+        Path(job_path).joinpath(wf_commons["steps"][0]["application_log"]).touch()
+        Path(job_path).joinpath(wf_commons["steps"][0]["outputs"][0]["outputDataName"]).touch()
 
         # Mock the XMLSummary object
         xml_content = dedent("""\

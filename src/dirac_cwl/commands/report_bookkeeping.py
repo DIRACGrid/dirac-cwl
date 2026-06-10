@@ -3,6 +3,7 @@
 import copy
 import logging
 import os
+from pathlib import Path
 from typing import Any, Dict
 
 from DIRAC.Core.Utilities.ReturnValues import SErrorException, returnValueOrRaise
@@ -102,6 +103,7 @@ class ReportBookkeeping(PostProcessCommand):
                 workflow_commons.prod_job_id,
                 step_commons.number,
                 step_commons.id,
+                path=job_path,
             )
 
         info_dict = {
@@ -145,9 +147,10 @@ class ReportBookkeeping(PostProcessCommand):
             step_commons.xf_o,
             step_commons.outputs,
             step_commons.inputs,
-            step_commons.size,
-            step_commons.md5,
-            step_commons.guid,
+            path=job_path,
+            size_map=step_commons.size,
+            md5_map=step_commons.md5,
+            guid_map=step_commons.guid,
         )
 
         # Generate SimulationConditions
@@ -158,7 +161,7 @@ class ReportBookkeeping(PostProcessCommand):
         doc = job_info.to_xml()
 
         # Write to file
-        bfilename = f"bookkeeping_{step_commons.id}.xml"
+        bfilename = Path(job_path).joinpath(f"bookkeeping_{step_commons.id}.xml")
         with open(bfilename, "wb") as bfile:
             bfile.write(doc)
 

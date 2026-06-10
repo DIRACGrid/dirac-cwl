@@ -6,6 +6,7 @@ The status will be "Processed" if everything ended properly or "Unused" if it di
 import json
 import logging
 import os
+from pathlib import Path
 
 from DIRAC.AccountingSystem.Client.DataStoreClient import DataStoreClient
 from DIRAC.Core.Utilities.ReturnValues import SErrorException, returnValueOrRaise
@@ -76,7 +77,7 @@ class CreateFailoverRequest(PostProcessCommand):
         if workflow_commons.step_status == StepStatus.Done:
             self.job_report.setApplicationStatus("Job Finished Successfully", True)
 
-        self.generate_failover_file(workflow_commons)
+        self.generate_failover_file(job_path, workflow_commons)
 
     def _resolve_clients(self, workflow_commons: WorkflowCommons):
         super()._resolve_clients(workflow_commons)
@@ -87,7 +88,7 @@ class CreateFailoverRequest(PostProcessCommand):
         if not self.dsc:
             self.dsc = DataStoreClient()
 
-    def generate_failover_file(self, workflow_commons: WorkflowCommons):
+    def generate_failover_file(self, job_path: os.PathLike[str], workflow_commons: WorkflowCommons):
         """Create a request.json file."""
         try:
             diset_op = returnValueOrRaise(self.job_report.generateForwardDISET())
@@ -114,7 +115,9 @@ class CreateFailoverRequest(PostProcessCommand):
             request_json_content = returnValueOrRaise(self.request.toJSON())
 
             # Write it
-            fname = f"{workflow_commons.production_id}_{workflow_commons.prod_job_id}_request.json"
+            fname = Path(job_path).joinpath(
+                f"{workflow_commons.production_id}_{workflow_commons.prod_job_id}_request.json"
+            )
             with open(fname, "w", encoding="utf-8") as f:
                 json.dump(request_json_content, f)
 

@@ -1,5 +1,6 @@
 """Common pytest fixture used by test modules."""
 
+import shutil
 from pathlib import Path
 
 import pytest
@@ -56,7 +57,16 @@ def sample_job(sample_command_line_tool):
 @pytest.fixture
 def job_path():
     """Job Path Fixture."""
-    return Path(".")
+    path = Path(".").joinpath("examplepath")
+
+    if path.exists():
+        raise Exception("NON EMPTY DIRECTORY !!!")
+
+    path.mkdir()
+
+    yield path
+
+    shutil.rmtree(path)
 
 
 @pytest.fixture

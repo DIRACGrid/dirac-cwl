@@ -4,6 +4,7 @@ import logging
 import os
 import random
 import time
+from pathlib import Path
 
 from DIRAC.Core.Utilities.ReturnValues import SErrorException, returnValueOrRaise
 from DIRAC.DataManagementSystem.Client.DataManager import DataManager
@@ -75,6 +76,7 @@ class UploadOutputData(PostProcessCommand):
             workflow_commons.output_data_file_mask,
             workflow_commons.output_data_step,
             workflow_commons.output_SEs,
+            path=job_path,
         )
 
         if not file_metadata:
@@ -118,7 +120,7 @@ class UploadOutputData(PostProcessCommand):
                 self.file_report.setFileStatus(int(workflow_commons.production_id), lfns_with_descendents, "Processed")
                 raise WorkflowProcessingException("Input Data Already Processed")
 
-        bk_files = _getBKFiles()
+        bk_files = _getBKFiles(path=job_path)
         logger.info("The following BK records will be sent\n%s", ", ".join(bk_files))
 
         for bk_file in bk_files:
@@ -134,7 +136,7 @@ class UploadOutputData(PostProcessCommand):
                 logger.info("Preparing DISET request for %s", bk_file)
 
         logger.info("Creating DISABLE_WATCHDOG_CPU_WALLCLOCK_CHECK in order to disable the Watchdog")
-        with open("DISABLE_WATCHDOG_CPU_WALLCLOCK_CHECK", "w") as f:
+        with open(Path(job_path).joinpath("DISABLE_WATCHDOG_CPU_WALLCLOCK_CHECK"), "w") as f:
             f.write(f"{time.asctime()}")
 
         perform_bk_registration = []
@@ -143,7 +145,9 @@ class UploadOutputData(PostProcessCommand):
         for file_name, metadata in final.items():
             target_se = metadata["resolvedSE"]
 
-            logger.info("Attempting to store file to SE %s to the following SE(s):\n%s", file_name, ", ".join(target_se))
+            logger.info(
+                "Attempting to store file to SE %s to the following SE(s):\n%s", file_name, ", ".join(target_se)
+            )
 
             file_meta_dict = _createMetaDict(metadata)
 

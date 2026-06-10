@@ -3,6 +3,7 @@
 import logging
 import os
 import shlex
+from pathlib import Path
 
 from DIRAC.ConfigurationSystem.Client.Helpers.Operations import Operations
 from DIRAC.Core.Utilities.ReturnValues import SErrorException, returnSingleResult, returnValueOrRaise
@@ -75,7 +76,7 @@ class UploadLogFile(PostProcessCommand):
         _prepareRequest(self.request, workflow_commons.job_id)
 
         try:
-            file_list = returnValueOrRaise(systemCall(0, shlex.split("ls -al")))
+            file_list = returnValueOrRaise(systemCall(0, shlex.split(f"ls -al {str(job_path)}")))
             if file_list:
                 logger.info("The contents of the working directory...")
                 logger.info(str(file_list[1]))
@@ -85,7 +86,7 @@ class UploadLogFile(PostProcessCommand):
             logger.error("Failed to list the log directory\n%s", e)
 
         workflow_commons.log_dir = os.path.realpath(
-            os.path.join(job_path, f"./job/log/{workflow_commons.production_id}/{workflow_commons.prod_job_id}")
+            Path(job_path).joinpath("job", "log", workflow_commons.production_id, workflow_commons.production_id)
         )
         logger.info("Selected log files will be temporarily stored in %s", workflow_commons.log_dir)
 
@@ -94,7 +95,7 @@ class UploadLogFile(PostProcessCommand):
         logger.info("Determining the files to be saved in the logs.")
 
         try:
-            selected_files = returnValueOrRaise(_determineRelevantFiles(log_extensions))
+            selected_files = returnValueOrRaise(_determineRelevantFiles(log_extensions, path=job_path))
         except SErrorException as e:
             logger.error("Completely failed to select relevant log files.", exc_info=e)
             return  # Does not fail
@@ -123,7 +124,7 @@ class UploadLogFile(PostProcessCommand):
 
         # zip all files
         try:
-            zip_file_name = returnValueOrRaise(_zip_files(workflow_commons.prod_job_id, selected_files))
+            zip_file_name = returnValueOrRaise(_zip_files(workflow_commons.prod_job_id, selected_files, path=job_path))
         except SErrorException as e:
             logger.error("Failed to create zip of log files %s", e)
             self.job_report.setApplicationStatus("Failed to create zip of log files")
@@ -133,7 +134,7 @@ class UploadLogFile(PostProcessCommand):
 
         # logFilePath is something like /lhcb/MC/2016/LOG/00095376/0000/
         # the zipFileName should have the same name, e.g. 00000381.zip
-        zip_path = os.path.join(workflow_commons.log_file_path, zip_file_name)
+        zip_path = Path(job_path).joinpath(workflow_commons.log_file_path, zip_file_name)
         log_https_url = _get_log_url(log_se, zip_path)
 
         logger.info("putFile %s to %s", zip_file_name, log_se)
@@ -150,10 +151,7 @@ class UploadLogFile(PostProcessCommand):
             try:
                 upload_result_dict = returnValueOrRaise(
                     _uploadLogToFailoverSE(
-                        self.failover_transfer,
-                        zip_file_name,
-                        log_lfn_path,
-                        workflow_commons.site_name,
+                        self.failover_transfer, zip_file_name, log_lfn_path, workflow_commons.site_name, path=job_path
                     )
                 )
 

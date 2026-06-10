@@ -35,7 +35,7 @@ class TestUploadLogFile:
         Path(job_path).joinpath(f"{wf_commons['prod_job_id']}.zip").unlink(missing_ok=True)
         Path(job_path).joinpath("workflow_commons.json").unlink(missing_ok=True)
 
-        shutil.rmtree(Path(job_path).joinpath("unzipped"), ignore_errors=True)
+        shutil.rmtree(Path("unzipped"), ignore_errors=True)
 
     @pytest.fixture
     def prodconf_json(self, job_path):
@@ -45,7 +45,7 @@ class TestUploadLogFile:
         with open(file, "w") as f:
             f.write('{"foo": "bar"}')
 
-        yield file
+        yield file.name
 
         file.unlink(missing_ok=True)
 
@@ -57,7 +57,7 @@ class TestUploadLogFile:
         with open(file, "w") as f:
             f.write('foo = "bar"')
 
-        yield file
+        yield file.name
 
         file.unlink(missing_ok=True)
 
@@ -96,7 +96,7 @@ class TestUploadLogFile:
         assert zipFile.exists()
 
         zipfile.ZipFile(zipFile, "r").extractall("unzipped")
-        unzipped = Path("unzipped").joinpath(updated_wf_commons.prod_job_id)
+        unzipped = Path("unzipped").joinpath(updated_wf_commons.prod_job_id, job_path)
         assert unzipped.joinpath(prodconf_json).exists()
         assert unzipped.joinpath(prodconf_py).exists()
         assert unzipped.joinpath(prodconf_json).read_text() == '{"foo": "bar"}'
@@ -288,7 +288,7 @@ class TestUploadLogFile:
         assert zipFile.exists()
 
         zipfile.ZipFile(zipFile, "r").extractall("unzipped")
-        unzipped = Path("unzipped").joinpath(updated_wf_commons.prod_job_id)
+        unzipped = Path("unzipped").joinpath(updated_wf_commons.prod_job_id, job_path)
         assert unzipped.joinpath(prodconf_json).exists()
         assert unzipped.joinpath(prodconf_py).exists()
         assert unzipped.joinpath(prodconf_json).read_text() == '{"foo": "bar"}'
@@ -355,7 +355,7 @@ class TestUploadLogFile:
         assert zipFile.exists()
 
         zipfile.ZipFile(zipFile, "r").extractall("unzipped")
-        unzipped = Path("unzipped").joinpath(updated_wf_commons.prod_job_id)
+        unzipped = Path("unzipped").joinpath(updated_wf_commons.prod_job_id, job_path)
         assert unzipped.joinpath(prodconf_json).exists()
         assert unzipped.joinpath(prodconf_py).exists()
         assert unzipped.joinpath(prodconf_json).read_text() == '{"foo": "bar"}'
