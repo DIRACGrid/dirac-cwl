@@ -4,10 +4,14 @@ import json
 from pathlib import Path
 
 import pytest
+from DIRAC.DataManagementSystem.Client.FailoverTransfer import FailoverTransfer
 from DIRAC.RequestManagementSystem.Client.File import File
 from DIRAC.RequestManagementSystem.Client.Operation import Operation
 from DIRAC.RequestManagementSystem.Client.Request import Request
+from DIRAC.TransformationSystem.Client.FileReport import FileReport
+from DIRAC.WorkloadManagementSystem.Client.JobReport import JobReport
 from DIRACCommon.Core.Utilities.ReturnValues import S_ERROR, S_OK
+from LHCbDIRAC.BookkeepingSystem.Client.BookkeepingClient import BookkeepingClient
 from pytest_mock import MockerFixture
 
 from dirac_cwl.commands import UploadOutputData
@@ -59,7 +63,18 @@ class TestUploadOutputDataFile:
         if "ProductionOutputData" in wf_commons:
             wf_commons.pop("ProductionOutputData")
 
-        yield UploadOutputData()
+        command = UploadOutputData()
+        command.request = Request()
+        command.failover_transfer = FailoverTransfer(command.request)
+        command.bk_client = BookkeepingClient()
+        command.file_report = FileReport()
+        command.job_report = JobReport(wf_commons["job_id"])
+
+        mocker.patch.object(command.bk_client, "sendXMLBookkeepingReport", return_value=S_OK())
+        mocker.patch.object(command.file_report, "setFileStatus")
+        mocker.patch.object(command.job_report, "setJobParameter")
+
+        yield command
 
         Path(job_path).joinpath("workflow_commons.json").unlink(missing_ok=True)
         Path(job_path).joinpath("DISABLE_WATCHDOG_CPU_WALLCLOCK_CHECK").unlink(missing_ok=True)
@@ -73,23 +88,13 @@ class TestUploadOutputDataFile:
         * The output should be uploaded and registered in the bookkeeping system.
         * The bookkeeping report should be sent and the job parameter updated.
         """
-        mock_setFileStatus = mocker.patch("DIRAC.TransformationSystem.Client.FileReport.FileReport.setFileStatus")
-
-        mock_setJobParameter = mocker.patch("DIRAC.WorkloadManagementSystem.Client.JobReport.JobReport.setJobParameter")
-
-        mock_transferAndRegisterFile = mocker.patch(
-            "DIRAC.DataManagementSystem.Client.FailoverTransfer.FailoverTransfer.transferAndRegisterFile",
+        mocker.patch.object(
+            upload_output.failover_transfer,
+            "transferAndRegisterFile",
             return_value=S_OK({"uploadedSE": "CERN", "lfn": sim_file}),
         )
 
-        mock_transferAndRegisterFileFailover = mocker.patch(
-            "DIRAC.DataManagementSystem.Client.FailoverTransfer.FailoverTransfer.transferAndRegisterFileFailover"
-        )
-
-        mock_sendXMLBookkeepingReport = mocker.patch(
-            "LHCbDIRAC.BookkeepingSystem.Client.BookkeepingClient.BookkeepingClient.sendXMLBookkeepingReport",
-            return_value=S_OK(),
-        )
+        mocker.patch.object(upload_output.failover_transfer, "transferAndRegisterFileFailover")
 
         wf_commons["outputs"] = [
             {"outputDataName": sim_file, "outputDataType": "sim", "outputBKType": "SIM", "stepName": "Gauss_1"}
@@ -103,22 +108,20 @@ class TestUploadOutputDataFile:
 
         upload_output.execute(job_path)
 
-        updated_wf_commons = WorkflowCommons.load(job_path)
+        assert upload_output.file_report.setFileStatus.call_count == 0
+        assert upload_output.bk_client.sendXMLBookkeepingReport.call_count == 1
 
-        assert mock_setFileStatus.call_count == 0
-        assert mock_sendXMLBookkeepingReport.call_count == 1
+        assert upload_output.failover_transfer.transferAndRegisterFile.call_count == 1
+        assert upload_output.failover_transfer.transferAndRegisterFile.call_args[1]["fileName"] == str(sim_file)
 
-        assert mock_transferAndRegisterFile.call_count == 1
-        assert mock_transferAndRegisterFile.call_args[1]["fileName"] == str(sim_file)
+        assert upload_output.failover_transfer.transferAndRegisterFileFailover.call_count == 0
 
-        assert mock_transferAndRegisterFileFailover.call_count == 0
-
-        assert mock_setJobParameter.call_count == 1
-        assert mock_setJobParameter.call_args[0][0] == "UploadedOutputData"
-        assert mock_setJobParameter.call_args[0][1] == str(sim_file)
+        assert upload_output.job_report.setJobParameter.call_count == 1
+        assert upload_output.job_report.setJobParameter.call_args[0][0] == "UploadedOutputData"
+        assert upload_output.job_report.setJobParameter.call_args[0][1] == str(sim_file)
 
         # Make sure the forward DISET is not generated
-        operations = json.loads(updated_wf_commons.request.toJSON()["Value"])["Operations"]
+        operations = json.loads(upload_output.request.toJSON()["Value"])["Operations"]
         assert len(operations) == 0
 
     def test_uploadOutputData_failedBKRegistration(
@@ -128,23 +131,12 @@ class TestUploadOutputDataFile:
 
         * The output should be uploaded but not registered in the bookkeeping system now.
         """
-        mock_setFileStatus = mocker.patch("DIRAC.TransformationSystem.Client.FileReport.FileReport.setFileStatus")
-
-        mock_setJobParameter = mocker.patch("DIRAC.WorkloadManagementSystem.Client.JobReport.JobReport.setJobParameter")
-
-        mock_transferAndRegisterFile = mocker.patch(
-            "DIRAC.DataManagementSystem.Client.FailoverTransfer.FailoverTransfer.transferAndRegisterFile",
+        mocker.patch.object(
+            upload_output.failover_transfer,
+            "transferAndRegisterFile",
             return_value=S_OK({"uploadedSE": "CERN", "lfn": sim_file}),
         )
-
-        mock_transferAndRegisterFileFailover = mocker.patch(
-            "DIRAC.DataManagementSystem.Client.FailoverTransfer.FailoverTransfer.transferAndRegisterFileFailover"
-        )
-
-        mock_sendXMLBookkeepingReport = mocker.patch(
-            "LHCbDIRAC.BookkeepingSystem.Client.BookkeepingClient.BookkeepingClient.sendXMLBookkeepingReport",
-            return_value=S_OK(),
-        )
+        mocker.patch.object(upload_output.failover_transfer, "transferAndRegisterFileFailover")
 
         # BK registration failure
         mocker.patch(
@@ -171,22 +163,20 @@ class TestUploadOutputDataFile:
 
         upload_output.execute(job_path)
 
-        updated_wf_commons = WorkflowCommons.load(job_path)
+        assert upload_output.file_report.setFileStatus.call_count == 0
+        assert upload_output.bk_client.sendXMLBookkeepingReport.call_count == 1
 
-        assert mock_setFileStatus.call_count == 0
-        assert mock_sendXMLBookkeepingReport.call_count == 1
+        assert upload_output.failover_transfer.transferAndRegisterFile.call_count == 1
+        assert upload_output.failover_transfer.transferAndRegisterFile.call_args[1]["fileName"] == str(sim_file)
 
-        assert mock_transferAndRegisterFile.call_count == 1
-        assert mock_transferAndRegisterFile.call_args[1]["fileName"] == str(sim_file)
+        assert upload_output.failover_transfer.transferAndRegisterFileFailover.call_count == 0
 
-        assert mock_transferAndRegisterFileFailover.call_count == 0
-
-        assert mock_setJobParameter.call_count == 1
-        assert mock_setJobParameter.call_args[0][0] == "UploadedOutputData"
-        assert mock_setJobParameter.call_args[0][1] == str(sim_file)
+        assert upload_output.job_report.setJobParameter.call_count == 1
+        assert upload_output.job_report.setJobParameter.call_args[0][0] == "UploadedOutputData"
+        assert upload_output.job_report.setJobParameter.call_args[0][1] == str(sim_file)
 
         # Make sure the request is generated
-        operations = json.loads(updated_wf_commons.request.toJSON()["Value"])["Operations"]
+        operations = json.loads(upload_output.request.toJSON()["Value"])["Operations"]
         assert len(operations) == 1
 
         assert operations[0]["Type"] == "RegisterFile"
@@ -200,26 +190,15 @@ class TestUploadOutputDataFile:
 
         * The output should be uploaded but not registered in the bookkeeping system now.
         """
-        mock_setFileStatus = mocker.patch("DIRAC.TransformationSystem.Client.FileReport.FileReport.setFileStatus")
-
-        mock_setJobParameter = mocker.patch("DIRAC.WorkloadManagementSystem.Client.JobReport.JobReport.setJobParameter")
-
-        mock_transferAndRegisterFile = mocker.patch(
-            "DIRAC.DataManagementSystem.Client.FailoverTransfer.FailoverTransfer.transferAndRegisterFile",
+        mocker.patch.object(
+            upload_output.failover_transfer,
+            "transferAndRegisterFile",
             return_value=S_OK({"uploadedSE": "CERN", "lfn": sim_file}),
         )
 
-        mock_transferAndRegisterFileFailover = mocker.patch(
-            "DIRAC.DataManagementSystem.Client.FailoverTransfer.FailoverTransfer.transferAndRegisterFileFailover"
-        )
-
-        mock_sendXMLBookkeepingReport = mocker.patch(
-            "LHCbDIRAC.BookkeepingSystem.Client.BookkeepingClient.BookkeepingClient.sendXMLBookkeepingReport",
-            return_value=S_OK(),
-        )
+        mocker.patch.object(upload_output.failover_transfer, "transferAndRegisterFileFailover")
 
         # Mock a previous failover request: the BK registration should be postponed and added to the request
-        req = Request()
         file1 = File()
         file1.LFN = (
             f"/lhcb/{wf_commons['config_name']}/{wf_commons['config_version']}"
@@ -228,8 +207,7 @@ class TestUploadOutputDataFile:
         o1 = Operation()
         o1.Type = "RegisterFile"
         o1.addFile(file1)
-        req.addOperation(o1)
-        wf_commons["request_dict"] = json.loads(req.toJSON()["Value"])
+        upload_output.request.addOperation(o1)
 
         wf_commons["outputs"] = [
             {"outputDataName": sim_file, "outputDataType": "sim", "outputBKType": "SIM", "stepName": "Gauss_1"}
@@ -244,22 +222,20 @@ class TestUploadOutputDataFile:
         # Execute module
         upload_output.execute(job_path)
 
-        updated_wf_commons = WorkflowCommons.load(job_path)
+        assert upload_output.file_report.setFileStatus.call_count == 0
+        assert upload_output.bk_client.sendXMLBookkeepingReport.call_count == 1
 
-        assert mock_setFileStatus.call_count == 0
-        assert mock_sendXMLBookkeepingReport.call_count == 1
+        assert upload_output.failover_transfer.transferAndRegisterFile.call_count == 1
+        assert upload_output.failover_transfer.transferAndRegisterFile.call_args[1]["fileName"] == str(sim_file)
 
-        assert mock_transferAndRegisterFile.call_count == 1
-        assert mock_transferAndRegisterFile.call_args[1]["fileName"] == str(sim_file)
+        assert upload_output.failover_transfer.transferAndRegisterFileFailover.call_count == 0
 
-        assert mock_transferAndRegisterFileFailover.call_count == 0
-
-        assert mock_setJobParameter.call_count == 1
-        assert mock_setJobParameter.call_args[0][0] == "UploadedOutputData"
-        assert mock_setJobParameter.call_args[0][1] == str(sim_file)
+        assert upload_output.job_report.setJobParameter.call_count == 1
+        assert upload_output.job_report.setJobParameter.call_args[0][0] == "UploadedOutputData"
+        assert upload_output.job_report.setJobParameter.call_args[0][1] == str(sim_file)
 
         # Make sure the request is generated
-        operations = json.loads(updated_wf_commons.request.toJSON()["Value"])["Operations"]
+        operations = json.loads(upload_output.request.toJSON()["Value"])["Operations"]
         assert len(operations) == 2
 
         assert operations[0]["Type"] == "RegisterFile"
@@ -277,23 +253,13 @@ class TestUploadOutputDataFile:
 
         * The output should be uploaded but not registered in the bookkeeping system at all.
         """
-        mock_setFileStatus = mocker.patch("DIRAC.TransformationSystem.Client.FileReport.FileReport.setFileStatus")
-
-        mock_setJobParameter = mocker.patch("DIRAC.WorkloadManagementSystem.Client.JobReport.JobReport.setJobParameter")
-
-        mock_transferAndRegisterFile = mocker.patch(
-            "DIRAC.DataManagementSystem.Client.FailoverTransfer.FailoverTransfer.transferAndRegisterFile",
+        mocker.patch.object(
+            upload_output.failover_transfer,
+            "transferAndRegisterFile",
             return_value=S_OK({"uploadedSE": "CERN", "lfn": sim_file}),
         )
 
-        mock_transferAndRegisterFileFailover = mocker.patch(
-            "DIRAC.DataManagementSystem.Client.FailoverTransfer.FailoverTransfer.transferAndRegisterFileFailover"
-        )
-
-        mock_sendXMLBookkeepingReport = mocker.patch(
-            "LHCbDIRAC.BookkeepingSystem.Client.BookkeepingClient.BookkeepingClient.sendXMLBookkeepingReport",
-            return_value=S_OK(),
-        )
+        mocker.patch.object(upload_output.failover_transfer, "transferAndRegisterFileFailover")
 
         # BK registration failure
         mocker.patch(
@@ -320,22 +286,20 @@ class TestUploadOutputDataFile:
         with pytest.raises(WorkflowProcessingException, match="Could Not Perform BK Registration"):
             upload_output.execute(job_path)
 
-        updated_wf_commons = WorkflowCommons.load(job_path)
+        assert upload_output.file_report.setFileStatus.call_count == 0
+        assert upload_output.bk_client.sendXMLBookkeepingReport.call_count == 1
 
-        assert mock_setFileStatus.call_count == 0
-        assert mock_sendXMLBookkeepingReport.call_count == 1
+        assert upload_output.failover_transfer.transferAndRegisterFile.call_count == 1
+        assert upload_output.failover_transfer.transferAndRegisterFile.call_args[1]["fileName"] == str(sim_file)
 
-        assert mock_transferAndRegisterFile.call_count == 1
-        assert mock_transferAndRegisterFile.call_args[1]["fileName"] == str(sim_file)
+        assert upload_output.failover_transfer.transferAndRegisterFileFailover.call_count == 0
 
-        assert mock_transferAndRegisterFileFailover.call_count == 0
-
-        assert mock_setJobParameter.call_count == 1
-        assert mock_setJobParameter.call_args[0][0] == "UploadedOutputData"
-        assert mock_setJobParameter.call_args[0][1] == str(sim_file)
+        assert upload_output.job_report.setJobParameter.call_count == 1
+        assert upload_output.job_report.setJobParameter.call_args[0][0] == "UploadedOutputData"
+        assert upload_output.job_report.setJobParameter.call_args[0][1] == str(sim_file)
 
         # Make sure the request is generated
-        operations = json.loads(updated_wf_commons.request.toJSON()["Value"])["Operations"]
+        operations = json.loads(upload_output.request.toJSON()["Value"])["Operations"]
         assert len(operations) == 0
 
     def test_uploadOutputData_failUpload1(
@@ -345,22 +309,15 @@ class TestUploadOutputDataFile:
 
         * The output should be uploaded correctly with the second method.
         """
-        mock_setFileStatus = mocker.patch("DIRAC.TransformationSystem.Client.FileReport.FileReport.setFileStatus")
-
-        mock_setJobParameter = mocker.patch("DIRAC.WorkloadManagementSystem.Client.JobReport.JobReport.setJobParameter")
-
-        mock_transferAndRegisterFile = mocker.patch(
-            "DIRAC.DataManagementSystem.Client.FailoverTransfer.FailoverTransfer.transferAndRegisterFile",
+        mocker.patch.object(
+            upload_output.failover_transfer,
+            "transferAndRegisterFile",
             return_value=S_ERROR("Error uploading file"),
         )
 
-        mock_transferAndRegisterFileFailover = mocker.patch(
-            "DIRAC.DataManagementSystem.Client.FailoverTransfer.FailoverTransfer.transferAndRegisterFileFailover",
-            return_value=S_OK(),
-        )
-
-        mock_sendXMLBookkeepingReport = mocker.patch(
-            "LHCbDIRAC.BookkeepingSystem.Client.BookkeepingClient.BookkeepingClient.sendXMLBookkeepingReport",
+        mocker.patch.object(
+            upload_output.failover_transfer,
+            "transferAndRegisterFileFailover",
             return_value=S_OK(),
         )
 
@@ -376,23 +333,21 @@ class TestUploadOutputDataFile:
 
         upload_output.execute(job_path)
 
-        updated_wf_commons = WorkflowCommons.load(job_path)
+        assert upload_output.file_report.setFileStatus.call_count == 0
+        assert upload_output.bk_client.sendXMLBookkeepingReport.call_count == 1
 
-        assert mock_setFileStatus.call_count == 0
-        assert mock_sendXMLBookkeepingReport.call_count == 1
+        assert upload_output.failover_transfer.transferAndRegisterFile.call_count == 1
+        assert upload_output.failover_transfer.transferAndRegisterFile.call_args[1]["fileName"] == str(sim_file)
 
-        assert mock_transferAndRegisterFile.call_count == 1
-        assert mock_transferAndRegisterFile.call_args[1]["fileName"] == str(sim_file)
+        assert upload_output.failover_transfer.transferAndRegisterFileFailover.call_count == 1
+        assert upload_output.failover_transfer.transferAndRegisterFileFailover.call_args[1]["fileName"] == str(sim_file)
 
-        assert mock_transferAndRegisterFileFailover.call_count == 1
-        assert mock_transferAndRegisterFileFailover.call_args[1]["fileName"] == str(sim_file)
-
-        assert mock_setJobParameter.call_count == 1
-        assert mock_setJobParameter.call_args[0][0] == "UploadedOutputData"
-        assert mock_setJobParameter.call_args[0][1] == str(sim_file)
+        assert upload_output.job_report.setJobParameter.call_count == 1
+        assert upload_output.job_report.setJobParameter.call_args[0][0] == "UploadedOutputData"
+        assert upload_output.job_report.setJobParameter.call_args[0][1] == str(sim_file)
 
         # Make sure the request is not generated
-        operations = json.loads(updated_wf_commons.request.toJSON()["Value"])["Operations"]
+        operations = json.loads(upload_output.request.toJSON()["Value"])["Operations"]
         assert len(operations) == 0
 
     def test_uploadOutputData_failUpload2(
@@ -402,29 +357,20 @@ class TestUploadOutputDataFile:
 
         * A request should be generated to upload outputs later.
         """
-        mock_setFileStatus = mocker.patch("DIRAC.TransformationSystem.Client.FileReport.FileReport.setFileStatus")
-
-        mock_setJobParameter = mocker.patch("DIRAC.WorkloadManagementSystem.Client.JobReport.JobReport.setJobParameter")
-
-        mock_transferAndRegisterFile = mocker.patch(
-            "DIRAC.DataManagementSystem.Client.FailoverTransfer.FailoverTransfer.transferAndRegisterFile",
+        mocker.patch.object(
+            upload_output.failover_transfer,
+            "transferAndRegisterFile",
             return_value=S_ERROR("Error uploading file"),
         )
 
-        mock_transferAndRegisterFileFailover = mocker.patch(
-            "DIRAC.DataManagementSystem.Client.FailoverTransfer.FailoverTransfer.transferAndRegisterFileFailover",
+        mocker.patch.object(
+            upload_output.failover_transfer,
+            "transferAndRegisterFileFailover",
             return_value=S_ERROR("Error uploading file"),
-        )
-
-        mock_sendXMLBookkeepingReport = mocker.patch(
-            "LHCbDIRAC.BookkeepingSystem.Client.BookkeepingClient.BookkeepingClient.sendXMLBookkeepingReport",
-            return_value=S_OK(),
         )
 
         # Mock a previous failover request:
         # Add the end of the execution, o1 should be removed
-        req = Request()
-
         file1 = File()
         file1.LFN = (
             f"/lhcb/{wf_commons['config_name']}/{wf_commons['config_version']}"
@@ -440,10 +386,8 @@ class TestUploadOutputDataFile:
         o2.Type = "RegisterFile"
         o2.addFile(file2)
 
-        req.addOperation(o1)
-        req.addOperation(o2)
-
-        wf_commons["request_dict"] = json.loads(req.toJSON()["Value"])
+        upload_output.request.addOperation(o1)
+        upload_output.request.addOperation(o2)
 
         wf_commons["outputs"] = [
             {"outputDataName": sim_file, "outputDataType": "sim", "outputBKType": "SIM", "stepName": "Gauss_1"}
@@ -459,21 +403,19 @@ class TestUploadOutputDataFile:
         with pytest.raises(WorkflowProcessingException, match="Failed to upload output data"):
             upload_output.execute(job_path)
 
-        updated_wf_commons = WorkflowCommons.load(job_path)
+        assert upload_output.file_report.setFileStatus.call_count == 0
+        assert upload_output.bk_client.sendXMLBookkeepingReport.call_count == 1
 
-        assert mock_setFileStatus.call_count == 0
-        assert mock_sendXMLBookkeepingReport.call_count == 1
+        assert upload_output.failover_transfer.transferAndRegisterFile.call_count == 1
+        assert upload_output.failover_transfer.transferAndRegisterFile.call_args[1]["fileName"] == str(sim_file)
 
-        assert mock_transferAndRegisterFile.call_count == 1
-        assert mock_transferAndRegisterFile.call_args[1]["fileName"] == str(sim_file)
+        assert upload_output.failover_transfer.transferAndRegisterFileFailover.call_count == 1
+        assert upload_output.failover_transfer.transferAndRegisterFileFailover.call_args[1]["fileName"] == str(sim_file)
 
-        assert mock_transferAndRegisterFileFailover.call_count == 1
-        assert mock_transferAndRegisterFileFailover.call_args[1]["fileName"] == str(sim_file)
-
-        assert mock_setJobParameter.call_count == 0
+        assert upload_output.job_report.setJobParameter.call_count == 0
 
         # Make sure the request is generated
-        operations = json.loads(updated_wf_commons.request.toJSON()["Value"])["Operations"]
+        operations = json.loads(upload_output.request.toJSON()["Value"])["Operations"]
         assert len(operations) == 2
 
         assert operations[0]["Type"] == "RegisterFile"
@@ -494,22 +436,21 @@ class TestUploadOutputDataFile:
         * The output should be uploaded and registered in the bookkeeping system.
         * The bookkeeping report should be added to a failover request.
         """
-        mock_setFileStatus = mocker.patch("DIRAC.TransformationSystem.Client.FileReport.FileReport.setFileStatus")
-
-        mock_setJobParameter = mocker.patch("DIRAC.WorkloadManagementSystem.Client.JobReport.JobReport.setJobParameter")
-
-        mock_transferAndRegisterFile = mocker.patch(
-            "DIRAC.DataManagementSystem.Client.FailoverTransfer.FailoverTransfer.transferAndRegisterFile",
+        mocker.patch.object(
+            upload_output.failover_transfer,
+            "transferAndRegisterFile",
             return_value=S_OK({"uploadedSE": "CERN", "lfn": sim_file}),
         )
 
-        mock_transferAndRegisterFileFailover = mocker.patch(
-            "DIRAC.DataManagementSystem.Client.FailoverTransfer.FailoverTransfer.transferAndRegisterFileFailover",
+        mocker.patch.object(
+            upload_output.failover_transfer,
+            "transferAndRegisterFileFailover",
             return_value=S_ERROR("Error uploading file"),
         )
 
-        mock_sendXMLBookkeepingReport = mocker.patch(
-            "LHCbDIRAC.BookkeepingSystem.Client.BookkeepingClient.BookkeepingClient.sendXMLBookkeepingReport",
+        mocker.patch.object(
+            upload_output.bk_client,
+            "sendXMLBookkeepingReport",
             return_value={"OK": False, "rpcStub": "Error", "Message": "Error sending BK report"},
         )
 
@@ -525,22 +466,20 @@ class TestUploadOutputDataFile:
 
         upload_output.execute(job_path)
 
-        updated_wf_commons = WorkflowCommons.load(job_path)
+        assert upload_output.file_report.setFileStatus.call_count == 0
+        assert upload_output.bk_client.sendXMLBookkeepingReport.call_count == 1
 
-        assert mock_setFileStatus.call_count == 0
-        assert mock_sendXMLBookkeepingReport.call_count == 1
+        assert upload_output.failover_transfer.transferAndRegisterFile.call_count == 1
+        assert upload_output.failover_transfer.transferAndRegisterFile.call_args[1]["fileName"] == str(sim_file)
 
-        assert mock_transferAndRegisterFile.call_count == 1
-        assert mock_transferAndRegisterFile.call_args[1]["fileName"] == str(sim_file)
+        assert upload_output.failover_transfer.transferAndRegisterFileFailover.call_count == 0
 
-        assert mock_transferAndRegisterFileFailover.call_count == 0
-
-        assert mock_setJobParameter.call_count == 1
-        assert mock_setJobParameter.call_args[0][0] == "UploadedOutputData"
-        assert mock_setJobParameter.call_args[0][1] == str(sim_file)
+        assert upload_output.job_report.setJobParameter.call_count == 1
+        assert upload_output.job_report.setJobParameter.call_args[0][0] == "UploadedOutputData"
+        assert upload_output.job_report.setJobParameter.call_args[0][1] == str(sim_file)
 
         # Make sure the request is not generated
-        operations = json.loads(updated_wf_commons.request.toJSON()["Value"])["Operations"]
+        operations = json.loads(upload_output.request.toJSON()["Value"])["Operations"]
         assert len(operations) == 1
 
         assert operations[0]["Type"] == "ForwardDISET"
@@ -558,22 +497,15 @@ class TestUploadOutputDataFile:
             "dirac_cwl.commands.upload_output_data.getFileDescendents", return_value=S_OK(["/path/to/other/file.txt"])
         )
 
-        mock_setFileStatus = mocker.patch("DIRAC.TransformationSystem.Client.FileReport.FileReport.setFileStatus")
-
-        mock_setJobParameter = mocker.patch("DIRAC.WorkloadManagementSystem.Client.JobReport.JobReport.setJobParameter")
-
-        mock_transferAndRegisterFile = mocker.patch(
-            "DIRAC.DataManagementSystem.Client.FailoverTransfer.FailoverTransfer.transferAndRegisterFile",
+        mocker.patch.object(
+            upload_output.failover_transfer,
+            "transferAndRegisterFile",
             return_value=S_OK({"uploadedSE": "CERN", "lfn": sim_file}),
         )
 
-        mock_transferAndRegisterFileFailover = mocker.patch(
-            "DIRAC.DataManagementSystem.Client.FailoverTransfer.FailoverTransfer.transferAndRegisterFileFailover"
-        )
+        mocker.patch.object(upload_output.failover_transfer, "transferAndRegisterFileFailover")
 
-        mock_sendXMLBookkeepingReport = mocker.patch(
-            "LHCbDIRAC.BookkeepingSystem.Client.BookkeepingClient.BookkeepingClient.sendXMLBookkeepingReport"
-        )
+        mocker.patch.object(upload_output.bk_client, "sendXMLBookkeepingReport")
 
         wf_commons["outputs"] = [
             {"outputDataName": sim_file, "outputDataType": "sim", "outputBKType": "SIM", "stepName": "Gauss_1"}
@@ -589,39 +521,30 @@ class TestUploadOutputDataFile:
         with pytest.raises(WorkflowProcessingException):
             upload_output.execute(job_path)
 
-        updated_wf_commons = WorkflowCommons.load(job_path)
+        assert upload_output.file_report.setFileStatus.assert_called_once
+        assert upload_output.file_report.setFileStatus.call_args[0][0] == int(wf_commons["production_id"])
+        assert upload_output.bk_client.sendXMLBookkeepingReport.call_count == 0
 
-        assert mock_setFileStatus.assert_called_once
-        assert mock_setFileStatus.call_args[0][0] == int(wf_commons["production_id"])
-        assert mock_sendXMLBookkeepingReport.call_count == 0
+        assert upload_output.failover_transfer.transferAndRegisterFile.call_count == 0
+        assert upload_output.failover_transfer.transferAndRegisterFileFailover.call_count == 0
 
-        assert mock_transferAndRegisterFile.call_count == 0
-        assert mock_transferAndRegisterFileFailover.call_count == 0
-
-        assert mock_setJobParameter.call_count == 0
+        assert upload_output.job_report.setJobParameter.call_count == 0
 
         # Make sure the request is not generated
-        operations = json.loads(updated_wf_commons.request.toJSON()["Value"])["Operations"]
+        operations = json.loads(upload_output.request.toJSON()["Value"])["Operations"]
         assert len(operations) == 0
 
     def test_uploadOutputData_noOutput(self, mocker: MockerFixture, upload_output, job_path, wf_commons, sim_file):
         """Test UploadOutputData with no output data."""
-        mock_setFileStatus = mocker.patch("DIRAC.TransformationSystem.Client.FileReport.FileReport.setFileStatus")
-
-        mock_setJobParameter = mocker.patch("DIRAC.WorkloadManagementSystem.Client.JobReport.JobReport.setJobParameter")
-
-        mock_transferAndRegisterFile = mocker.patch(
-            "DIRAC.DataManagementSystem.Client.FailoverTransfer.FailoverTransfer.transferAndRegisterFile",
+        mocker.patch.object(
+            upload_output.failover_transfer,
+            "transferAndRegisterFile",
             return_value=S_OK({"uploadedSE": "CERN", "lfn": sim_file}),
         )
 
-        mock_transferAndRegisterFileFailover = mocker.patch(
-            "DIRAC.DataManagementSystem.Client.FailoverTransfer.FailoverTransfer.transferAndRegisterFileFailover"
-        )
+        mocker.patch.object(upload_output.failover_transfer, "transferAndRegisterFileFailover")
 
-        mock_sendXMLBookkeepingReport = mocker.patch(
-            "LHCbDIRAC.BookkeepingSystem.Client.BookkeepingClient.BookkeepingClient.sendXMLBookkeepingReport"
-        )
+        mocker.patch.object(upload_output.bk_client, "sendXMLBookkeepingReport")
 
         wf_commons["outputs"] = [
             {"outputDataName": sim_file, "outputDataType": "sim", "outputBKType": "SIM", "stepName": "Gauss_1"}
@@ -640,40 +563,27 @@ class TestUploadOutputDataFile:
         with pytest.raises(WorkflowProcessingException, match="Output data not found"):
             upload_output.execute(job_path)
 
-        updated_wf_commons = WorkflowCommons.load(job_path)
+        assert upload_output.file_report.setFileStatus.call_count == 0
+        assert upload_output.bk_client.sendXMLBookkeepingReport.call_count == 0
 
-        assert mock_setFileStatus.call_count == 0
-        assert mock_sendXMLBookkeepingReport.call_count == 0
+        assert upload_output.failover_transfer.transferAndRegisterFile.call_count == 0
+        assert upload_output.failover_transfer.transferAndRegisterFileFailover.call_count == 0
 
-        assert mock_transferAndRegisterFile.call_count == 0
-        assert mock_transferAndRegisterFileFailover.call_count == 0
-
-        assert mock_setJobParameter.call_count == 0
+        assert upload_output.job_report.setJobParameter.call_count == 0
 
         # Make sure the request is not generated
-        print(updated_wf_commons)
-        operations = json.loads(updated_wf_commons.request.toJSON()["Value"])["Operations"]
+        operations = json.loads(upload_output.request.toJSON()["Value"])["Operations"]
         assert len(operations) == 0
 
     def test_uploadOutputData_previousError_fail(
         self, mocker: MockerFixture, upload_output, job_path, wf_commons, sim_file
     ):
         """Test UploadOutputData with an intentional failure."""
-        mock_setFileStatus = mocker.patch("DIRAC.TransformationSystem.Client.FileReport.FileReport.setFileStatus")
+        mocker.patch.object(upload_output.failover_transfer, "transferAndRegisterFile")
 
-        mock_setJobParameter = mocker.patch("DIRAC.WorkloadManagementSystem.Client.JobReport.JobReport.setJobParameter")
+        mocker.patch.object(upload_output.failover_transfer, "transferAndRegisterFileFailover")
 
-        mock_transferAndRegisterFile = mocker.patch(
-            "DIRAC.DataManagementSystem.Client.FailoverTransfer.FailoverTransfer.transferAndRegisterFile"
-        )
-
-        mock_transferAndRegisterFileFailover = mocker.patch(
-            "DIRAC.DataManagementSystem.Client.FailoverTransfer.FailoverTransfer.transferAndRegisterFileFailover"
-        )
-
-        mock_sendXMLBookkeepingReport = mocker.patch(
-            "LHCbDIRAC.BookkeepingSystem.Client.BookkeepingClient.BookkeepingClient.sendXMLBookkeepingReport"
-        )
+        mocker.patch.object(upload_output.bk_client, "sendXMLBookkeepingReport")
 
         wf_commons["outputs"] = [
             {"outputDataName": sim_file, "outputDataType": "sim", "outputBKType": "SIM", "stepName": "Gauss_1"}
@@ -691,16 +601,14 @@ class TestUploadOutputDataFile:
 
         upload_output.execute(job_path)
 
-        updated_wf_commons = WorkflowCommons.load(job_path)
+        assert upload_output.file_report.setFileStatus.call_count == 0
+        assert upload_output.bk_client.sendXMLBookkeepingReport.call_count == 0
 
-        assert mock_setFileStatus.call_count == 0
-        assert mock_sendXMLBookkeepingReport.call_count == 0
+        assert upload_output.failover_transfer.transferAndRegisterFile.call_count == 0
+        assert upload_output.failover_transfer.transferAndRegisterFileFailover.call_count == 0
 
-        assert mock_transferAndRegisterFile.call_count == 0
-        assert mock_transferAndRegisterFileFailover.call_count == 0
-
-        assert mock_setJobParameter.call_count == 0
+        assert upload_output.job_report.setJobParameter.call_count == 0
 
         # Make sure the request is not generated
-        operations = json.loads(updated_wf_commons.request.toJSON()["Value"])["Operations"]
+        operations = json.loads(upload_output.request.toJSON()["Value"])["Operations"]
         assert len(operations) == 0

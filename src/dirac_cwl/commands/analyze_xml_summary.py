@@ -3,6 +3,7 @@
 import logging
 import os
 
+from DIRAC.TransformationSystem.Client.FileReport import FileReport
 from LHCbDIRAC.Workflow.Modules.AnalyseXMLSummary import _areInputsOK, _isXMLSummaryOK
 
 from dirac_cwl.core.exceptions import WorkflowProcessingException
@@ -36,14 +37,20 @@ class AnalyseXmlSummary(PostProcessCommand):
                 step_commons.inputs,
                 step_commons.number_of_events,
                 workflow_commons.production_id,
-                workflow_commons.file_report,
+                self.file_report,
             )
         if not job_ok:
-            workflow_commons.job_report.setApplicationStatus("XMLSummary reports error")
+            self.job_report.setApplicationStatus("XMLSummary reports error")
             raise WorkflowProcessingException("XMLSummary reports error")
 
         if workflow_commons.step_status == StepStatus.Failed:
             logger.info("Workflow already failed")
             return
 
-        workflow_commons.job_report.setApplicationStatus(f"{step_commons.application_name} Step OK")
+        self.job_report.setApplicationStatus(f"{step_commons.application_name} Step OK")
+
+    def _resolve_clients(self, workflow_commons):
+        super()._resolve_clients(workflow_commons)
+
+        if not self.file_report:
+            self.file_report = FileReport()

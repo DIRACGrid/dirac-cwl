@@ -4,6 +4,7 @@ from pathlib import Path
 from textwrap import dedent
 
 import pytest
+from DIRAC.AccountingSystem.Client.DataStoreClient import DataStoreClient
 from pytest_mock import MockerFixture
 
 from dirac_cwl.commands import WorkflowAccounting
@@ -16,15 +17,18 @@ class TestWorkflowAccounting:
     @pytest.fixture
     def accounting(self, mocker: MockerFixture, job_path):
         """Fixture for WorkflowAccounting module."""
-        yield WorkflowAccounting()
+        command = WorkflowAccounting()
+
+        command.dsc = DataStoreClient()
+        mocker.patch.object(command.dsc, "addRegister")
+
+        yield command
 
         Path(job_path).joinpath("workflow_commons.json").unlink(missing_ok=True)
 
     # Test Scenarios
     def test_accounting_success(self, mocker: MockerFixture, job_path, accounting, wf_commons, xml_summary_file):
         """Test successful execution of WorkflowAccounting module."""
-        mock_addRegister = mocker.patch("DIRAC.AccountingSystem.Client.DataStoreClient.DataStoreClient.addRegister")
-
         wf_commons["steps"][0]["application_name"] = "Gauss"
         xml_content = dedent("""<?xml version="1.0" encoding="UTF-8"?>
             <summary version="1.0" xsi:noNamespaceSchemaLocation="$XMLSUMMARYBASEROOT/xml/XMLSummary.xsd"
@@ -60,14 +64,12 @@ class TestWorkflowAccounting:
         WorkflowCommons.load(job_path)
 
         # Make sure the dsc was called
-        assert mock_addRegister.assert_called_once
+        assert accounting.dsc.addRegister.assert_called_once
 
     def test_accounting_noApplicationName_fail(
         self, mocker: MockerFixture, job_path, accounting, wf_commons, xml_summary_file
     ):
         """Test WorkflowAccounting when there is no application name in step commons."""
-        mock_addRegister = mocker.patch("DIRAC.AccountingSystem.Client.DataStoreClient.DataStoreClient.addRegister")
-
         xml_content = dedent("""<?xml version="1.0" encoding="UTF-8"?>
             <summary version="1.0" xsi:noNamespaceSchemaLocation="$XMLSUMMARYBASEROOT/xml/XMLSummary.xsd"
             xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
@@ -100,14 +102,12 @@ class TestWorkflowAccounting:
         WorkflowCommons.load(job_path)
 
         # Make sure the dsc was not called
-        assert mock_addRegister.assert_not_called
+        assert accounting.dsc.addRegister.assert_not_called
 
     def test_accounting_incompleteData_success(
         self, mocker: MockerFixture, job_path, accounting, wf_commons, xml_summary_file
     ):
         """Test successful execution of WorkflowAccounting module."""
-        mock_addRegister = mocker.patch("DIRAC.AccountingSystem.Client.DataStoreClient.DataStoreClient.addRegister")
-
         xml_content = dedent("""<?xml version="1.0" encoding="UTF-8"?>
             <summary version="1.0" xsi:noNamespaceSchemaLocation="$XMLSUMMARYBASEROOT/xml/XMLSummary.xsd"
             xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
@@ -140,14 +140,12 @@ class TestWorkflowAccounting:
         WorkflowCommons.load(job_path)
 
         # Make sure the dsc was not called
-        assert mock_addRegister.assert_not_called
+        assert accounting.dsc.addRegister.assert_not_called
 
     def test_accounting_previousError_fail(
         self, mocker: MockerFixture, job_path, accounting, wf_commons, xml_summary_file
     ):
         """Test WorkflowAccounting with an intentional failure."""
-        mock_addRegister = mocker.patch("DIRAC.AccountingSystem.Client.DataStoreClient.DataStoreClient.addRegister")
-
         xml_content = dedent("""<?xml version="1.0" encoding="UTF-8"?>
             <summary version="1.0" xsi:noNamespaceSchemaLocation="$XMLSUMMARYBASEROOT/xml/XMLSummary.xsd"
             xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
@@ -184,4 +182,4 @@ class TestWorkflowAccounting:
         WorkflowCommons.load(job_path)
 
         # Make sure the dsc was called
-        assert mock_addRegister.assert_called_once
+        assert accounting.dsc.addRegister.assert_called_once

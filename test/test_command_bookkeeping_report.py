@@ -427,9 +427,7 @@ class TestBookkeepingReport:
         simulation_condition = root.find("SimulationCondition")
         assert simulation_condition is None, "SimulationCondition element should not be present."
 
-    def test_bkreport_previousError_success(
-        self, mocker: MockerFixture, bk_report, job_path, wf_commons, bookkeeping_file
-    ):
+    def test_bkreport_previousError_success(self, bk_report, job_path, wf_commons, bookkeeping_file):
         """Test previous command failure."""
         wf_commons["steps"][0]["application_name"] = "Gauss"
         wf_commons["steps"][0]["application_version"] = wf_commons["config_version"]

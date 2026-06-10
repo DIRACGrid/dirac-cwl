@@ -6,6 +6,8 @@ import zipfile
 from pathlib import Path
 
 import pytest
+from DIRAC.DataManagementSystem.Client.FailoverTransfer import FailoverTransfer
+from DIRAC.RequestManagementSystem.Client.Request import Request
 from DIRACCommon.Core.Utilities.ReturnValues import S_ERROR, S_OK
 from pytest_mock import MockerFixture
 
@@ -19,14 +21,21 @@ class TestUploadLogFile:
     @pytest.fixture
     def uplogfile(self, mocker: MockerFixture, wf_commons, job_path):
         """Fixture for UploadLogFile module."""
-        uplogfile = UploadLogFile()
+        command = UploadLogFile()
+        command.request = Request()
+        command.failover_transfer = FailoverTransfer(command.request)
 
-        yield uplogfile
+        mocker.patch.object(command, "job_report")
+        mocker.patch.object(command.job_report, "setJobParameter")
+        mocker.patch.object(command.job_report, "setApplicationStatus")
+        mocker.patch.object(command.failover_transfer, "transferAndRegisterFile", return_value=S_OK())
+
+        yield command
 
         Path(job_path).joinpath(f"{wf_commons['prod_job_id']}.zip").unlink(missing_ok=True)
-        shutil.rmtree(Path(job_path).joinpath("unzipped"), ignore_errors=True)
-
         Path(job_path).joinpath("workflow_commons.json").unlink(missing_ok=True)
+
+        shutil.rmtree(Path(job_path).joinpath("unzipped"), ignore_errors=True)
 
     @pytest.fixture
     def prodconf_json(self, job_path):
@@ -61,14 +70,6 @@ class TestUploadLogFile:
         mock_se_method = mocker.patch(
             "DIRAC.Resources.Storage.StorageElement.StorageElementItem._StorageElementItem__executeMethod",
             return_value=S_OK({"Failed": [], "Successful": {log_url: log_url}}),
-        )
-        mock_transferAndRegisterFile = mocker.patch(
-            "DIRAC.DataManagementSystem.Client.FailoverTransfer.FailoverTransfer.transferAndRegisterFile",
-            return_value=S_OK(),
-        )
-        mock_setJobParameter = mocker.patch("DIRAC.WorkloadManagementSystem.Client.JobReport.JobReport.setJobParameter")
-        mock_setApplicationStatus = mocker.patch(
-            "DIRAC.WorkloadManagementSystem.Client.JobReport.JobReport.setApplicationStatus"
         )
 
         WorkflowCommons(**wf_commons).save(job_path)
@@ -105,15 +106,15 @@ class TestUploadLogFile:
         assert mock_se_method.call_count == 2
 
         # Make sure that the request was not created
-        assert mock_transferAndRegisterFile.call_count == 0
+        assert uplogfile.failover_transfer.transferAndRegisterFile.call_count == 0
 
         # Make sure the application status was not changed
-        assert mock_setApplicationStatus.call_count == 0
+        assert uplogfile.job_report.setApplicationStatus.call_count == 0
 
-        # Check the jobReport.setParameter arguments
-        assert mock_setJobParameter.call_count == 1
-        assert mock_setJobParameter.call_args_list
-        params = mock_setJobParameter.call_args_list[0][0]
+        # Check the job_report.setParameter arguments
+        assert uplogfile.job_report.setJobParameter.call_count == 1
+        assert uplogfile.job_report.setJobParameter.call_args_list
+        params = uplogfile.job_report.setJobParameter.call_args_list[0][0]
         assert params[0] == "Log URL"
         assert params[1] == f'<a href="{log_url}">Log file directory</a>'
 
@@ -127,14 +128,6 @@ class TestUploadLogFile:
         mock_se_method = mocker.patch(
             "DIRAC.Resources.Storage.StorageElement.StorageElementItem._StorageElementItem__executeMethod",
             return_value=S_OK({"Failed": [], "Successful": {"notImportant": "notImportant"}}),
-        )
-        mock_transferAndRegisterFile = mocker.patch(
-            "DIRAC.DataManagementSystem.Client.FailoverTransfer.FailoverTransfer.transferAndRegisterFile",
-            return_value=S_OK(),
-        )
-        mock_setJobParameter = mocker.patch("DIRAC.WorkloadManagementSystem.Client.JobReport.JobReport.setJobParameter")
-        mock_setApplicationStatus = mocker.patch(
-            "DIRAC.WorkloadManagementSystem.Client.JobReport.JobReport.setApplicationStatus"
         )
 
         WorkflowCommons(**wf_commons).save(job_path)
@@ -159,11 +152,11 @@ class TestUploadLogFile:
         assert mock_se_method.call_count == 0
 
         # Make sure that the request was not created
-        assert mock_transferAndRegisterFile.call_count == 0
+        assert uplogfile.failover_transfer.transferAndRegisterFile.call_count == 0
 
         # Make sure the application status was changed
-        assert mock_setApplicationStatus.call_count == 1
-        assert mock_setJobParameter.call_count == 0
+        assert uplogfile.job_report.setApplicationStatus.call_count == 1
+        assert uplogfile.job_report.setJobParameter.call_count == 0
 
         shutil.rmtree(updated_wf_commons.log_dir, ignore_errors=True)
 
@@ -175,13 +168,6 @@ class TestUploadLogFile:
         mock_se_method = mocker.patch(
             "DIRAC.Resources.Storage.StorageElement.StorageElementItem._StorageElementItem__executeMethod",
             return_value=S_OK({"Failed": [], "Successful": {"notImportant": "notImportant"}}),
-        )
-        mock_transferAndRegisterFile = mocker.patch(
-            "DIRAC.DataManagementSystem.Client.FailoverTransfer.FailoverTransfer.transferAndRegisterFile",
-            return_value=S_OK(),
-        )
-        mock_setApplicationStatus = mocker.patch(
-            "DIRAC.WorkloadManagementSystem.Client.JobReport.JobReport.setApplicationStatus"
         )
 
         WorkflowCommons(**wf_commons).save(job_path)
@@ -211,10 +197,10 @@ class TestUploadLogFile:
         assert mock_se_method.call_count == 0
 
         # Make sure that the request was not created
-        assert mock_transferAndRegisterFile.call_count == 0
+        assert uplogfile.failover_transfer.transferAndRegisterFile.call_count == 0
 
         # Make sure the application status was changed
-        assert mock_setApplicationStatus.call_count == 1
+        assert uplogfile.job_report.setApplicationStatus.call_count == 1
 
         shutil.rmtree(updated_wf_commons.log_dir, ignore_errors=True)
 
@@ -226,13 +212,6 @@ class TestUploadLogFile:
         mock_se_method = mocker.patch(
             "DIRAC.Resources.Storage.StorageElement.StorageElementItem._StorageElementItem__executeMethod",
             return_value=S_OK({"Failed": [], "Successful": {"notImportant": "notImportant"}}),
-        )
-        mock_transferAndRegisterFile = mocker.patch(
-            "DIRAC.DataManagementSystem.Client.FailoverTransfer.FailoverTransfer.transferAndRegisterFile",
-            return_value=S_OK(),
-        )
-        mock_setApplicationStatus = mocker.patch(
-            "DIRAC.WorkloadManagementSystem.Client.JobReport.JobReport.setApplicationStatus"
         )
 
         # Execute the module
@@ -263,10 +242,10 @@ class TestUploadLogFile:
         assert mock_se_method.call_count == 0
 
         # Make sure that the request was not created
-        assert mock_transferAndRegisterFile.call_count == 0
+        assert uplogfile.failover_transfer.transferAndRegisterFile.call_count == 0
 
         # Make sure the application status was changed
-        assert mock_setApplicationStatus.call_count == 1
+        assert uplogfile.job_report.setApplicationStatus.call_count == 1
 
         shutil.rmtree(updated_wf_commons.log_dir, ignore_errors=True)
 
@@ -279,12 +258,10 @@ class TestUploadLogFile:
             "DIRAC.Resources.Storage.StorageElement.StorageElementItem._StorageElementItem__executeMethod",
             return_value=S_ERROR("Error"),
         )
-        mock_transferAndRegisterFile = mocker.patch(
-            "DIRAC.DataManagementSystem.Client.FailoverTransfer.FailoverTransfer.transferAndRegisterFile",
+        mocker.patch.object(
+            uplogfile.failover_transfer,
+            "transferAndRegisterFile",
             return_value=S_OK({"uploadedSE": "SE1"}),
-        )
-        mock_setApplicationStatus = mocker.patch(
-            "DIRAC.WorkloadManagementSystem.Client.JobReport.JobReport.setApplicationStatus"
         )
 
         WorkflowCommons(**wf_commons).save(job_path)
@@ -321,9 +298,9 @@ class TestUploadLogFile:
         assert mock_se_method.call_count == 2
 
         # Make sure that the request was created
-        assert mock_transferAndRegisterFile.call_count == 1
+        assert uplogfile.failover_transfer.transferAndRegisterFile.call_count == 1
 
-        operations = json.loads(updated_wf_commons.request.toJSON()["Value"])["Operations"]
+        operations = json.loads(uplogfile.request.toJSON()["Value"])["Operations"]
 
         assert len(operations) == 2
         assert operations[0]["Type"] == "LogUpload"
@@ -335,7 +312,7 @@ class TestUploadLogFile:
         assert operations[1]["Files"][0]["LFN"] == updated_wf_commons.log_lfn_path
 
         # Make sure the application status was not changed
-        assert mock_setApplicationStatus.call_count == 0
+        assert uplogfile.job_report.setApplicationStatus.call_count == 0
 
         shutil.rmtree(updated_wf_commons.log_dir, ignore_errors=True)
 
@@ -348,12 +325,10 @@ class TestUploadLogFile:
             "DIRAC.Resources.Storage.StorageElement.StorageElementItem._StorageElementItem__executeMethod",
             return_value=S_ERROR("Error"),
         )
-        mock_transferAndRegisterFile = mocker.patch(
-            "DIRAC.DataManagementSystem.Client.FailoverTransfer.FailoverTransfer.transferAndRegisterFile",
+        mocker.patch.object(
+            uplogfile.failover_transfer,
+            "transferAndRegisterFile",
             return_value=S_ERROR("Error"),
-        )
-        mock_setApplicationStatus = mocker.patch(
-            "DIRAC.WorkloadManagementSystem.Client.JobReport.JobReport.setApplicationStatus"
         )
 
         WorkflowCommons(**wf_commons).save(job_path)
@@ -390,13 +365,13 @@ class TestUploadLogFile:
         assert mock_se_method.call_count == 2
 
         # Make sure that the request was not created
-        assert mock_transferAndRegisterFile.call_count == 1
+        assert uplogfile.failover_transfer.transferAndRegisterFile.call_count == 1
 
-        operations = json.loads(updated_wf_commons.request.toJSON()["Value"])["Operations"]
+        operations = json.loads(uplogfile.request.toJSON()["Value"])["Operations"]
 
         assert len(operations) == 0
 
         # Make sure the application status was changed
-        assert mock_setApplicationStatus.call_count == 1
+        assert uplogfile.job_report.setApplicationStatus.call_count == 1
 
         shutil.rmtree(updated_wf_commons.log_dir, ignore_errors=True)

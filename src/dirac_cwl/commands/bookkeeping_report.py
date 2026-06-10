@@ -7,6 +7,7 @@ from typing import Any, Dict
 
 from DIRAC.Core.Utilities.ReturnValues import SErrorException, returnValueOrRaise
 from DIRAC.Workflow.Utilities.Utils import getStepCPUTimes
+from LHCbDIRAC.BookkeepingSystem.Client.BookkeepingClient import BookkeepingClient
 from LHCbDIRAC.Core.Utilities.ProductionData import constructProductionLFNs
 from LHCbDIRAC.Workflow.Modules.BookkeepingReport import (
     _generate_xml_object,
@@ -82,9 +83,7 @@ class BookkeepingReport(PostProcessCommand):
         else:
             logger.info("BookkeepingLFNs parameters not found, creating on the fly")
             try:
-                production_lfns_dict = returnValueOrRaise(
-                    constructProductionLFNs(parameters, workflow_commons.bk_client)
-                )
+                production_lfns_dict = returnValueOrRaise(constructProductionLFNs(parameters, self.bk_client))
             except SErrorException as e:
                 logger.error("Could not create production LFNs", exc_info=e)
                 raise WorkflowProcessingException(f"Could not create production LFNs: {e}") from e
@@ -127,7 +126,7 @@ class BookkeepingReport(PostProcessCommand):
             step_commons.inputs,
             step_commons.id,
             step_commons.bk_id,
-            workflow_commons.bk_client,
+            self.bk_client,
             workflow_commons.config_name,
             workflow_commons.config_version,
         )
@@ -160,3 +159,9 @@ class BookkeepingReport(PostProcessCommand):
         bfilename = f"bookkeeping_{step_commons.id}.xml"
         with open(bfilename, "wb") as bfile:
             bfile.write(doc)
+
+    def _resolve_clients(self, workflow_commons):
+        super()._resolve_clients(workflow_commons)
+
+        if not self.bk_client:
+            self.bk_client = BookkeepingClient()

@@ -9,6 +9,7 @@ import os
 from typing import Any, Dict
 
 from DIRAC import gConfig
+from DIRAC.AccountingSystem.Client.DataStoreClient import DataStoreClient
 from DIRAC.Core.Utilities.ReturnValues import SErrorException, returnValueOrRaise
 from DIRAC.Workflow.Utilities.Utils import getStepCPUTimes
 from LHCbDIRAC.AccountingSystem.Client.Types.JobStep import JobStep
@@ -89,4 +90,10 @@ class WorkflowAccounting(PostProcessCommand):
                 f"Values for StepAccounting are wrong. Here are the given data: {data_dict}"
             ) from e
 
-        workflow_commons.dsc.addRegister(job_step)
+        self.dsc.addRegister(job_step)
+
+    def _resolve_clients(self, workflow_commons):
+        super()._resolve_clients(workflow_commons)
+
+        if not self.dsc:
+            self.dsc = DataStoreClient()

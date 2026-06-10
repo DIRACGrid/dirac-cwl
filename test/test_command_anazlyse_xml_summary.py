@@ -4,6 +4,7 @@ from pathlib import Path
 from textwrap import dedent
 
 import pytest
+from DIRAC.WorkloadManagementSystem.Client.JobReport import JobReport
 from DIRACCommon.Core.Utilities.ReturnValues import S_OK
 from LHCbDIRAC.Core.Utilities.XMLSummaries import XMLSummary
 from pytest_mock import MockerFixture
@@ -17,19 +18,21 @@ class TestAnalyseXmlSummary:
     """Collection of tests for the AnalyseXmlSummary command."""
 
     @pytest.fixture
-    def axlf(self, mocker: MockerFixture, job_path):
+    def axlf(self, mocker: MockerFixture, wf_commons, job_path):
         """Fixture for AnalyseXmlSummary module."""
-        yield AnalyseXmlSummary()
+        command = AnalyseXmlSummary()
+
+        command.job_report = JobReport(wf_commons["job_id"])
+
+        mocker.patch.object(command.job_report, "setApplicationStatus", return_value=S_OK())
+
+        yield command
 
         Path(job_path).joinpath("workflow_commons.json").unlink(missing_ok=True)
 
     # Test scenarios
-    def test_analyseXMLSummary_basic_success(self, mocker: MockerFixture, axlf, job_path, wf_commons, xml_summary_file):
+    def test_analyseXMLSummary_basic_success(self, axlf, job_path, wf_commons, xml_summary_file):
         """Test basic success scenario."""
-        mock_setApplicationStatus = mocker.patch(
-            "DIRAC.WorkloadManagementSystem.Client.JobReport.JobReport.setApplicationStatus", return_value=S_OK()
-        )
-
         xml_content = dedent("""<?xml version="1.0" encoding="UTF-8"?>
             <summary version="1.0" xsi:noNamespaceSchemaLocation="$XMLSUMMARYBASEROOT/xml/XMLSummary.xsd"
             xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
@@ -66,19 +69,11 @@ class TestAnalyseXmlSummary:
 
         axlf.execute(job_path)
 
-        updated_wf_commons = WorkflowCommons.load(job_path)
+        axlf.job_report.setApplicationStatus.assert_called_once()
+        assert axlf.file_report.statusDict == {}
 
-        mock_setApplicationStatus.assert_called_once()
-        assert updated_wf_commons.file_report.statusDict == {}
-
-    def test_analyseXMLSummary_previousError_success(
-        self, mocker: MockerFixture, axlf, job_path, wf_commons, xml_summary_file
-    ):
+    def test_analyseXMLSummary_previousError_success(self, axlf, job_path, wf_commons, xml_summary_file):
         """Test success scenario with previous error: stepStatus = S_ERROR()."""
-        mock_setApplicationStatus = mocker.patch(
-            "DIRAC.WorkloadManagementSystem.Client.JobReport.JobReport.setApplicationStatus", return_value=S_OK()
-        )
-
         xml_content = dedent("""<?xml version="1.0" encoding="UTF-8"?>
             <summary version="1.0" xsi:noNamespaceSchemaLocation="$XMLSUMMARYBASEROOT/xml/XMLSummary.xsd"
             xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
@@ -116,19 +111,11 @@ class TestAnalyseXmlSummary:
 
         axlf.execute(job_path)
 
-        updated_wf_commons = WorkflowCommons.load(job_path)
+        axlf.job_report.setApplicationStatus.assert_not_called()
+        assert axlf.file_report.statusDict == {}
 
-        mock_setApplicationStatus.assert_not_called()
-        assert updated_wf_commons.file_report.statusDict == {}
-
-    def test_analyseXMLSummary_badInput_success(
-        self, mocker: MockerFixture, axlf, job_path, wf_commons, xml_summary_file
-    ):
+    def test_analyseXMLSummary_badInput_success(self, axlf, job_path, wf_commons, xml_summary_file):
         """Test success scenario with part and fail input not part of the input data list."""
-        mock_setApplicationStatus = mocker.patch(
-            "DIRAC.WorkloadManagementSystem.Client.JobReport.JobReport.setApplicationStatus", return_value=S_OK()
-        )
-
         xml_content = dedent("""<?xml version="1.0" encoding="UTF-8"?>
             <summary version="1.0" xsi:noNamespaceSchemaLocation="$XMLSUMMARYBASEROOT/xml/XMLSummary.xsd"
             xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
@@ -167,19 +154,12 @@ class TestAnalyseXmlSummary:
 
         axlf.execute(job_path)
 
-        updated_wf_commons = WorkflowCommons.load(job_path)
+        axlf.job_report.setApplicationStatus.assert_called_once()
+        assert axlf.file_report.statusDict == {}
 
-        mock_setApplicationStatus.assert_called_once()
-        assert updated_wf_commons.file_report.statusDict == {}
-
-    def test_analyseXMLSummary_partInput_success(
-        self, mocker: MockerFixture, axlf, job_path, wf_commons, xml_summary_file
-    ):
+    def test_analyseXMLSummary_partInput_success(self, axlf, job_path, wf_commons, xml_summary_file):
         """Test success scenario with part input part of the input data list."""
         # Input is 'part' and is part of the input data list but the number of events is not -1
-        mock_setApplicationStatus = mocker.patch(
-            "DIRAC.WorkloadManagementSystem.Client.JobReport.JobReport.setApplicationStatus", return_value=S_OK()
-        )
 
         xml_content = dedent("""<?xml version="1.0" encoding="UTF-8"?>
             <summary version="1.0" xsi:noNamespaceSchemaLocation="$XMLSUMMARYBASEROOT/xml/XMLSummary.xsd"
@@ -217,19 +197,11 @@ class TestAnalyseXmlSummary:
 
         axlf.execute(job_path)
 
-        updated_wf_commons = WorkflowCommons.load(job_path)
+        axlf.job_report.setApplicationStatus.assert_called_once()
+        assert axlf.file_report.statusDict == {}
 
-        mock_setApplicationStatus.assert_called_once()
-        assert updated_wf_commons.file_report.statusDict == {}
-
-    def test_analyseXMLSummary_notSuccess_fail(
-        self, mocker: MockerFixture, axlf, job_path, wf_commons, xml_summary_file
-    ):
+    def test_analyseXMLSummary_notSuccess_fail(self, axlf, job_path, wf_commons, xml_summary_file):
         """Test failure scenario with success=False."""
-        mock_setApplicationStatus = mocker.patch(
-            "DIRAC.WorkloadManagementSystem.Client.JobReport.JobReport.setApplicationStatus", return_value=S_OK()
-        )
-
         xml_content = dedent("""<?xml version="1.0" encoding="UTF-8"?>
             <summary version="1.0" xsi:noNamespaceSchemaLocation="$XMLSUMMARYBASEROOT/xml/XMLSummary.xsd"
             xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
@@ -268,17 +240,11 @@ class TestAnalyseXmlSummary:
         with pytest.raises(WorkflowProcessingException):
             axlf.execute(job_path)
 
-        updated_wf_commons = WorkflowCommons.load(job_path)
+        axlf.job_report.setApplicationStatus.assert_called_once()
+        assert axlf.file_report.statusDict == {}
 
-        mock_setApplicationStatus.assert_called_once()
-        assert updated_wf_commons.file_report.statusDict == {}
-
-    def test_analyseXMLSummary_badStep_fail(self, mocker: MockerFixture, axlf, job_path, wf_commons, xml_summary_file):
+    def test_analyseXMLSummary_badStep_fail(self, axlf, job_path, wf_commons, xml_summary_file):
         """Test failure scenario with step != finalize."""
-        mock_setApplicationStatus = mocker.patch(
-            "DIRAC.WorkloadManagementSystem.Client.JobReport.JobReport.setApplicationStatus", return_value=S_OK()
-        )
-
         xml_content = dedent("""<?xml version="1.0" encoding="UTF-8"?>
             <summary version="1.0" xsi:noNamespaceSchemaLocation="$XMLSUMMARYBASEROOT/xml/XMLSummary.xsd"
             xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
@@ -316,19 +282,11 @@ class TestAnalyseXmlSummary:
         with pytest.raises(WorkflowProcessingException):
             axlf.execute(job_path)
 
-        updated_wf_commons = WorkflowCommons.load(job_path)
+        axlf.job_report.setApplicationStatus.assert_called_once()
+        assert axlf.file_report.statusDict == {}
 
-        mock_setApplicationStatus.assert_called_once()
-        assert updated_wf_commons.file_report.statusDict == {}
-
-    def test_analyseXMLSummary_badOutput_fail(
-        self, mocker: MockerFixture, axlf, job_path, wf_commons, xml_summary_file
-    ):
+    def test_analyseXMLSummary_badOutput_fail(self, axlf, job_path, wf_commons, xml_summary_file):
         """Test failure scenario with output status != full."""
-        mock_setApplicationStatus = mocker.patch(
-            "DIRAC.WorkloadManagementSystem.Client.JobReport.JobReport.setApplicationStatus", return_value=S_OK()
-        )
-
         xml_content = dedent("""<?xml version="1.0" encoding="UTF-8"?>
             <summary version="1.0" xsi:noNamespaceSchemaLocation="$XMLSUMMARYBASEROOT/xml/XMLSummary.xsd"
             xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
@@ -366,17 +324,11 @@ class TestAnalyseXmlSummary:
         with pytest.raises(WorkflowProcessingException):
             axlf.execute(job_path)
 
-        updated_wf_commons = WorkflowCommons.load(job_path)
+        axlf.job_report.setApplicationStatus.assert_called_once()
+        assert axlf.file_report.statusDict == {}
 
-        mock_setApplicationStatus.assert_called_once()
-        assert updated_wf_commons.file_report.statusDict == {}
-
-    def test_analyseXMLSummary_badInput_fail(self, mocker: MockerFixture, axlf, job_path, wf_commons, xml_summary_file):
+    def test_analyseXMLSummary_badInput_fail(self, axlf, job_path, wf_commons, xml_summary_file):
         """Test failure scenario with input status = mult."""
-        mock_setApplicationStatus = mocker.patch(
-            "DIRAC.WorkloadManagementSystem.Client.JobReport.JobReport.setApplicationStatus", return_value=S_OK()
-        )
-
         xml_content = dedent("""<?xml version="1.0" encoding="UTF-8"?>
             <summary version="1.0" xsi:noNamespaceSchemaLocation="$XMLSUMMARYBASEROOT/xml/XMLSummary.xsd"
             xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
@@ -414,19 +366,11 @@ class TestAnalyseXmlSummary:
         with pytest.raises(WorkflowProcessingException):
             axlf.execute(job_path)
 
-        updated_wf_commons = WorkflowCommons.load(job_path)
+        axlf.job_report.setApplicationStatus.assert_called_once()
+        assert axlf.file_report.statusDict == {}
 
-        mock_setApplicationStatus.assert_called_once()
-        assert updated_wf_commons.file_report.statusDict == {}
-
-    def test_analyseXMLSummary_badInput2_fail(
-        self, mocker: MockerFixture, axlf, job_path, wf_commons, xml_summary_file
-    ):
+    def test_analyseXMLSummary_badInput2_fail(self, axlf, job_path, wf_commons, xml_summary_file):
         """Test failure scenario with an unknown input status (weoweo)."""
-        mock_setApplicationStatus = mocker.patch(
-            "DIRAC.WorkloadManagementSystem.Client.JobReport.JobReport.setApplicationStatus", return_value=S_OK()
-        )
-
         xml_content = dedent("""<?xml version="1.0" encoding="UTF-8"?>
             <summary version="1.0" xsi:noNamespaceSchemaLocation="$XMLSUMMARYBASEROOT/xml/XMLSummary.xsd"
             xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
@@ -464,19 +408,11 @@ class TestAnalyseXmlSummary:
         with pytest.raises(WorkflowProcessingException):
             axlf.execute(job_path)
 
-        updated_wf_commons = WorkflowCommons.load(job_path)
+        axlf.job_report.setApplicationStatus.assert_called_once()
+        assert axlf.file_report.statusDict == {}
 
-        mock_setApplicationStatus.assert_called_once()
-        assert updated_wf_commons.file_report.statusDict == {}
-
-    def test_analyseXMLSummary_badInput3_fail(
-        self, mocker: MockerFixture, axlf, job_path, wf_commons, xml_summary_file
-    ):
+    def test_analyseXMLSummary_badInput3_fail(self, axlf, job_path, wf_commons, xml_summary_file):
         """Test failure scenario with input status = fail."""
-        mock_setApplicationStatus = mocker.patch(
-            "DIRAC.WorkloadManagementSystem.Client.JobReport.JobReport.setApplicationStatus", return_value=S_OK()
-        )
-
         xml_content = dedent("""<?xml version="1.0" encoding="UTF-8"?>
             <summary version="1.0" xsi:noNamespaceSchemaLocation="$XMLSUMMARYBASEROOT/xml/XMLSummary.xsd"
             xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
@@ -517,20 +453,12 @@ class TestAnalyseXmlSummary:
         with pytest.raises(WorkflowProcessingException):
             axlf.execute(job_path)
 
-        updated_wf_commons = WorkflowCommons.load(job_path)
+        axlf.job_report.setApplicationStatus.assert_called_once()
+        assert axlf.file_report.statusDict == {"00012478_00000532_1.sim": "Problematic"}
 
-        mock_setApplicationStatus.assert_called_once()
-        assert updated_wf_commons.file_report.statusDict == {"00012478_00000532_1.sim": "Problematic"}
-
-    def test_analyseXMLSummary_badInput4_fail(
-        self, mocker: MockerFixture, axlf, job_path, wf_commons, xml_summary_file
-    ):
+    def test_analyseXMLSummary_badInput4_fail(self, axlf, job_path, wf_commons, xml_summary_file):
         """Test failure scenario with input status = part."""
         # Input is 'part' and is part of the input data list but the number of events is -1 (by default)
-        mock_setApplicationStatus = mocker.patch(
-            "DIRAC.WorkloadManagementSystem.Client.JobReport.JobReport.setApplicationStatus", return_value=S_OK()
-        )
-
         xml_content = dedent("""<?xml version="1.0" encoding="UTF-8"?>
             <summary version="1.0" xsi:noNamespaceSchemaLocation="$XMLSUMMARYBASEROOT/xml/XMLSummary.xsd"
             xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
@@ -571,7 +499,5 @@ class TestAnalyseXmlSummary:
         with pytest.raises(WorkflowProcessingException):
             axlf.execute(job_path)
 
-        updated_wf_commons = WorkflowCommons.load(job_path)
-
-        mock_setApplicationStatus.assert_called_once()
-        assert updated_wf_commons.file_report.statusDict == {"00012478_00000532_1.sim": "Problematic"}
+        axlf.job_report.setApplicationStatus.assert_called_once()
+        assert axlf.file_report.statusDict == {"00012478_00000532_1.sim": "Problematic"}

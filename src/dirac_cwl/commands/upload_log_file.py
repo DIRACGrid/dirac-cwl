@@ -7,7 +7,10 @@ import shlex
 from DIRAC.ConfigurationSystem.Client.Helpers.Operations import Operations
 from DIRAC.Core.Utilities.ReturnValues import SErrorException, returnSingleResult, returnValueOrRaise
 from DIRAC.Core.Utilities.Subprocess import systemCall
+from DIRAC.DataManagementSystem.Client.FailoverTransfer import FailoverTransfer
+from DIRAC.RequestManagementSystem.Client.Request import Request
 from DIRAC.Resources.Storage.StorageElement import StorageElement
+from LHCbDIRAC.BookkeepingSystem.Client.BookkeepingClient import BookkeepingClient
 from LHCbDIRAC.Core.Utilities.ProductionData import getLogPath
 from LHCbDIRAC.Workflow.Modules.FailoverRequest import _prepareRequest
 from LHCbDIRAC.Workflow.Modules.UploadLogFile import (
@@ -38,9 +41,13 @@ class UploadLogFile(PostProcessCommand):
         :param workflow_commons: WorkflowCommons object.
         :param kwargs: Additional keyword arguments.
         """
-        # Obtain workflow information
         if workflow_commons.step_status == StepStatus.Failed:
             return
+
+        if not self.request:
+            self.request = Request(workflow_commons.request_dict)
+        if not self.failover_transfer:
+            self.failover_transfer = FailoverTransfer(self.request)
 
         log_lfn_path = workflow_commons.log_target_path
         if not log_lfn_path:
@@ -51,7 +58,7 @@ class UploadLogFile(PostProcessCommand):
                 "configVersion": workflow_commons.config_version,
             }
             try:
-                log_dict = returnValueOrRaise(getLogPath(parameters, workflow_commons.bk_client))
+                log_dict = returnValueOrRaise(getLogPath(parameters, self.bk_client))
             except SErrorException as e:
                 raise WorkflowProcessingException("Could not create LogFilePath") from e
             log_lfn_path = log_dict["LogTargetPath"][0]
@@ -65,7 +72,7 @@ class UploadLogFile(PostProcessCommand):
         log_se = ops.getValue("LogStorage/LogSE", "LogSE")
         log_extensions = ops.getValue("LogFiles/Extensions", [])
 
-        _prepareRequest(workflow_commons.request, workflow_commons.job_id)
+        _prepareRequest(self.request, workflow_commons.job_id)
 
         try:
             file_list = returnValueOrRaise(systemCall(0, shlex.split("ls -al")))
@@ -103,7 +110,7 @@ class UploadLogFile(PostProcessCommand):
             returnValueOrRaise(_populateLogDirectory(selected_files, workflow_commons.log_dir))
         except SErrorException as e:
             logger.error("Completely failed to populate temporary log file directory.", stack_info=e)
-            workflow_commons.job_report.setApplicationStatus("Failed To Populate Log Dir")
+            self.job_report.setApplicationStatus("Failed To Populate Log Dir")
             return  # Does not fail
 
         logger.debug("%s populated with log files.", workflow_commons.log_dir)
@@ -120,7 +127,7 @@ class UploadLogFile(PostProcessCommand):
             zip_file_name = returnValueOrRaise(_zip_files(workflow_commons.prod_job_id, selected_files))
         except SErrorException as e:
             logger.error("Failed to create zip of log files %s", e)
-            workflow_commons.job_report.setApplicationStatus("Failed to create zip of log files")
+            self.job_report.setApplicationStatus("Failed to create zip of log files")
             return  # Does not fail
 
         logger.info("Transferring zipped log files to the %s", log_se)
@@ -144,19 +151,19 @@ class UploadLogFile(PostProcessCommand):
             try:
                 upload_result_dict = returnValueOrRaise(
                     _uploadLogToFailoverSE(
-                        workflow_commons.failover_request,
+                        self.failover_transfer,
                         zip_file_name,
                         log_lfn_path,
                         workflow_commons.site_name,
                     )
                 )
 
-                uploadedSE = upload_result_dict["uploadedSE"]
+                uploaded_se = upload_result_dict["uploadedSE"]
 
-                logger.info("Uploading logs to failover SE '%s'", uploadedSE)
+                logger.info("Uploading logs to failover SE '%s'", uploaded_se)
                 logger.info("Setting log upload request for %s at %s", log_lfn_path, log_se)
 
-                _createLogUploadRequest(workflow_commons.failover_request.request, log_se, log_lfn_path, uploadedSE)
+                _createLogUploadRequest(self.failover_transfer.request, log_se, log_lfn_path, uploaded_se)
 
                 logger.debug("Successfully created failover request")
 
@@ -164,10 +171,16 @@ class UploadLogFile(PostProcessCommand):
                 logger.error(
                     "Failed to upload logs to all failover destinations (the job will not fail for this reason"
                 )
-                workflow_commons.job_report.setApplicationStatus("Failed To Upload Logs")
+                self.job_report.setApplicationStatus("Failed To Upload Logs")
 
         # While it's the zip file that is uploaded, we set in job parameters its directory,
         # as the .zip is deflated automatically
-        workflow_commons.job_report.setJobParameter(
+        self.job_report.setJobParameter(
             "Log URL", f"<a href=\"{log_https_url.replace('.zip','/')}\">Log file directory</a>"
         )
+
+    def _resolve_clients(self, workflow_commons):
+        super()._resolve_clients(workflow_commons)
+
+        if not self.bk_client:
+            self.bk_client = BookkeepingClient()

@@ -8,18 +8,11 @@ import os
 import shutil
 from enum import Enum
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Optional, Union
 
 from DIRAC import siteName
 from DIRAC.AccountingSystem.Client.DataStoreClient import DataStoreClient
-from DIRAC.Core.Utilities.ReturnValues import SErrorException, returnValueOrRaise
-from DIRAC.DataManagementSystem.Client.DataManager import DataManager
-from DIRAC.DataManagementSystem.Client.FailoverTransfer import FailoverTransfer
 from DIRAC.RequestManagementSystem.Client.Request import Request
-from DIRAC.RequestManagementSystem.private.RequestValidator import RequestValidator
-from DIRAC.TransformationSystem.Client.FileReport import FileReport
-from DIRAC.WorkloadManagementSystem.Client.JobReport import JobReport
-from LHCbDIRAC.BookkeepingSystem.Client.BookkeepingClient import BookkeepingClient
 from LHCbDIRAC.Core.Utilities.XMLSummaries import XMLSummary
 from pydantic import BaseModel, ConfigDict, Field, PrivateAttr
 
@@ -154,21 +147,11 @@ class WorkflowCommons(BaseModel):
     accounting_registers: list = []
     xml_summary_paths: dict[str, str] = {}
     request_dict: dict = {}
-    files_report_files_dict: dict = {}
 
     site_name: str = Field(default_factory=siteName)
     multicore: bool = False
 
     step_status: StepStatus = StepStatus.Done
-
-    # Private attributes
-    _request = PrivateAttr(default=None)
-    _failover_request = PrivateAttr(default=None)
-    _job_report = PrivateAttr(default=None)
-    _file_report = PrivateAttr(default_factory=FileReport)
-    _data_manager = PrivateAttr(default_factory=DataManager)
-    _bk_client = PrivateAttr(default_factory=BookkeepingClient)
-    _dsc = PrivateAttr(default_factory=DataStoreClient)
 
     _logger = PrivateAttr(default=logging.getLogger(__name__))
 
@@ -178,13 +161,13 @@ class WorkflowCommons(BaseModel):
         """WorkflowCommons constructor."""
         super().__init__(**data)
 
-        self._request = Request(fromDict=self.request_dict)
-        self._failover_request = FailoverTransfer(self.request)
-
-        self._job_report = JobReport(self.job_id, source="WorkflowCommons")
-        self._file_report.statusDict = self.file_report_files_dict
-
-    def save(self, job_path: os.PathLike, failed: bool = False) -> None:
+    def save(
+        self,
+        job_path: os.PathLike,
+        request: Union[Request, None] = None,
+        dsc: Union[DataStoreClient, None] = None,
+        failed: bool = False,
+    ) -> None:
         """Update the workflow_commons file to accomodate for the new values."""
         logger.info("Saving workflow commons json file")
         wf_path = Path(job_path).joinpath("workflow_commons.json")
@@ -196,8 +179,10 @@ class WorkflowCommons(BaseModel):
         if failed:
             self.step_status = StepStatus.Failed
 
-        self.request_dict = json.loads(self.request.toJSON()["Value"])
-        self.accounting_registers = self.dsc._DataStoreClient__registersList
+        if request:
+            self.request_dict = json.loads(request.toJSON()["Value"])
+        if dsc:
+            self.accounting_registers.extend(dsc._DataStoreClient__registersList)
 
         try:
             wf_dict = self.model_dump(mode="json")
@@ -221,81 +206,3 @@ class WorkflowCommons(BaseModel):
             wf_dict = json.load(f)
 
         return cls(**wf_dict)
-
-    # Properties
-
-    @property
-    def request(self) -> Request:
-        """Request property getter."""
-        return self._request
-
-    @request.setter
-    def request(self, value: Request) -> None:
-        """Request property setter."""
-        self._request = value
-
-    @property
-    def failover_request(self) -> FailoverTransfer:
-        """FailoverTransfer property getter."""
-        return self._failover_request
-
-    @property
-    def job_report(self) -> JobReport:
-        """JobReport property getter."""
-        return self._job_report
-
-    @property
-    def file_report(self) -> FileReport:
-        """FileReport property getter."""
-        return self._file_report
-
-    @property
-    def data_manager(self) -> DataManager:
-        """DataManager property getter."""
-        return self._data_manager
-
-    @property
-    def bk_client(self) -> BookkeepingClient:
-        """BookkeepingClient property getter."""
-        return self._bk_client
-
-    @property
-    def dsc(self) -> DataStoreClient:
-        """DataStoreClient property getter."""
-        return self._dsc
-
-    def generate_failover_file(self):
-        """Create a request.json file."""
-        try:
-            diset_op = returnValueOrRaise(self.job_report.generateForwardDISET())
-        except SErrorException as e:
-            self._logger.warning("Could not generate Operation for job report", exc_info=e)
-
-        if diset_op:
-            self._logger.info("Populating request with job report information")
-            self.request.addOperation(diset_op)
-
-        if len(self.request):
-            # Try to optimize the request
-            try:
-                returnValueOrRaise(self.request.optimize())
-            except SErrorException as e:
-                self._logger.error("Could not optimize", exc_info=e)
-                self._logger.error("Not failing the job because of that, keep going")
-            except Exception:
-                pass
-
-            # Validate workflow_commons.request
-            returnValueOrRaise(RequestValidator().validate(self.request))
-
-            # Get the self.request as a Json
-            request_json_content = returnValueOrRaise(self.request.toJSON())
-
-            # Write it
-            fname = f"{self.production_id}_{self.prod_job_id}_request.json"
-            with open(fname, "w", encoding="utf-8") as f:
-                json.dump(request_json_content, f)
-        if self.accounting_registers:
-            for register in self.accounting_registers:
-                self.dsc.addRegister(register)
-            self.dsc.commit()

@@ -6,6 +6,11 @@ import random
 import time
 
 from DIRAC.Core.Utilities.ReturnValues import SErrorException, returnValueOrRaise
+from DIRAC.DataManagementSystem.Client.DataManager import DataManager
+from DIRAC.DataManagementSystem.Client.FailoverTransfer import FailoverTransfer
+from DIRAC.RequestManagementSystem.Client.Request import Request
+from DIRAC.TransformationSystem.Client.FileReport import FileReport
+from LHCbDIRAC.BookkeepingSystem.Client.BookkeepingClient import BookkeepingClient
 from LHCbDIRAC.Core.Utilities.ProductionData import constructProductionLFNs
 from LHCbDIRAC.Core.Utilities.ResolveSE import getDestinationSEList
 from LHCbDIRAC.DataManagementSystem.Client.ConsistencyChecks import getFileDescendents
@@ -40,6 +45,11 @@ class UploadOutputData(PostProcessCommand):
         if workflow_commons.step_status == StepStatus.Failed:
             return
 
+        if not self.request:
+            self.request = Request(workflow_commons.request_dict)
+        if not self.failover_transfer:
+            self.failover_transfer = FailoverTransfer(self.request)
+
         failover_se_list = getDestinationSEList("Tier1-Failover", workflow_commons.site_name, outputmode="Any")
         random.shuffle(failover_se_list)
 
@@ -53,7 +63,7 @@ class UploadOutputData(PostProcessCommand):
                 "outputDataFileMask": workflow_commons.output_data_file_mask,
             }
             try:
-                prod_lfn_dict = returnValueOrRaise(constructProductionLFNs(parameters, workflow_commons.bk_client))
+                prod_lfn_dict = returnValueOrRaise(constructProductionLFNs(parameters, self.bk_client))
             except SErrorException as e:
                 raise WorkflowProcessingException("Unable to construct production LFNs") from e
 
@@ -92,8 +102,8 @@ class UploadOutputData(PostProcessCommand):
                 lfns_with_descendents = getFileDescendents(
                     workflow_commons.production_id,
                     workflow_commons.inputs,
-                    dm=workflow_commons.data_manager,
-                    bkClient=workflow_commons.bk_client,
+                    dm=self.data_manager,
+                    bkClient=self.bk_client,
                 )
 
             if not lfns_with_descendents:
@@ -105,9 +115,7 @@ class UploadOutputData(PostProcessCommand):
                     "The files above will be set as 'Processed', other lfns in input will be later reset as Unused"
                 )
 
-                workflow_commons.file_report.setFileStatus(
-                    int(workflow_commons.production_id), lfns_with_descendents, "Processed"
-                )
+                self.file_report.setFileStatus(int(workflow_commons.production_id), lfns_with_descendents, "Processed")
                 raise WorkflowProcessingException("Input Data Already Processed")
 
         bk_files = _getBKFiles()
@@ -119,7 +127,7 @@ class UploadOutputData(PostProcessCommand):
 
             logger.info("Sending BK record:\n%s", bkXML)
             try:
-                returnValueOrRaise(_sendBKReport(workflow_commons.bk_client, workflow_commons.request, bkXML))
+                returnValueOrRaise(_sendBKReport(self.bk_client, self.request, bkXML))
                 logger.info("Bookkeeping report sent for %s", bk_file)
             except SErrorException as e:
                 logger.error("Could not send Bookkeeping XML file to server:\n%s", e)
@@ -141,7 +149,7 @@ class UploadOutputData(PostProcessCommand):
 
             try:
                 returnValueOrRaise(
-                    workflow_commons.failover_request.transferAndRegisterFile(
+                    self.failover_transfer.transferAndRegisterFile(
                         fileName=file_name,
                         localPath=metadata["localpath"],
                         lfn=metadata["filedict"]["LFN"],
@@ -168,7 +176,7 @@ class UploadOutputData(PostProcessCommand):
             file_meta_dict = _createMetaDict(metadata)
             try:
                 returnValueOrRaise(
-                    workflow_commons.failover_request.transferAndRegisterFileFailover(
+                    self.failover_transfer.transferAndRegisterFileFailover(
                         fileName=file_name,
                         localPath=metadata["localpath"],
                         lfn=metadata["filedict"]["LFN"],
@@ -183,14 +191,26 @@ class UploadOutputData(PostProcessCommand):
                 clean_up = True
                 break
 
-        workflow_commons.request = workflow_commons.failover_request.request
+        self.request = self.failover_transfer.request
         if clean_up:
-            workflow_commons.request = _getCleanRequest(workflow_commons.request, final)
+            self.request = _getCleanRequest(self.request, final)
             raise WorkflowProcessingException("Failed to upload output data")
 
         if final:
             report = ", ".join(final)
-            workflow_commons.job_report.setJobParameter("UploadedOutputData", report)
+            self.job_report.setJobParameter("UploadedOutputData", report)
 
         if perform_bk_registration:
-            returnValueOrRaise(_registerLFNs(workflow_commons.request, perform_bk_registration))
+            returnValueOrRaise(_registerLFNs(self.request, perform_bk_registration))
+
+    def _resolve_clients(self, workflow_commons):
+        super()._resolve_clients(workflow_commons)
+
+        if not self.bk_client:
+            self.bk_client = BookkeepingClient()
+
+        if not self.file_report:
+            self.file_report = FileReport()
+
+        if not self.data_manager:
+            self.data_manager = DataManager()
