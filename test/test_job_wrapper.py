@@ -53,15 +53,15 @@ class TestJobWrapper:
 
         # Initialization
         class PreProcessCmd(PreProcessCommand):
-            def execute(job_path, **kwargs):
+            def _execute(job_path, **kwargs):
                 return
 
         class PostProcessCmd(PostProcessCommand):
-            def execute(job_path, **kwargs):
+            def _execute(job_path, **kwargs):
                 return
 
         class DualProcessCmd(PreProcessCommand, PostProcessCommand):
-            def execute(job_path, **kwargs):
+            def _execute(job_path, **kwargs):
                 return
 
         plugin = job_type_testing()
@@ -114,7 +114,7 @@ class TestJobWrapper:
 
         # Initialization and set the execute function to raise an exception
         class Command(PreProcessCommand, PostProcessCommand):
-            def execute(job_path, **kwargs):
+            def _execute(job_path, **kwargs):
                 raise NotImplementedError()
 
         plugin = job_type_testing()
